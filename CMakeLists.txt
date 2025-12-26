@@ -1,43 +1,62 @@
+# 1. 基础配置
 cmake_minimum_required(VERSION 3.15)
-project(DarkRoomEngine)
+project(DarkRoomEngine LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 创建 Core 静态库
-add_library(Core STATIC
-    src/Core/Window.cpp
-)
+# 2. 查找系统包
+find_package(OpenGL REQUIRED)
 
-# 为 Core 库设置头文件路径
+# 3. 定义 Core 库
+add_library(Core STATIC src/Core/Window.cpp)
 target_include_directories(Core PUBLIC
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/vendor/glfw/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm
 )
 
-# 创建可执行文件
-add_executable(HelloWindow src/main.cpp src/glad.c)
-
-# 为可执行文件设置头文件路径
-target_include_directories(HelloWindow PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-)
-
-# 平台相关配置：重点修改 Windows 部分
+# 4. 关键：为 Core 库链接 GLFW 和系统库
 if(WIN32)
-    # 假设库文件已放置在 vendor/glfw/lib/ 下
-    # 关键修改：链接具体的 .a 库文件，注意名称可能不同
-    target_link_libraries(HelloWindow PRIVATE
-        Core
-        ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a  # 或 libglfw3dll.a
+    # 方式A: 链接项目vendor目录下的GLFW（优先确认库文件存在且与编译器兼容）
+    target_link_libraries(Core PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
         opengl32.lib
-        gdi32.lib # MinGW 链接 GLFW 有时需要额外链接 gdi32
+        gdi32.lib
     )
-elseif(APPLE)
-    find_package(OpenGL REQUIRED)
-    find_package(glfw3 REQUIRED)
-    target_link_libraries(HelloWindow PRIVATE Core glfw OpenGL::GL)
 else()
-    find_package(OpenGL REQUIRED)
-    find_package(glfw3 REQUIRED)
-    target_link_libraries(HelloWindow PRIVATE Core glfw OpenGL::GL)
+    # 方式B: 适用于Linux/macOS，尝试查找系统安装的GLFW
+    find_package(glfw3 QUIET)
+    if(glfw3_FOUND)
+        target_link_libraries(Core PUBLIC glfw)
+    else()
+        # 备用方案：链接可能的本地安装或特定路径的GLFW
+        target_link_libraries(Core PUBLIC glfw3)
+    endif()
+    target_link_libraries(Core PUBLIC OpenGL::GL)
 endif()
+
+# 5. 定义 Renderer 库
+add_library(Renderer STATIC src/Renderer/Shader.cpp)
+target_include_directories(Renderer PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm
+)
+target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
+
+add_library(Geometry OBJECT
+    src/Renderer/Geometry.cpp
+    src/Renderer/Cube.cpp
+)
+
+target_include_directories(Geometry PUBLIC 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/vendor/glm
+)
+
+target_link_libraries(Geometry PRIVATE Renderer Core)
+
+# 6. 定义主程序
+add_executable(HelloWindow src/main.cpp src/glad.c $<TARGET_OBJECTS:Geometry>)
+target_include_directories(HelloWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
