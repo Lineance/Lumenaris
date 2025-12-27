@@ -1,10 +1,11 @@
 #include "Core/Window.hpp"
 #include "Core/MouseController.hpp"
-#include "Core/KeyboardController.hpp" // 新增包含
+#include "Core/KeyboardController.hpp"
 #include "Renderer/Shader.hpp"
-#include "Renderer/Geometry.hpp"
+#include "Renderer/Cube.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <vector>
 
 // 摄像机位置和移动参数
 Core::Vec3 cameraPos = Core::Vec3(0.0f, 0.0f, 3.0f);
@@ -14,7 +15,7 @@ int main()
 {
     try
     {
-        Core::Window window(800, 600, "DarkRoom Engine - Input Control");
+        Core::Window window(800, 600, "DarkRoom Engine - Multiple Cubes");
         window.Init();
 
         // 初始化鼠标控制器
@@ -32,25 +33,37 @@ int main()
             window.SetWindowShouldClose(); });
 
         keyboardController.RegisterKeyCallback(GLFW_KEY_SPACE, []()
-                                               {
-                                                   std::cout << "空格键按下，执行跳跃动作" << std::endl;
-                                                   // 这里可以添加跳跃逻辑
-                                               },
-                                               true, 0.5f); // 允许重复，每0.5秒触发一次
+                                               { std::cout << "空格键按下，执行跳跃动作" << std::endl; }, true, 0.5f); // 允许重复，每0.5秒触发一次
 
         keyboardController.RegisterKeyCallback(GLFW_KEY_R, []()
-                                               {
-                                                   std::cout << "R键按下，重新加载场景" << std::endl;
-                                                   // 这里可以添加重新加载逻辑
-                                               });
+                                               { std::cout << "R键按下，重新加载场景" << std::endl; });
 
         Renderer::Shader shader;
         shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag");
 
-        auto cube = Renderer::GeometryFactory::Create("CUBE");
-        if (!cube)
-            throw std::runtime_error("Failed to create cube geometry");
-        cube->Create();
+        // =================================================================
+        // 创建多个立方体（必须手动调用Create()，与原始代码一致）
+        std::vector<Renderer::Cube> cubes;
+        const int cubeCount = 10;
+
+        for (int i = 0; i < cubeCount; ++i)
+        {
+            Renderer::Cube cube;
+            cube.Create(); // ✅ 手动调用，与原始代码行为一致
+
+            // 设置位置：沿X轴一字排开，间距2个单位，中心对称分布
+            cube.SetPosition(glm::vec3(i * 2.0f - cubeCount, 0.0f, 0.0f));
+
+            // 设置颜色：随索引变化产生渐变效果
+            cube.SetColor(glm::vec3(
+                0.5f + i * 0.05f, // R分量递增
+                0.3f + i * 0.07f, // G分量递增
+                0.8f - i * 0.03f  // B分量递减
+                ));
+
+            cubes.push_back(std::move(cube));
+        }
+        // =================================================================
 
         glEnable(GL_DEPTH_TEST);
 
@@ -63,7 +76,6 @@ int main()
 
         while (!window.ShouldClose())
         {
-
             double fps_currentTime = glfwGetTime();
             fps_frameCount++;
 
@@ -73,7 +85,7 @@ int main()
                 // 计算FPS
                 double fps = fps_frameCount / (fps_currentTime - fps_lastTime);
 
-                // 方法1: 在控制台输出
+                // 在控制台输出
                 std::cout << "FPS: " << fps << std::endl;
 
                 // 重置计数器和时间
@@ -122,17 +134,26 @@ int main()
                                           cameraPos + mouseController.GetCameraFront(),
                                           Core::Vec3(0.0f, 1.0f, 0.0f));
 
+            // =================================================================
+            // 渲染所有立方体
             shader.Use();
             shader.SetMat4("projection", projection);
             shader.SetMat4("view", view);
-            shader.SetMat4("model", Core::Mat4(1.0f));
-            shader.SetVec3("objectColor", Core::Vec3(0.5f, 0.5f, 0.5f));
-            shader.SetVec3("lightPos", Core::Vec3(0, 0, 5));
+            shader.SetVec3("viewPos", cameraPos); // 片段着色器需要摄像机位置
+            shader.SetVec3("lightPos", Core::Vec3(0.0f, 5.0f, 5.0f));
 
             glClearColor(0.1f, 0.1f, 0.3f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            cube->Draw();
+            // 遍历绘制每个立方体
+            for (const auto &cube : cubes)
+            {
+                shader.SetMat4("model", cube.GetModelMatrix());
+                shader.SetVec3("objectColor", cube.GetColor());
+
+                cube.Draw();
+            }
+            // =================================================================
 
             window.SwapBuffers();
             window.PollEvents();

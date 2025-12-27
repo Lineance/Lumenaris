@@ -21,6 +21,9 @@ namespace Renderer
         void SetVec3(const std::string &name, const Core::Vec3 &vec) const;
         void SetFloat(const std::string &name, float value) const;
         void SetInt(const std::string &name, int value) const;
+
+        // 新增：获取OpenGL程序ID
+        unsigned int GetID() const { return m_id; }
     };
 
 } // namespace Renderer
