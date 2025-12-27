@@ -5,21 +5,32 @@ in vec3 FragPos;
 in vec3 Normal;
 
 uniform vec3 objectColor;
+uniform vec3 lightColor;
 uniform vec3 lightPos;
-uniform vec3 viewPos; // 摄像机世界坐标，需要从C++代码传入
+uniform vec3 viewPos;
+uniform float shininess; // 光泽度
 
 void main() {
-    // 环境光分量：即使不被直接照亮，也有微弱的光
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * objectColor;
-
-    // 漫反射光照分量：塑造立体感的核心
-    vec3 norm = normalize(Normal); // 归一化法线
-    vec3 lightDir = normalize(lightPos - FragPos); // 计算光源方向（世界空间）
-    float diff = max(dot(norm, lightDir), 0.0); // 点乘计算强度
-    vec3 diffuse = diff * objectColor;
-
-    // 组合最终颜色
-    vec3 result = (ambient + diffuse);
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 viewDir = normalize(viewPos - FragPos);
+    
+    // 环境光
+    float ambientStrength = 0.3;
+    vec3 ambient = ambientStrength * objectColor * lightColor;
+    
+    // 漫反射
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * objectColor * lightColor;
+    
+    // 镜面反射
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+    vec3 specular = spec * lightColor * 0.5;
+    
+    
+    vec3 result = (ambient + diffuse + specular) ;
+    result = clamp(result, 0.0, 1.0);
+    
     FragColor = vec4(result, 1.0);
 }

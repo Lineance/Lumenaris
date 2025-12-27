@@ -139,7 +139,10 @@ int main()
             shader.Use();
             shader.SetMat4("projection", projection);
             shader.SetMat4("view", view);
-            shader.SetVec3("viewPos", cameraPos); // 片段着色器需要摄像机位置
+            shader.SetVec3("viewPos", cameraPos);
+
+            shader.SetFloat("shininess", 32.0f); // 典型材质值
+            shader.SetVec3("lightColor", Core::Vec3(1.0f, 1.0f, 1.0f));
             shader.SetVec3("lightPos", Core::Vec3(0.0f, 5.0f, 5.0f));
 
             glClearColor(0.1f, 0.1f, 0.3f, 1.0f);
