@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <Core/Types.hpp>
+#include <Core/MathTypes.hpp>
 
 namespace Renderer
 {

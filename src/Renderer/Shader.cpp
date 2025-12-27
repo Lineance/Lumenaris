@@ -78,11 +78,13 @@ namespace Renderer
         glDeleteShader(fragment);
     }
 
+    // 对于OpenGL的封装
     void Shader::Use() const
     {
         glUseProgram(m_id);
     }
 
+    // 传递矩阵、向量、整数与浮点数到着色器
     void Shader::SetMat4(const std::string &name, const Core::Mat4 &mat) const
     {
         glUniformMatrix4fv(glGetUniformLocation(m_id, name.c_str()), 1, GL_FALSE, &mat[0][0]);

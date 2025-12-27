@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenGL REQUIRED)
 
 # 3. 定义 Core 库
-add_library(Core STATIC src/Core/Window.cpp)
+add_library(Core STATIC src/Core/Window.cpp src/Core/MouseController.cpp src/Core/KeyboardController.cpp)
 target_include_directories(Core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw/include

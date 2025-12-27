@@ -1,5 +1,5 @@
 #pragma once
-#include <Core/Types.hpp>
+#include <Core/MathTypes.hpp>
 #include <glad/glad.h>
 #include <memory>
 #include <functional>
@@ -17,6 +17,7 @@ namespace Renderer
         virtual ~IGeometry() = default;
     };
 
+    // 工程模式
     class GeometryFactory
     {
         // C++17 inline static，强制编译期定义，避免类外初始化
