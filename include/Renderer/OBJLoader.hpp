@@ -47,6 +47,9 @@ namespace Renderer
         // 获取材质数据
         const std::vector<OBJMaterial>& GetMaterials() const { return m_materials; }
 
+        // 获取面材质索引
+        const std::vector<int>& GetFaceMaterialIndices() const { return m_faceMaterialIndices; }
+
         // 是否有索引数据
         bool HasIndices() const { return !m_indices.empty(); }
 
@@ -75,6 +78,7 @@ namespace Renderer
         std::vector<OBJVertex> m_vertices;
         std::vector<unsigned int> m_indices;
         std::vector<OBJMaterial> m_materials;
+        std::vector<int> m_faceMaterialIndices; // 每个面的材质索引
 
         // 加载状态
         bool m_loaded;

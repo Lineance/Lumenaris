@@ -20,6 +20,9 @@ namespace Renderer
         void Create() override;
         void Draw() const override;
 
+        // 按材质渲染
+        void DrawWithMaterial(int materialIndex) const;
+
         // 加载OBJ文件
         bool LoadFromFile(const std::string& filepath);
 

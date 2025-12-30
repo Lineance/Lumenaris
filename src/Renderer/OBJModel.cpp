@@ -96,32 +96,78 @@ namespace Renderer
 
     void OBJModel::Draw() const
     {
+        DrawWithMaterial(m_currentMaterialIndex);
+    }
+
+    void OBJModel::DrawWithMaterial(int materialIndex) const
+    {
         if (m_vao == 0)
         {
             std::cerr << "OBJModel not created. Call Create() first." << std::endl;
             return;
         }
 
-        // 绑定纹理（如果有的话）
-        if (HasTexture() && m_currentMaterialIndex >= 0 && m_currentMaterialIndex < static_cast<int>(m_textures.size()))
+        // 如果没有材质信息或materialIndex无效，直接绘制整个模型
+        const auto& faceMaterials = m_loader.GetFaceMaterialIndices();
+        if (faceMaterials.empty() || materialIndex < 0)
         {
-            m_textures[m_currentMaterialIndex].Bind(GL_TEXTURE0);
+            // 绑定纹理（如果有的话）
+            if (HasTexture() && materialIndex >= 0 && materialIndex < static_cast<int>(m_textures.size()))
+            {
+                m_textures[materialIndex].Bind(GL_TEXTURE0);
+            }
+
+            // 绑定VAO并绘制整个模型
+            glBindVertexArray(m_vao);
+
+            if (m_loader.HasIndices())
+            {
+                const auto& indices = m_loader.GetIndices();
+                glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
+            }
+            else
+            {
+                const auto& vertices = m_loader.GetVertices();
+                glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+            }
+
+            glBindVertexArray(0);
+
+            // 解绑纹理
+            if (HasTexture())
+            {
+                Texture::UnbindStatic();
+            }
+            return;
         }
 
-        // 绑定VAO并绘制
+        // 分材质渲染 - 遍历所有三角形，只渲染使用指定材质的
         glBindVertexArray(m_vao);
 
         if (m_loader.HasIndices())
         {
-            // 使用索引绘制
             const auto& indices = m_loader.GetIndices();
-            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
-        }
-        else
-        {
-            // 使用顶点数组绘制
-            const auto& vertices = m_loader.GetVertices();
-            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+
+            // 绑定纹理
+            if (HasTexture() && materialIndex >= 0 && materialIndex < static_cast<int>(m_textures.size()))
+            {
+                m_textures[materialIndex].Bind(GL_TEXTURE0);
+            }
+
+            // 遍历每个三角形（3个索引为一组）
+            for (size_t i = 0; i < indices.size(); i += 3)
+            {
+                // 计算对应的face索引（每个face对应一个三角形）
+                size_t faceIndex = i / 3;
+
+                // 检查这个face是否使用指定的材质
+                if (faceIndex < faceMaterials.size() && faceMaterials[faceIndex] == materialIndex)
+                {
+                    // 渲染这个三角形
+                    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT,
+                                 (const void*)(i * sizeof(unsigned int)));
+                }
+            }
         }
 
         glBindVertexArray(0);
@@ -129,7 +175,7 @@ namespace Renderer
         // 解绑纹理
         if (HasTexture())
         {
-            Texture::UnbindStatic(); // 使用静态方法解绑
+            Texture::UnbindStatic();
         }
     }
 

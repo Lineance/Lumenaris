@@ -173,26 +173,33 @@ int main()
             {
                 shader.SetMat4("model", cloudModel.GetModelMatrix());
 
-                // 使用材质信息
-                const auto* material = cloudModel.GetCurrentMaterial();
-                if (material)
+                const auto& materials = cloudModel.GetMaterials();
+                if (!materials.empty())
                 {
-                    // 使用材质的漫反射颜色
-                    shader.SetVec3("objectColor", material->diffuse);
-
-                    // 设置材质的光泽度
-                    shader.SetFloat("shininess", material->shininess > 0.0f ? material->shininess : 32.0f);
-
-                    // 检查是否有纹理
-                    if (cloudModel.HasTexture())
+                    // 对每个材质单独渲染
+                    for (size_t matIdx = 0; matIdx < materials.size(); ++matIdx)
                     {
-                        shader.SetBool("useTexture", true);
-                        // 注意：纹理已经在OBJModel中绑定，这里只需要设置uniform
-                        // 实际的纹理绑定在Draw方法中处理会更合适
-                    }
-                    else
-                    {
-                        shader.SetBool("useTexture", false);
+                        const auto& material = materials[matIdx];
+
+                        // 使用材质的漫反射颜色
+                        shader.SetVec3("objectColor", material.diffuse);
+
+                        // 设置材质的光泽度
+                        shader.SetFloat("shininess", material.shininess > 0.0f ? material.shininess : 32.0f);
+
+                        // 检查是否有纹理
+                        cloudModel.SetCurrentMaterialIndex(static_cast<int>(matIdx));
+                        if (cloudModel.HasTexture())
+                        {
+                            shader.SetBool("useTexture", true);
+                        }
+                        else
+                        {
+                            shader.SetBool("useTexture", false);
+                        }
+
+                        // 渲染使用此材质的面
+                        cloudModel.DrawWithMaterial(static_cast<int>(matIdx));
                     }
                 }
                 else
@@ -201,9 +208,8 @@ int main()
                     shader.SetVec3("objectColor", cloudModel.GetColor());
                     shader.SetBool("useTexture", false);
                     shader.SetFloat("shininess", 32.0f);
+                    cloudModel.Draw();
                 }
-
-                cloudModel.Draw();
             }
 
             window.SwapBuffers();

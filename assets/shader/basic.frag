@@ -28,8 +28,16 @@ void main() {
         baseColor = objectColor;
     }
 
+    // 对暗的材质颜色进行亮度补偿
+    float brightness = dot(baseColor, vec3(0.299, 0.587, 0.114)); // 计算亮度
+    if (brightness < 0.3) {
+        // 如果颜色太暗，进行亮度增强
+        float factor = 0.3 / max(brightness, 0.01);
+        baseColor *= min(factor, 3.0); // 最多增强3倍
+    }
+
     // 环境光 - 增加强度以补偿暗的材质颜色
-    float ambientStrength = 0.6;
+    float ambientStrength = 0.8;
     vec3 ambient = ambientStrength * baseColor * lightColor;
 
     // 漫反射 - 增加强度

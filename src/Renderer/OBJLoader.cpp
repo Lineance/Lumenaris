@@ -73,6 +73,7 @@ namespace Renderer
         // 清空之前的数据
         m_vertices.clear();
         m_indices.clear();
+        m_faceMaterialIndices.clear();
 
         // 用于避免顶点重复的映射
         std::map<std::tuple<int, int, int>, unsigned int> vertexMap;
@@ -84,6 +85,7 @@ namespace Renderer
             // 处理每个face
             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
                 int fv = shape.mesh.num_face_vertices[f];
+                int materialId = shape.mesh.material_ids[f]; // 获取face的材质索引
 
                 // 只处理三角形（fv == 3）或将四边形转换为三角形
                 if (fv == 3 || fv == 4) {
@@ -147,6 +149,7 @@ namespace Renderer
                     // 如果是三角形，直接添加索引
                     if (fv == 3) {
                         m_indices.insert(m_indices.end(), faceIndices.begin(), faceIndices.end());
+                        m_faceMaterialIndices.push_back(materialId);
                     }
                     // 如果是四边形，拆分为两个三角形
                     else if (fv == 4) {
@@ -157,6 +160,10 @@ namespace Renderer
                         m_indices.push_back(faceIndices[2]);
                         m_indices.push_back(faceIndices[3]);
                         m_indices.push_back(faceIndices[0]);
+
+                        // 四边形拆分为两个三角形，都使用相同的材质
+                        m_faceMaterialIndices.push_back(materialId);
+                        m_faceMaterialIndices.push_back(materialId);
                     }
                 }
 
@@ -197,6 +204,7 @@ namespace Renderer
         m_vertices.clear();
         m_indices.clear();
         m_materials.clear();
+        m_faceMaterialIndices.clear();
         m_loaded = false;
         m_basePath.clear();
     }
