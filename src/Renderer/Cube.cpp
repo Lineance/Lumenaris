@@ -7,56 +7,85 @@ namespace Renderer
 
     void Cube::Create()
     {
-        // 恢复原始实现：顶点数据在函数内部定义
-        std::vector<float> vertices = {
-            // 位置             法线            UV
+        std::vector<float> vertices;
+
+        // 定义6个面的顶点数据：位置、法线、UV坐标
+        // 每个面使用两个三角形，共6个顶点
+        struct FaceData {
+            glm::vec3 normal;    // 面的法线
+            glm::vec3 vertices[4]; // 4个顶点位置（按逆时针顺序）
+        };
+
+        FaceData faces[6] = {
             // 前面 (Z负方向)
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-            0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
-            0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-            0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-            -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-
+            {glm::vec3(0.0f, 0.0f, -1.0f), {
+                glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, -0.5f, -0.5f),
+                glm::vec3(0.5f, 0.5f, -0.5f), glm::vec3(-0.5f, 0.5f, -0.5f)
+            }},
             // 后面 (Z正方向)
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-            0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-            0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-            -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-
+            {glm::vec3(0.0f, 0.0f, 1.0f), {
+                glm::vec3(-0.5f, -0.5f, 0.5f), glm::vec3(-0.5f, 0.5f, 0.5f),
+                glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0.5f, -0.5f, 0.5f)
+            }},
             // 左面 (X负方向)
-            -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-            -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-            -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
+            {glm::vec3(-1.0f, 0.0f, 0.0f), {
+                glm::vec3(-0.5f, 0.5f, 0.5f), glm::vec3(-0.5f, 0.5f, -0.5f),
+                glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(-0.5f, -0.5f, 0.5f)
+            }},
             // 右面 (X正方向)
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-            0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-            0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
+            {glm::vec3(1.0f, 0.0f, 0.0f), {
+                glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0.5f, -0.5f, 0.5f),
+                glm::vec3(0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, -0.5f)
+            }},
             // 下面 (Y负方向)
-            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
-            0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-            0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-            -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-
+            {glm::vec3(0.0f, -1.0f, 0.0f), {
+                glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, -0.5f, -0.5f),
+                glm::vec3(0.5f, -0.5f, 0.5f), glm::vec3(-0.5f, -0.5f, 0.5f)
+            }},
             // 上面 (Y正方向)
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-            0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-            0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-            -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
+            {glm::vec3(0.0f, 1.0f, 0.0f), {
+                glm::vec3(-0.5f, 0.5f, -0.5f), glm::vec3(-0.5f, 0.5f, 0.5f),
+                glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0.5f, 0.5f, -0.5f)
+            }}
+        };
+
+        // 定义UV坐标（每个面的4个顶点）
+        glm::vec2 uvCoords[4] = {
+            glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f),
+            glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f)
+        };
+
+        // 使用循环生成所有顶点数据
+        for (int face = 0; face < 6; ++face) {
+            const FaceData& faceData = faces[face];
+
+            // 每个面使用两个三角形，共6个顶点
+            // 三角形1: vertices[0], vertices[1], vertices[2]
+            // 三角形2: vertices[2], vertices[3], vertices[0]
+
+            // 三角形1
+            for (int i = 0; i < 3; ++i) {
+                const glm::vec3& pos = (i == 2) ? faceData.vertices[2] : faceData.vertices[i];
+                const glm::vec2& uv = (i == 2) ? uvCoords[2] : uvCoords[i];
+
+                // 添加位置、法线、UV坐标
+                vertices.insert(vertices.end(), {pos.x, pos.y, pos.z});
+                vertices.insert(vertices.end(), {faceData.normal.x, faceData.normal.y, faceData.normal.z});
+                vertices.insert(vertices.end(), {uv.x, uv.y});
+            }
+
+            // 三角形2
+            for (int i = 0; i < 3; ++i) {
+                int vertexIndex = (i == 0) ? 2 : (i == 1) ? 3 : 0;
+                const glm::vec3& pos = faceData.vertices[vertexIndex];
+                const glm::vec2& uv = uvCoords[vertexIndex];
+
+                // 添加位置、法线、UV坐标
+                vertices.insert(vertices.end(), {pos.x, pos.y, pos.z});
+                vertices.insert(vertices.end(), {faceData.normal.x, faceData.normal.y, faceData.normal.z});
+                vertices.insert(vertices.end(), {uv.x, uv.y});
+            }
+        }
 
         glGenVertexArrays(1, &m_vao);
         glGenBuffers(1, &m_vbo);
