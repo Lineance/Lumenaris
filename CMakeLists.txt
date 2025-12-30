@@ -47,6 +47,7 @@ target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 add_library(Geometry OBJECT
     src/Renderer/Geometry.cpp
     src/Renderer/Cube.cpp
+    src/Renderer/Sphere.cpp
 )
 
 target_include_directories(Geometry PUBLIC 
