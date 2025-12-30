@@ -8,6 +8,13 @@ namespace Core
     static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     {
         glViewport(0, 0, width, height); // 调整OpenGL视口
+
+        // 更新Window实例的成员变量
+        Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
+        if (win)
+        {
+            win->SetSize(width, height);
+        }
     }
 
     // 构造函数：仅初始化成员变量，不执行实际创建操作，延迟初始化窗口
@@ -47,6 +54,7 @@ namespace Core
         }
 
         glfwMakeContextCurrent(m_window);                                    // 设置为当前OpenGL上下文
+        glfwSetWindowUserPointer(m_window, this);                         // 设置用户指针以便回调函数访问
         glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback); // 设置窗口回调
 
         // 初始化GLAD，加载OpenGL函数指针

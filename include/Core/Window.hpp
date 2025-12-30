@@ -25,6 +25,9 @@ namespace Core
         // 获取宽高
         int GetWidth() const { return m_width; }
         int GetHeight() const { return m_height; }
+
+        // 设置宽高（用于窗口大小变化回调）
+        void SetSize(int width, int height) { m_width = width; m_height = height; }
     };
 
 } // namespace Core
