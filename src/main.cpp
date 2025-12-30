@@ -144,8 +144,10 @@ int main()
                 cameraPos += moveDirection * moveSpeed;
             }
 
+            // 动态计算窗口宽高比以适应窗口大小变化
+            float aspectRatio = static_cast<float>(window.GetWidth()) / static_cast<float>(window.GetHeight());
             glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
-                                                    1920.0f / 1080.0f, 0.1f, 100.0f);
+                                                    aspectRatio, 0.1f, 100.0f);
             glm::mat4 view = glm::lookAt(cameraPos,
                                          cameraPos + mouseController.GetCameraFront(),
                                          glm::vec3(0.0f, 1.0f, 0.0f));
