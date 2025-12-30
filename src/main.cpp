@@ -15,12 +15,6 @@
 Core::Vec3 cameraPos = Core::Vec3(0.0f, 0.0f, 3.0f);
 float cameraSpeed = 5.0f;
 
-// Shader parameters
-std::atomic<float> grainSize{0.5f};
-std::atomic<float> grainIntensity{0.4f};
-std::atomic<float> blurAmount{0.2f};
-std::atomic<float> threshold{0.5f};
-std::atomic<float> pixelBlockSize{4.0f};
 
 int main()
 {
@@ -45,32 +39,6 @@ int main()
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
                                                { exit(0); });
 
-        keyboardController.RegisterKeyCallback(GLFW_KEY_U, []()
-                                               {
-            pixelBlockSize.store(glm::min(50.0f, pixelBlockSize.load() + 1.0f));
-            std::cout << "[PixelBlock]: " << pixelBlockSize.load() << std::endl; });
-        keyboardController.RegisterKeyCallback(GLFW_KEY_J, []()
-                                               {
-            pixelBlockSize.store(glm::max(1.0f, pixelBlockSize.load() - 1.0f));
-            std::cout << "[PixelBlock]: " << pixelBlockSize.load() << std::endl; });
-
-        keyboardController.RegisterKeyCallback(GLFW_KEY_I, []()
-                                               {
-            grainIntensity.store(glm::min(1.0f, grainIntensity.load() + 0.05f));
-            std::cout << "[Intensity]: " << grainIntensity.load() << std::endl; });
-        keyboardController.RegisterKeyCallback(GLFW_KEY_K, []()
-                                               {
-            grainIntensity.store(glm::max(0.0f, grainIntensity.load() - 0.05f));
-            std::cout << "[Intensity]: " << grainIntensity.load() << std::endl; });
-
-        keyboardController.RegisterKeyCallback(GLFW_KEY_T, []()
-                                               {
-            threshold.store(glm::min(0.9f, threshold.load() + 0.05f));
-            std::cout << "[Threshold]: " << threshold.load() << std::endl; });
-        keyboardController.RegisterKeyCallback(GLFW_KEY_G, []()
-                                               {
-            threshold.store(glm::max(0.1f, threshold.load() - 0.05f));
-            std::cout << "[Threshold]: " << threshold.load() << std::endl; });
 
         Renderer::Shader shader;
         shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag");
@@ -87,6 +55,12 @@ int main()
             spheres.push_back(std::move(sphere));
         }
 
+        // 创建光源可视化立方体
+        Renderer::Cube lightCube;
+        lightCube.Create();
+        lightCube.SetColor(glm::vec3(1.0f, 1.0f, 0.8f)); // 暖白色光颜色
+        lightCube.SetScale(0.3f); // 小立方体
+
         glEnable(GL_DEPTH_TEST);
 
         float lastTime = static_cast<float>(glfwGetTime());
@@ -94,7 +68,7 @@ int main()
         int fps_frameCount = 0;
 
         // Initial parameters
-        std::cout << "[Controls] U/J: PixelBlock I/K: Intensity T/G: Threshold ESC: Exit\n";
+        std::cout << "[Controls] WASD: Move Q/E: Up/Down ESC: Exit\n";
 
         while (!window.ShouldClose())
         {
@@ -105,11 +79,7 @@ int main()
             {
                 double fps = fps_frameCount / (fps_currentTime - fps_lastTime);
 
-                std::cout << "\r[FPS: " << std::fixed << std::setprecision(1) << fps
-                          << "] [Size: " << std::setprecision(3) << grainSize.load()
-                          << "] [Inten: " << std::setprecision(2) << grainIntensity.load()
-                          << "] [Blur: " << blurAmount.load()
-                          << "] [Thresh: " << threshold.load() << "]   ";
+                std::cout << "\r[FPS: " << std::fixed << std::setprecision(1) << fps << "]   ";
                 std::cout.flush();
 
                 fps_frameCount = 0;
@@ -132,6 +102,10 @@ int main()
                 moveDirection -= glm::normalize(glm::cross(mouseController.GetCameraFront(), Core::Vec3(0.0f, 1.0f, 0.0f)));
             if (keyboardController.IsKeyPressed(GLFW_KEY_D))
                 moveDirection += glm::normalize(glm::cross(mouseController.GetCameraFront(), Core::Vec3(0.0f, 1.0f, 0.0f)));
+            if (keyboardController.IsKeyPressed(GLFW_KEY_Q))
+                moveDirection -= Core::Vec3(0.0f, 1.0f, 0.0f); // 向下飞行
+            if (keyboardController.IsKeyPressed(GLFW_KEY_E))
+                moveDirection += Core::Vec3(0.0f, 1.0f, 0.0f); // 向上飞行
             if (glm::length(moveDirection) > 0.0f)
             {
                 moveDirection = glm::normalize(moveDirection);
@@ -149,26 +123,33 @@ int main()
             shader.SetMat4("projection", projection);
             shader.SetMat4("view", view);
 
-            shader.SetVec3("lightPos", Core::Vec3(5.0f, 5.0f, 5.0f));
+            // Light position and visualization
+            Core::Vec3 lightPos = Core::Vec3(5.0f, 5.0f, 5.0f);
+            shader.SetVec3("lightPos", lightPos);
+
+            // Update light cube position
+            lightCube.SetPosition(lightPos);
+
             shader.SetVec3("lightColor", Core::Vec3(1.0f, 1.0f, 1.0f));
             shader.SetVec3("viewPos", cameraPos);
             shader.SetFloat("shininess", 32.0f);
 
-            shader.SetFloat("grainSize", grainSize.load());
-            shader.SetFloat("grainIntensity", grainIntensity.load());
-            shader.SetFloat("blurAmount", blurAmount.load());
-            shader.SetFloat("threshold", threshold.load());
-            shader.SetFloat("pixelBlockSize", pixelBlockSize.load());
 
             glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            // Render spheres
             for (const auto &sphere : spheres)
             {
                 shader.SetMat4("model", sphere.GetModelMatrix());
                 shader.SetVec3("objectColor", sphere.GetColor());
                 sphere.Draw();
             }
+
+            // Render light cube
+            shader.SetMat4("model", lightCube.GetModelMatrix());
+            shader.SetVec3("objectColor", lightCube.GetColor());
+            lightCube.Draw();
 
             window.SwapBuffers();
             window.PollEvents();
