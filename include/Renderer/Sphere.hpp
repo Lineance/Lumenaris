@@ -1,11 +1,11 @@
 #pragma once
-#include "Renderer/Geometry.hpp"
+#include "Renderer/Mesh.hpp"
 #include "Core/GLM.hpp"
 
 namespace Renderer
 {
 
-    class Sphere : public IGeometry
+    class Sphere : public IMesh
     {
     public:
         // 构造函数，设置球体参数

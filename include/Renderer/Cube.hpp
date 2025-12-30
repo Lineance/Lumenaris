@@ -1,11 +1,11 @@
 #pragma once
-#include "Renderer/Geometry.hpp"
+#include "Renderer/Mesh.hpp"
 #include "Core/GLM.hpp"
 
 namespace Renderer
 {
 
-    class Cube : public IGeometry
+    class Cube : public IMesh
     {
     public:
         // 保持原始接口不变

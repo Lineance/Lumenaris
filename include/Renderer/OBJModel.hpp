@@ -1,5 +1,5 @@
 #pragma once
-#include "Renderer/Geometry.hpp"
+#include "Renderer/Mesh.hpp"
 #include "Renderer/OBJLoader.hpp"
 #include "Core/GLM.hpp"
 #include <string>
@@ -7,7 +7,7 @@
 namespace Renderer
 {
 
-    class OBJModel : public IGeometry
+    class OBJModel : public IMesh
     {
     public:
         OBJModel();

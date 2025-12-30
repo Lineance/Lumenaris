@@ -1,5 +1,5 @@
 # OpenGL学习项目构建配置
-# 支持几何体渲染、OBJ模型加载、GLM数学库封装
+# 支持网格渲染、OBJ模型加载、GLM数学库封装
 
 cmake_minimum_required(VERSION 3.15)
 project(DarkRoomEngine LANGUAGES C CXX)
@@ -52,9 +52,9 @@ target_include_directories(Renderer PUBLIC
 )
 target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 
-# 几何体库 - 支持基础几何体和OBJ模型加载
+# 网格库 - 支持基础网格和OBJ模型加载
 add_library(Geometry OBJECT
-    src/Renderer/Geometry.cpp
+    src/Renderer/Mesh.cpp
     src/Renderer/Cube.cpp
     src/Renderer/Sphere.cpp
     src/Renderer/OBJLoader.cpp    # OBJ文件解析器
@@ -78,7 +78,7 @@ target_include_directories(HelloWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inclu
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 
 # 项目特性：
-# - 3D几何体渲染 (Cube, Sphere, OBJ模型)
+# - 3D网格渲染 (Cube, Sphere, OBJ模型)
 # - 实时着色器切换 (Phong, Toon, Glass, etc.)
 # - 3D相机控制 (WASD移动 + 鼠标旋转)
 # - GLM数学库统一封装
