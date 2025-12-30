@@ -25,6 +25,10 @@ namespace Renderer
         // 获取文件所在目录，用于加载材质文件
         fs::path path(filepath);
         m_basePath = path.parent_path().string();
+        // 确保basePath以路径分隔符结尾
+        if (!m_basePath.empty() && m_basePath.back() != fs::path::preferred_separator) {
+            m_basePath += fs::path::preferred_separator;
+        }
 
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
