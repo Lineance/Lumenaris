@@ -1,3 +1,5 @@
 build/
 CMakeFiles/
-vendor
+vendor/
+assets/models
+assets/picture

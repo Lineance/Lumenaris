@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <map>
 #include "Core/GLM.hpp"
+#include "Renderer/tiny_obj_loader.h"
 
 namespace Renderer
 {
@@ -11,6 +13,20 @@ namespace Renderer
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texCoord;
+    };
+
+    struct OBJMaterial
+    {
+        std::string name;
+        glm::vec3 ambient;     // Ka
+        glm::vec3 diffuse;     // Kd
+        glm::vec3 specular;    // Ks
+        float shininess;       // Ns
+        float dissolve;        // d/Tr (1.0 = opaque, 0.0 = transparent)
+        std::string ambientTexname;
+        std::string diffuseTexname;
+        std::string specularTexname;
+        std::string normalTexname;
     };
 
     class OBJLoader
@@ -25,48 +41,41 @@ namespace Renderer
         // 获取解析后的顶点数据
         const std::vector<OBJVertex>& GetVertices() const { return m_vertices; }
 
-        // 获取索引数据（如果有的话）
+        // 获取索引数据
         const std::vector<unsigned int>& GetIndices() const { return m_indices; }
+
+        // 获取材质数据
+        const std::vector<OBJMaterial>& GetMaterials() const { return m_materials; }
 
         // 是否有索引数据
         bool HasIndices() const { return !m_indices.empty(); }
+
+        // 获取顶点数量
+        size_t GetVertexCount() const { return m_vertices.size(); }
+
+        // 获取材质数量
+        size_t GetMaterialCount() const { return m_materials.size(); }
 
         // 清理数据
         void Clear();
 
     private:
-        // 解析OBJ文件行
-        void ParseLine(const std::string& line);
+        // 将tinyobj数据转换为我们的顶点格式
+        void ConvertTinyObjData(const tinyobj::attrib_t& attrib,
+                               const std::vector<tinyobj::shape_t>& shapes,
+                               const std::vector<tinyobj::material_t>& materials);
 
-        // 解析顶点位置 (v x y z)
-        void ParseVertex(const std::string& line);
-
-        // 解析纹理坐标 (vt u v)
-        void ParseTexCoord(const std::string& line);
-
-        // 解析法线 (vn x y z)
-        void ParseNormal(const std::string& line);
-
-        // 解析面 (f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ...)
-        void ParseFace(const std::string& line);
-
-        // 从字符串中提取浮点数
-        std::vector<float> ExtractFloats(const std::string& str, int count);
-
-        // 从面定义中提取索引
-        glm::ivec3 ExtractFaceIndices(const std::string& faceStr);
-
-        // 原始数据存储
-        std::vector<glm::vec3> m_positions;    // 顶点位置
-        std::vector<glm::vec2> m_texCoords;    // 纹理坐标
-        std::vector<glm::vec3> m_normals;      // 法线
+        // 转换材质数据
+        void ConvertMaterials(const std::vector<tinyobj::material_t>& tinyMaterials);
 
         // 最终用于渲染的顶点数据
         std::vector<OBJVertex> m_vertices;
         std::vector<unsigned int> m_indices;
+        std::vector<OBJMaterial> m_materials;
 
-        // 用于避免重复顶点的映射
-        std::vector<std::vector<std::vector<unsigned int>>> m_vertexCache;
+        // 加载状态
+        bool m_loaded;
+        std::string m_basePath;
     };
 
 } // namespace Renderer

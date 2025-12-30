@@ -1,17 +1,16 @@
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "Renderer/OBJLoader.hpp"
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <algorithm>
-#include <unordered_map>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace Renderer
 {
 
     OBJLoader::OBJLoader()
+        : m_loaded(false)
     {
-        // 初始化顶点缓存
-        m_vertexCache.resize(3); // position, texcoord, normal
     }
 
     OBJLoader::~OBJLoader()
@@ -21,238 +20,181 @@ namespace Renderer
 
     bool OBJLoader::LoadFromFile(const std::string& filepath)
     {
-        std::ifstream file(filepath);
-        if (!file.is_open())
-        {
-            std::cerr << "Failed to open OBJ file: " << filepath << std::endl;
+        Clear();
+
+        // 获取文件所在目录，用于加载材质文件
+        fs::path path(filepath);
+        m_basePath = path.parent_path().string();
+
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+
+        std::string err;
+
+        // 使用tinyobjloader加载OBJ文件
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
+                                   filepath.c_str(), m_basePath.c_str(), true);
+
+        // 检查错误和警告信息（tinyobj将警告也包含在err中）
+        if (!err.empty()) {
+            // 检查是否包含警告信息
+            if (err.find("WARN") != std::string::npos) {
+                std::cout << "OBJ Loader Warning: " << err << std::endl;
+            } else {
+                std::cerr << "OBJ Loader Error: " << err << std::endl;
+            }
+        }
+
+        if (!ret) {
+            std::cerr << "Failed to load OBJ file: " << filepath << std::endl;
             return false;
         }
 
-        Clear();
+        // 转换tinyobj数据为我们的格式
+        ConvertTinyObjData(attrib, shapes, materials);
+        ConvertMaterials(materials);
 
-        std::string line;
-        while (std::getline(file, line))
-        {
-            // 移除行首行尾的空白字符
-            line.erase(line.begin(), std::find_if(line.begin(), line.end(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }));
-            line.erase(std::find_if(line.rbegin(), line.rend(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }).base(), line.end());
+        m_loaded = true;
 
-            if (line.empty() || line[0] == '#')
-                continue;
-
-            ParseLine(line);
-        }
-
-        file.close();
-
-        std::cout << "OBJ file loaded successfully: " << filepath << std::endl;
-        std::cout << "Vertices: " << m_positions.size() << std::endl;
-        std::cout << "TexCoords: " << m_texCoords.size() << std::endl;
-        std::cout << "Normals: " << m_normals.size() << std::endl;
-        std::cout << "Final vertices: " << m_vertices.size() << std::endl;
+        // OBJ文件加载成功
 
         return true;
     }
 
-    void OBJLoader::ParseLine(const std::string& line)
+    void OBJLoader::ConvertTinyObjData(const tinyobj::attrib_t& attrib,
+                                      const std::vector<tinyobj::shape_t>& shapes,
+                                      const std::vector<tinyobj::material_t>& materials)
     {
-        std::istringstream iss(line);
-        std::string prefix;
-        iss >> prefix;
+        // 清空之前的数据
+        m_vertices.clear();
+        m_indices.clear();
 
-        if (prefix == "v")
-        {
-            ParseVertex(line);
-        }
-        else if (prefix == "vt")
-        {
-            ParseTexCoord(line);
-        }
-        else if (prefix == "vn")
-        {
-            ParseNormal(line);
-        }
-        else if (prefix == "f")
-        {
-            ParseFace(line);
-        }
-        // 忽略其他行（如材质定义等）
-    }
+        // 用于避免顶点重复的映射
+        std::map<std::tuple<int, int, int>, unsigned int> vertexMap;
 
-    void OBJLoader::ParseVertex(const std::string& line)
-    {
-        auto values = ExtractFloats(line, 3);
-        if (values.size() >= 3)
-        {
-            m_positions.emplace_back(values[0], values[1], values[2]);
-        }
-    }
+        // 处理每个shape
+        for (const auto& shape : shapes) {
+            size_t index_offset = 0;
 
-    void OBJLoader::ParseTexCoord(const std::string& line)
-    {
-        auto values = ExtractFloats(line, 2);
-        if (values.size() >= 2)
-        {
-            m_texCoords.emplace_back(values[0], values[1]);
-        }
-    }
+            // 处理每个face
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                int fv = shape.mesh.num_face_vertices[f];
 
-    void OBJLoader::ParseNormal(const std::string& line)
-    {
-        auto values = ExtractFloats(line, 3);
-        if (values.size() >= 3)
-        {
-            m_normals.emplace_back(values[0], values[1], values[2]);
-        }
-    }
+                // 只处理三角形（fv == 3）或将四边形转换为三角形
+                if (fv == 3 || fv == 4) {
+                    // 为每个三角形创建顶点
+                    std::vector<unsigned int> faceIndices;
 
-    void OBJLoader::ParseFace(const std::string& line)
-    {
-        std::istringstream iss(line.substr(1)); // 跳过'f'
-        std::string vertexStr;
-        std::vector<glm::ivec3> faceIndices;
+                    for (size_t v = 0; v < fv; v++) {
+                        tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
 
-        while (iss >> vertexStr)
-        {
-            glm::ivec3 indices = ExtractFaceIndices(vertexStr);
-            faceIndices.push_back(indices);
-        }
+                        // 创建顶点键（位置、法线、纹理坐标索引）
+                        auto key = std::make_tuple(idx.vertex_index, idx.normal_index, idx.texcoord_index);
 
-        // 只处理三角形（3个顶点）或四边形（4个顶点，拆分为2个三角形）
-        if (faceIndices.size() >= 3)
-        {
-            // 为三角形的每个顶点创建顶点数据
-            for (size_t i = 0; i < 3; ++i)
-            {
-                glm::ivec3 idx = faceIndices[i];
+                        // 检查是否已经创建过这个顶点
+                        auto it = vertexMap.find(key);
+                        if (it != vertexMap.end()) {
+                            // 已经存在的顶点，直接使用索引
+                            faceIndices.push_back(it->second);
+                        } else {
+                            // 创建新顶点
+                            OBJVertex vertex;
 
-                OBJVertex vertex;
-                vertex.position = m_positions[idx.x - 1]; // OBJ索引从1开始
+                            // 位置（tinyobj使用float数组，每个顶点3个float）
+                            if (idx.vertex_index >= 0) {
+                                vertex.position = glm::vec3(
+                                    attrib.vertices[3 * idx.vertex_index + 0],
+                                    attrib.vertices[3 * idx.vertex_index + 1],
+                                    attrib.vertices[3 * idx.vertex_index + 2]
+                                );
+                            }
 
-                if (idx.y > 0 && idx.y <= static_cast<int>(m_texCoords.size()))
-                {
-                    vertex.texCoord = m_texCoords[idx.y - 1];
-                }
-                else
-                {
-                    vertex.texCoord = glm::vec2(0.0f, 0.0f);
-                }
+                            // 法线
+                            if (idx.normal_index >= 0) {
+                                vertex.normal = glm::vec3(
+                                    attrib.normals[3 * idx.normal_index + 0],
+                                    attrib.normals[3 * idx.normal_index + 1],
+                                    attrib.normals[3 * idx.normal_index + 2]
+                                );
+                            } else {
+                                // 如果没有法线，设置为默认值
+                                vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+                            }
 
-                if (idx.z > 0 && idx.z <= static_cast<int>(m_normals.size()))
-                {
-                    vertex.normal = m_normals[idx.z - 1];
-                }
-                else
-                {
-                    // 如果没有法线，使用默认法线
-                    vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-                }
+                            // 纹理坐标（tinyobj使用float数组，每个纹理坐标2个float）
+                            if (idx.texcoord_index >= 0) {
+                                vertex.texCoord = glm::vec2(
+                                    attrib.texcoords[2 * idx.texcoord_index + 0],
+                                    attrib.texcoords[2 * idx.texcoord_index + 1]
+                                );
+                            } else {
+                                vertex.texCoord = glm::vec2(0.0f, 0.0f);
+                            }
 
-                m_vertices.push_back(vertex);
-            }
-
-            // 如果是四边形，添加第二个三角形
-            if (faceIndices.size() == 4)
-            {
-                // 第二个三角形：顶点2、3、0（相对于面的顶点索引）
-                for (int i : {1, 2, 3}) // 对应原始顶点索引1, 2, 3（0-based: 1,2,3）
-                {
-                    int vertexIndex = (i == 3) ? 0 : i; // 3->0, 1->1, 2->2
-                    glm::ivec3 idx = faceIndices[vertexIndex];
-
-                    OBJVertex vertex;
-                    vertex.position = m_positions[idx.x - 1];
-
-                    if (idx.y > 0 && idx.y <= static_cast<int>(m_texCoords.size()))
-                    {
-                        vertex.texCoord = m_texCoords[idx.y - 1];
-                    }
-                    else
-                    {
-                        vertex.texCoord = glm::vec2(0.0f, 0.0f);
+                            // 添加顶点到数组
+                            unsigned int newIndex = static_cast<unsigned int>(m_vertices.size());
+                            m_vertices.push_back(vertex);
+                            vertexMap[key] = newIndex;
+                            faceIndices.push_back(newIndex);
+                        }
                     }
 
-                    if (idx.z > 0 && idx.z <= static_cast<int>(m_normals.size()))
-                    {
-                        vertex.normal = m_normals[idx.z - 1];
+                    // 如果是三角形，直接添加索引
+                    if (fv == 3) {
+                        m_indices.insert(m_indices.end(), faceIndices.begin(), faceIndices.end());
                     }
-                    else
-                    {
-                        vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-                    }
+                    // 如果是四边形，拆分为两个三角形
+                    else if (fv == 4) {
+                        m_indices.push_back(faceIndices[0]);
+                        m_indices.push_back(faceIndices[1]);
+                        m_indices.push_back(faceIndices[2]);
 
-                    m_vertices.push_back(vertex);
+                        m_indices.push_back(faceIndices[2]);
+                        m_indices.push_back(faceIndices[3]);
+                        m_indices.push_back(faceIndices[0]);
+                    }
                 }
+
+                index_offset += fv;
             }
         }
     }
 
-    std::vector<float> OBJLoader::ExtractFloats(const std::string& str, int count)
+    void OBJLoader::ConvertMaterials(const std::vector<tinyobj::material_t>& tinyMaterials)
     {
-        std::vector<float> result;
-        std::istringstream iss(str);
-        std::string token;
+        m_materials.clear();
 
-        // 跳过第一个token（前缀）
-        iss >> token;
+        for (const auto& tinyMat : tinyMaterials) {
+            OBJMaterial mat;
 
-        for (int i = 0; i < count && iss >> token; ++i)
-        {
-            try
-            {
-                result.push_back(std::stof(token));
-            }
-            catch (const std::exception&)
-            {
-                break;
-            }
+            mat.name = tinyMat.name;
+
+            // 转换颜色值
+            mat.ambient = glm::vec3(tinyMat.ambient[0], tinyMat.ambient[1], tinyMat.ambient[2]);
+            mat.diffuse = glm::vec3(tinyMat.diffuse[0], tinyMat.diffuse[1], tinyMat.diffuse[2]);
+            mat.specular = glm::vec3(tinyMat.specular[0], tinyMat.specular[1], tinyMat.specular[2]);
+
+            mat.shininess = tinyMat.shininess;
+            mat.dissolve = tinyMat.dissolve;
+
+            // 纹理文件名
+            mat.ambientTexname = tinyMat.ambient_texname;
+            mat.diffuseTexname = tinyMat.diffuse_texname;
+            mat.specularTexname = tinyMat.specular_texname;
+            mat.normalTexname = tinyMat.normal_texname;
+
+            m_materials.push_back(mat);
         }
-
-        return result;
-    }
-
-    glm::ivec3 OBJLoader::ExtractFaceIndices(const std::string& faceStr)
-    {
-        glm::ivec3 indices(-1, -1, -1); // -1表示未设置
-        std::istringstream iss(faceStr);
-        std::string token;
-
-        // OBJ面格式：position/texture/normal 或 position//normal 或 position/texture
-        if (std::getline(iss, token, '/'))
-        {
-            indices.x = std::stoi(token); // position index
-        }
-
-        if (std::getline(iss, token, '/'))
-        {
-            if (!token.empty())
-            {
-                indices.y = std::stoi(token); // texture index
-            }
-        }
-
-        if (std::getline(iss, token, '/'))
-        {
-            if (!token.empty())
-            {
-                indices.z = std::stoi(token); // normal index
-            }
-        }
-
-        return indices;
     }
 
     void OBJLoader::Clear()
     {
-        m_positions.clear();
-        m_texCoords.clear();
-        m_normals.clear();
         m_vertices.clear();
         m_indices.clear();
+        m_materials.clear();
+        m_loaded = false;
+        m_basePath.clear();
     }
 
 } // namespace Renderer

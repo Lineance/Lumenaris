@@ -23,7 +23,7 @@ namespace Renderer
 
         if (!vFile.is_open() || !fFile.is_open())
         {
-            throw std::runtime_error("Failed to open shader files");
+            throw std::runtime_error("Failed to open shader files: " + vertexPath + " or " + fragmentPath);
         }
 
         std::stringstream vStream, fStream;

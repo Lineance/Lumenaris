@@ -35,6 +35,12 @@ namespace Renderer
         // 获取顶点数量
         size_t GetVertexCount() const { return m_loader.GetVertices().size(); }
 
+        // 获取材质数量
+        size_t GetMaterialCount() const { return m_loader.GetMaterials().size(); }
+
+        // 获取材质数据
+        const std::vector<OBJMaterial>& GetMaterials() const { return m_loader.GetMaterials(); }
+
     private:
         // OpenGL缓冲区对象
         unsigned int m_vao = 0;

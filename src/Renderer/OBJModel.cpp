@@ -44,12 +44,25 @@ namespace Renderer
         glGenVertexArrays(1, &m_vao);
         glGenBuffers(1, &m_vbo);
 
+        // 检查VBO生成是否成功
+        if (m_vbo == 0) {
+            std::cerr << "Failed to generate VBO!" << std::endl;
+            return;
+        }
+
         // 绑定VAO
         glBindVertexArray(m_vao);
+        std::cout << "Bound VAO: " << m_vao << std::endl;
 
         // 绑定并设置VBO数据
         glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(OBJVertex), vertices.data(), GL_STATIC_DRAW);
+
+        // 检查OpenGL错误
+        GLenum error2 = glGetError();
+        if (error2 != GL_NO_ERROR) {
+            std::cerr << "OpenGL error before setting vertex attributes: " << error2 << std::endl;
+        }
 
         // 设置顶点属性指针
         // 位置属性 (location = 0)
@@ -75,8 +88,6 @@ namespace Renderer
 
         // 解绑VAO
         glBindVertexArray(0);
-
-        std::cout << "OBJModel created successfully. Vertices: " << vertices.size() << std::endl;
     }
 
     void OBJModel::Draw() const
@@ -87,6 +98,7 @@ namespace Renderer
             return;
         }
 
+        // 绑定VAO并绘制
         glBindVertexArray(m_vao);
 
         if (m_loader.HasIndices())
