@@ -1,8 +1,10 @@
 #pragma once
 #include "Renderer/Mesh.hpp"
 #include "Renderer/OBJLoader.hpp"
+#include "Renderer/Texture.hpp"
 #include "Core/GLM.hpp"
 #include <string>
+#include <vector>
 
 namespace Renderer
 {
@@ -20,6 +22,9 @@ namespace Renderer
 
         // 加载OBJ文件
         bool LoadFromFile(const std::string& filepath);
+
+        // 加载材质和纹理
+        void LoadMaterialsAndTextures();
 
         // 配置接口（与Cube保持一致）
         void SetPosition(const glm::vec3& pos) { m_position = pos; }
@@ -41,6 +46,18 @@ namespace Renderer
         // 获取材质数据
         const std::vector<OBJMaterial>& GetMaterials() const { return m_loader.GetMaterials(); }
 
+        // 获取当前使用的材质索引
+        int GetCurrentMaterialIndex() const { return m_currentMaterialIndex; }
+
+        // 设置当前使用的材质索引
+        void SetCurrentMaterialIndex(int index);
+
+        // 检查是否有纹理
+        bool HasTexture() const;
+
+        // 获取当前材质
+        const OBJMaterial* GetCurrentMaterial() const;
+
     private:
         // OpenGL缓冲区对象
         unsigned int m_vao = 0;
@@ -58,6 +75,11 @@ namespace Renderer
         glm::vec3 m_color = glm::vec3(1.0f);
         float m_scale = 1.0f;
         glm::vec3 m_rotation = glm::vec3(0.0f); // 欧拉角（度数）
+
+        // 材质和纹理
+        int m_currentMaterialIndex = 0;
+        std::vector<Texture> m_textures; // 存储加载的纹理
+        bool m_materialsLoaded = false;
 
         // 清理OpenGL资源
         void Cleanup();

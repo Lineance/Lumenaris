@@ -105,4 +105,9 @@ namespace Renderer
         glUniform1i(glGetUniformLocation(m_id, name.c_str()), value);
     }
 
+    void Shader::SetBool(const std::string &name, bool value) const
+    {
+        glUniform1i(glGetUniformLocation(m_id, name.c_str()), static_cast<int>(value));
+    }
+
 } // namespace Renderer

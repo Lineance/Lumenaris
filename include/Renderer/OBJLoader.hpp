@@ -53,6 +53,9 @@ namespace Renderer
         // 获取顶点数量
         size_t GetVertexCount() const { return m_vertices.size(); }
 
+        // 获取基础路径（用于加载材质文件）
+        const std::string& GetBasePath() const { return m_basePath; }
+
         // 获取材质数量
         size_t GetMaterialCount() const { return m_materials.size(); }
 

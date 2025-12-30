@@ -45,10 +45,12 @@ endif()
 # 5. 定义 Renderer 库
 add_library(Renderer STATIC
     src/Renderer/Shader.cpp
+    src/Renderer/Texture.cpp
 )
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb
 )
 target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 

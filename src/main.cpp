@@ -23,7 +23,7 @@ int main()
 
     try
     {
-        Core::Window window(1920, 1080, "Cloud Gallery - OBJ Model Loader");
+        Core::Window window(1920, 1080, "3D Car Gallery - OBJ Model Viewer");
         window.Init();
 
         Core::MouseController mouseController;
@@ -32,48 +32,48 @@ int main()
         Core::KeyboardController keyboardController;
         keyboardController.Initialize(glfwGetCurrentContext());
 
-        // Load bunny.obj model
+        // Load sportsCar.obj model
         std::vector<Renderer::OBJModel> cloudModels;
-        std::string bunnyPath = "assets/models/bunny.obj";
+        std::string carPath = "assets/models/cars/sportsCar.obj";
 
         try
         {
-            // Check if bunny.obj file exists
-            if (!fs::exists(bunnyPath))
+            // Check if sportsCar.obj file exists
+            if (!fs::exists(carPath))
             {
-                std::cerr << "Bunny model file not found: " << bunnyPath << std::endl;
+                std::cerr << "Sports car model file not found: " << carPath << std::endl;
             }
             else
             {
-                std::cout << "Loading bunny model from: " << bunnyPath << std::endl;
+                std::cout << "Loading sports car model from: " << carPath << std::endl;
 
-                std::cout << "Loading bunny.obj..." << std::endl;
+                std::cout << "Loading sportsCar.obj..." << std::endl;
 
-                cloudModels.emplace_back(bunnyPath);
-                if (cloudModels.back().LoadFromFile(bunnyPath))
+                cloudModels.emplace_back(carPath);
+                if (cloudModels.back().LoadFromFile(carPath))
                 {
                     cloudModels.back().Create();
-                    std::cout << "✓ Bunny loaded successfully - Vertices: "
+                    std::cout << "✓ Sports car loaded successfully - Vertices: "
                               << cloudModels.back().GetVertexCount()
                               << ", Materials: " << cloudModels.back().GetMaterialCount()
                               << std::endl;
                 }
                 else
                 {
-                    std::cerr << "✗ Failed to load bunny.obj" << std::endl;
+                    std::cerr << "✗ Failed to load sportsCar.obj" << std::endl;
                 }
 
                 std::cout << "Total models loaded: " << cloudModels.size() << std::endl;
 
-                // Position bunny model
+                // Position sports car model
                 if (!cloudModels.empty())
                 {
-                    // Position bunny at origin with appropriate scale and rotation
+                    // Position sports car at origin with appropriate scale and rotation
                     cloudModels[0].SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-                    cloudModels[0].SetScale(2.0f);                        // Make bunny larger to see details
-                    cloudModels[0].SetColor(glm::vec3(0.8f, 0.6f, 0.4f)); // Warm brown color
-                    // Rotate bunny to face the camera
-                    cloudModels[0].SetRotation(glm::vec3(0.0f, 180.0f, 0.0f));
+                    cloudModels[0].SetScale(0.5f);                        // Scale down sports car to fit view
+                    cloudModels[0].SetColor(glm::vec3(0.8f, 0.8f, 0.8f)); // Default white color (will be overridden by materials)
+                    // Rotate sports car to face the camera
+                    cloudModels[0].SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
                 }
             }
         }
@@ -100,7 +100,7 @@ int main()
 
         // Initial parameters
         std::cout << "[Controls] WASD: Move Q/E: Up/Down TAB: Toggle Mouse Capture ESC: Exit\n";
-        std::cout << "[Models] Loaded Stanford Bunny\n";
+        std::cout << "[Models] Loaded Sports Car\n";
 
         while (!window.ShouldClose())
         {
@@ -169,10 +169,40 @@ int main()
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // Render all cloud models
-            for (const auto &cloudModel : cloudModels)
+            for (auto &cloudModel : cloudModels)
             {
                 shader.SetMat4("model", cloudModel.GetModelMatrix());
-                shader.SetVec3("objectColor", cloudModel.GetColor());
+
+                // 使用材质信息
+                const auto* material = cloudModel.GetCurrentMaterial();
+                if (material)
+                {
+                    // 使用材质的漫反射颜色
+                    shader.SetVec3("objectColor", material->diffuse);
+
+                    // 设置材质的光泽度
+                    shader.SetFloat("shininess", material->shininess > 0.0f ? material->shininess : 32.0f);
+
+                    // 检查是否有纹理
+                    if (cloudModel.HasTexture())
+                    {
+                        shader.SetBool("useTexture", true);
+                        // 注意：纹理已经在OBJModel中绑定，这里只需要设置uniform
+                        // 实际的纹理绑定在Draw方法中处理会更合适
+                    }
+                    else
+                    {
+                        shader.SetBool("useTexture", false);
+                    }
+                }
+                else
+                {
+                    // 如果没有材质信息，使用默认颜色
+                    shader.SetVec3("objectColor", cloudModel.GetColor());
+                    shader.SetBool("useTexture", false);
+                    shader.SetFloat("shininess", 32.0f);
+                }
+
                 cloudModel.Draw();
             }
 

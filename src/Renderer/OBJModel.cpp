@@ -27,6 +27,10 @@ namespace Renderer
             std::cerr << "Failed to load OBJ model: " << filepath << std::endl;
             return false;
         }
+
+        // 自动加载材质和纹理
+        LoadMaterialsAndTextures();
+
         return true;
     }
 
@@ -98,6 +102,12 @@ namespace Renderer
             return;
         }
 
+        // 绑定纹理（如果有的话）
+        if (HasTexture() && m_currentMaterialIndex >= 0 && m_currentMaterialIndex < static_cast<int>(m_textures.size()))
+        {
+            m_textures[m_currentMaterialIndex].Bind(GL_TEXTURE0);
+        }
+
         // 绑定VAO并绘制
         glBindVertexArray(m_vao);
 
@@ -115,6 +125,12 @@ namespace Renderer
         }
 
         glBindVertexArray(0);
+
+        // 解绑纹理
+        if (HasTexture())
+        {
+            Texture::UnbindStatic(); // 使用静态方法解绑
+        }
     }
 
     glm::mat4 OBJModel::GetModelMatrix() const
@@ -129,6 +145,76 @@ namespace Renderer
         model = glm::scale(model, glm::vec3(m_scale));
 
         return model;
+    }
+
+    void OBJModel::LoadMaterialsAndTextures()
+    {
+        if (m_materialsLoaded)
+            return;
+
+        const auto& materials = m_loader.GetMaterials();
+        if (materials.empty())
+        {
+            std::cout << "No materials found in OBJ file" << std::endl;
+            m_materialsLoaded = true;
+            return;
+        }
+
+        // 为每个材质加载纹理
+        m_textures.resize(materials.size());
+
+        for (size_t i = 0; i < materials.size(); ++i)
+        {
+            const auto& material = materials[i];
+
+            // 尝试加载漫反射纹理
+            if (!material.diffuseTexname.empty())
+            {
+                std::string texPath = m_loader.GetBasePath() + "/" + material.diffuseTexname;
+                if (m_textures[i].LoadFromFile(texPath))
+                {
+                    std::cout << "Loaded texture for material '" << material.name << "': " << texPath << std::endl;
+                }
+                else
+                {
+                    std::cerr << "Failed to load texture for material '" << material.name << "': " << texPath << std::endl;
+                }
+            }
+        }
+
+        m_materialsLoaded = true;
+        std::cout << "Loaded " << materials.size() << " materials with textures" << std::endl;
+    }
+
+    void OBJModel::SetCurrentMaterialIndex(int index)
+    {
+        const auto& materials = m_loader.GetMaterials();
+        if (index >= 0 && index < static_cast<int>(materials.size()))
+        {
+            m_currentMaterialIndex = index;
+        }
+        else
+        {
+            std::cerr << "Invalid material index: " << index << std::endl;
+        }
+    }
+
+    bool OBJModel::HasTexture() const
+    {
+        if (m_currentMaterialIndex < 0 || m_currentMaterialIndex >= static_cast<int>(m_textures.size()))
+            return false;
+
+        return m_textures[m_currentMaterialIndex].IsLoaded();
+    }
+
+    const OBJMaterial* OBJModel::GetCurrentMaterial() const
+    {
+        const auto& materials = m_loader.GetMaterials();
+        if (m_currentMaterialIndex >= 0 && m_currentMaterialIndex < static_cast<int>(materials.size()))
+        {
+            return &materials[m_currentMaterialIndex];
+        }
+        return nullptr;
     }
 
     void OBJModel::Cleanup()
@@ -148,6 +234,10 @@ namespace Renderer
             glDeleteVertexArrays(1, &m_vao);
             m_vao = 0;
         }
+
+        // 清理纹理
+        m_textures.clear();
+        m_materialsLoaded = false;
     }
 
 } // namespace Renderer
