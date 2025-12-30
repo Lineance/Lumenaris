@@ -46,7 +46,7 @@ int main()
         Renderer::Cube regularCube;
         regularCube.Create();
         regularCube.SetPosition(glm::vec3(-2.0f, 0.0f, 0.0f));
-        regularCube.SetColor(glm::vec3(0.8f, 0.2f, 0.2f)); // Red color
+        regularCube.SetColor(glm::vec3(0.8f, 0.2f, 0.2f));      // Red color
         regularCube.SetRotation(glm::vec3(30.0f, 45.0f, 0.0f)); // Test rotation
 
         // Create another cube with rotation to test normal transformation
@@ -54,14 +54,17 @@ int main()
         rotatedCube.Create();
         rotatedCube.SetPosition(glm::vec3(0.0f, 2.0f, 0.0f));
         rotatedCube.SetRotation(glm::vec3(45.0f, 45.0f, 0.0f)); // Rotate 45 degrees on X and Y axes
-        rotatedCube.SetColor(glm::vec3(0.2f, 0.2f, 0.8f)); // Blue color
+        rotatedCube.SetColor(glm::vec3(0.2f, 0.2f, 0.8f));      // Blue color
 
         // Keyboard controls
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
                                                { exit(0); });
 
         Renderer::Shader shader;
-        shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag");
+        // 测试不同的着色器
+        // shader.Load("assets/shader/debug.vert", "assets/shader/debug.frag"); // 显示法线
+        // shader.Load("assets/shader/basic.vert", "assets/shader/test.frag"); // 简单光照测试
+        shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag"); // 卡通渲染
 
         // 创建球体
         // std::vector<Renderer::Sphere> spheres;
