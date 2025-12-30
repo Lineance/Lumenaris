@@ -66,6 +66,7 @@ add_library(Geometry OBJECT
 target_include_directories(Geometry PUBLIC
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/vendor/glm
+    ${CMAKE_SOURCE_DIR}/vendor/tinyobjloader
 )
 
 target_link_libraries(Geometry PRIVATE Renderer Core)
@@ -76,7 +77,10 @@ add_executable(HelloWindow
     src/glad.c
     $<TARGET_OBJECTS:Geometry>
 )
-target_include_directories(HelloWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(HelloWindow PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
+)
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 
 # 项目特性：

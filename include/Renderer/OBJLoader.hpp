@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 #include "Core/GLM.hpp"
-#include "Renderer/tiny_obj_loader.h"
+#include "tiny_obj_loader.h"
 
 namespace Renderer
 {
