@@ -21,6 +21,7 @@ namespace Core
         float GetPitch() const { return m_pitch; }
         float GetFOV() const { return m_fov; }
         bool IsFirstMouse() const { return m_firstMouse; }
+        bool IsMouseCaptured() const { return m_mouseCaptured; }
 
         // 摄像机控制方法
         glm::vec3 GetCameraFront() const { return m_cameraFront; }
@@ -38,6 +39,10 @@ namespace Core
         void SetMouseSensitivity(float sensitivity) { m_mouseSensitivity = sensitivity; }
         void SetScrollSensitivity(float sensitivity) { m_scrollSensitivity = sensitivity; }
 
+        // 鼠标捕获控制
+        void ToggleMouseCapture();
+        void SetMouseCapture(bool captured);
+
     private:
         // 鼠标状态
         float m_yaw;
@@ -46,6 +51,7 @@ namespace Core
 
         // 鼠标控制参数
         bool m_firstMouse;
+        bool m_mouseCaptured;
         float m_lastX;
         float m_lastY;
         float m_mouseSensitivity;

@@ -23,7 +23,7 @@ int main()
 
     try
     {
-        Core::Window window(800, 600, "Cloud Gallery - OBJ Model Loader");
+        Core::Window window(1920, 1080, "Cloud Gallery - OBJ Model Loader");
         window.Init();
 
         Core::MouseController mouseController;
@@ -85,6 +85,8 @@ int main()
         // Keyboard controls
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
                                                { exit(0); });
+        keyboardController.RegisterKeyCallback(GLFW_KEY_TAB, [&mouseController]()
+                                               { mouseController.ToggleMouseCapture(); });
 
         Renderer::Shader shader;
         // 测试不同的着色器
@@ -97,7 +99,7 @@ int main()
         int fps_frameCount = 0;
 
         // Initial parameters
-        std::cout << "[Controls] WASD: Move Q/E: Up/Down ESC: Exit\n";
+        std::cout << "[Controls] WASD: Move Q/E: Up/Down TAB: Toggle Mouse Capture ESC: Exit\n";
         std::cout << "[Models] Loaded Stanford Bunny\n";
 
         while (!window.ShouldClose())
@@ -143,7 +145,7 @@ int main()
             }
 
             glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
-                                                    800.0f / 600.0f, 0.1f, 100.0f);
+                                                    1920.0f / 1080.0f, 0.1f, 100.0f);
             glm::mat4 view = glm::lookAt(cameraPos,
                                          cameraPos + mouseController.GetCameraFront(),
                                          glm::vec3(0.0f, 1.0f, 0.0f));

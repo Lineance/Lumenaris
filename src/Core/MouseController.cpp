@@ -9,7 +9,7 @@ namespace Core
 
     MouseController::MouseController()
         : m_yaw(-90.0f), m_pitch(0.0f), m_fov(45.0f),
-          m_firstMouse(true), m_lastX(400.0f), m_lastY(300.0f),
+          m_firstMouse(true), m_mouseCaptured(true), m_lastX(400.0f), m_lastY(300.0f),
           m_mouseSensitivity(0.1f), m_scrollSensitivity(1.0f),
           m_cameraFront(0.0f, 0.0f, -1.0f), m_cameraUp(0.0f, 1.0f, 0.0f)
     {
@@ -48,7 +48,7 @@ namespace Core
 
     void MouseController::MouseCallback(GLFWwindow *window, double xpos, double ypos)
     {
-        if (!s_instance)
+        if (!s_instance || !s_instance->m_mouseCaptured)
             return;
 
         if (s_instance->m_firstMouse)
@@ -98,6 +98,37 @@ namespace Core
         front.y = sin(glm::radians(m_pitch));
         front.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
         m_cameraFront = glm::normalize(front);
+    }
+
+    void MouseController::ToggleMouseCapture()
+    {
+        SetMouseCapture(!m_mouseCaptured);
+    }
+
+    void MouseController::SetMouseCapture(bool captured)
+    {
+        if (m_mouseCaptured == captured)
+            return;
+
+        m_mouseCaptured = captured;
+
+        GLFWwindow* window = glfwGetCurrentContext();
+        if (window)
+        {
+            if (captured)
+            {
+                // 隐藏并捕捉光标
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                m_firstMouse = true; // 重置鼠标状态以避免跳跃
+                std::cout << "鼠标已捕获 (按Tab键释放)" << std::endl;
+            }
+            else
+            {
+                // 显示并释放光标
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                std::cout << "鼠标已释放 (按Tab键捕获)" << std::endl;
+            }
+        }
     }
 
 } // namespace Core
