@@ -119,8 +119,15 @@ namespace Renderer
     glm::mat4 Cube::GetModelMatrix() const
     {
         glm::mat4 model = glm::mat4(1.0f);
+
+        // 应用变换（顺序很重要：缩放 -> 旋转 -> 平移）
+        // 或者：平移 -> 旋转 -> 缩放（取决于你想要的旋转中心）
         model = glm::translate(model, m_position);
+        model = glm::rotate(model, glm::radians(m_rotation.x), glm::vec3(1.0f, 0.0f, 0.0f)); // X轴旋转
+        model = glm::rotate(model, glm::radians(m_rotation.y), glm::vec3(0.0f, 1.0f, 0.0f)); // Y轴旋转
+        model = glm::rotate(model, glm::radians(m_rotation.z), glm::vec3(0.0f, 0.0f, 1.0f)); // Z轴旋转
         model = glm::scale(model, glm::vec3(m_scale));
+
         return model;
     }
 

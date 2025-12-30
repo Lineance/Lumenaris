@@ -48,6 +48,8 @@ add_library(Geometry OBJECT
     src/Renderer/Geometry.cpp
     src/Renderer/Cube.cpp
     src/Renderer/Sphere.cpp
+    src/Renderer/OBJLoader.cpp
+    src/Renderer/OBJModel.cpp
 )
 
 target_include_directories(Geometry PUBLIC 
