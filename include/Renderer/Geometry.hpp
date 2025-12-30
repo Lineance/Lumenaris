@@ -1,6 +1,6 @@
 #pragma once
-#include <Core/MathTypes.hpp>
 #include <glad/glad.h>
+#include "Core/GLM.hpp"
 #include <memory>
 #include <functional>
 #include <string>

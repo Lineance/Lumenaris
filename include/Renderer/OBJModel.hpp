@@ -1,7 +1,7 @@
 #pragma once
 #include "Renderer/Geometry.hpp"
 #include "Renderer/OBJLoader.hpp"
-#include <glm/glm.hpp>
+#include "Core/GLM.hpp"
 #include <string>
 
 namespace Renderer

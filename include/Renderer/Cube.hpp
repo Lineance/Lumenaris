@@ -1,6 +1,6 @@
 #pragma once
 #include "Renderer/Geometry.hpp"
-#include <glm/glm.hpp>
+#include "Core/GLM.hpp"
 
 namespace Renderer
 {

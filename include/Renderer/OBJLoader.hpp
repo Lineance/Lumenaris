@@ -1,8 +1,7 @@
 #pragma once
-#include <Core/MathTypes.hpp>
 #include <vector>
 #include <string>
-#include <glm/glm.hpp>
+#include "Core/GLM.hpp"
 
 namespace Renderer
 {

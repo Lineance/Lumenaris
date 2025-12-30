@@ -1,4 +1,6 @@
-# 1. 基础配置
+# OpenGL学习项目构建配置
+# 支持几何体渲染、OBJ模型加载、GLM数学库封装
+
 cmake_minimum_required(VERSION 3.15)
 project(DarkRoomEngine LANGUAGES C CXX)
 
@@ -9,7 +11,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(OpenGL REQUIRED)
 
 # 3. 定义 Core 库
-add_library(Core STATIC src/Core/Window.cpp src/Core/MouseController.cpp src/Core/KeyboardController.cpp)
+add_library(Core STATIC
+    src/Core/Window.cpp
+    src/Core/MouseController.cpp
+    src/Core/KeyboardController.cpp
+)
 target_include_directories(Core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glfw/include
@@ -37,29 +43,43 @@ else()
 endif()
 
 # 5. 定义 Renderer 库
-add_library(Renderer STATIC src/Renderer/Shader.cpp)
+add_library(Renderer STATIC
+    src/Renderer/Shader.cpp
+)
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/glm
 )
 target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 
+# 几何体库 - 支持基础几何体和OBJ模型加载
 add_library(Geometry OBJECT
     src/Renderer/Geometry.cpp
     src/Renderer/Cube.cpp
     src/Renderer/Sphere.cpp
-    src/Renderer/OBJLoader.cpp
-    src/Renderer/OBJModel.cpp
+    src/Renderer/OBJLoader.cpp    # OBJ文件解析器
+    src/Renderer/OBJModel.cpp     # OBJ模型渲染器
 )
 
-target_include_directories(Geometry PUBLIC 
+target_include_directories(Geometry PUBLIC
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/vendor/glm
 )
 
 target_link_libraries(Geometry PRIVATE Renderer Core)
 
-# 6. 定义主程序
-add_executable(HelloWindow src/main.cpp src/glad.c $<TARGET_OBJECTS:Geometry>)
+# 6. 定义主程序 - 3D渲染演示应用
+add_executable(HelloWindow
+    src/main.cpp
+    src/glad.c
+    $<TARGET_OBJECTS:Geometry>
+)
 target_include_directories(HelloWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
+
+# 项目特性：
+# - 3D几何体渲染 (Cube, Sphere, OBJ模型)
+# - 实时着色器切换 (Phong, Toon, Glass, etc.)
+# - 3D相机控制 (WASD移动 + 鼠标旋转)
+# - GLM数学库统一封装
+# - 模块化架构设计

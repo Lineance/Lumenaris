@@ -1,5 +1,4 @@
 #pragma once
-#include "Core/MathTypes.hpp"
 #include <GLFW/glfw3.h>
 #include <unordered_map>
 #include <functional>

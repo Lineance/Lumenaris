@@ -13,7 +13,7 @@
 #include <atomic>
 
 // 摄像机参数
-Core::Vec3 cameraPos = Core::Vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 float cameraSpeed = 5.0f;
 
 int main()
@@ -116,30 +116,30 @@ int main()
             keyboardController.Update(deltaTime);
 
             float moveSpeed = cameraSpeed * deltaTime;
-            Core::Vec3 moveDirection(0.0f);
+            glm::vec3 moveDirection(0.0f);
             if (keyboardController.IsKeyPressed(GLFW_KEY_W))
                 moveDirection += mouseController.GetCameraFront();
             if (keyboardController.IsKeyPressed(GLFW_KEY_S))
                 moveDirection -= mouseController.GetCameraFront();
             if (keyboardController.IsKeyPressed(GLFW_KEY_A))
-                moveDirection -= glm::normalize(glm::cross(mouseController.GetCameraFront(), Core::Vec3(0.0f, 1.0f, 0.0f)));
+                moveDirection -= glm::normalize(glm::cross(mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f)));
             if (keyboardController.IsKeyPressed(GLFW_KEY_D))
-                moveDirection += glm::normalize(glm::cross(mouseController.GetCameraFront(), Core::Vec3(0.0f, 1.0f, 0.0f)));
+                moveDirection += glm::normalize(glm::cross(mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f)));
             if (keyboardController.IsKeyPressed(GLFW_KEY_Q))
-                moveDirection -= Core::Vec3(0.0f, 1.0f, 0.0f); // 向下飞行
+                moveDirection -= glm::vec3(0.0f, 1.0f, 0.0f); // 向下飞行
             if (keyboardController.IsKeyPressed(GLFW_KEY_E))
-                moveDirection += Core::Vec3(0.0f, 1.0f, 0.0f); // 向上飞行
+                moveDirection += glm::vec3(0.0f, 1.0f, 0.0f); // 向上飞行
             if (glm::length(moveDirection) > 0.0f)
             {
                 moveDirection = glm::normalize(moveDirection);
                 cameraPos += moveDirection * moveSpeed;
             }
 
-            Core::Mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
+            glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
                                                      800.0f / 600.0f, 0.1f, 100.0f);
-            Core::Mat4 view = glm::lookAt(cameraPos,
+            glm::mat4 view = glm::lookAt(cameraPos,
                                           cameraPos + mouseController.GetCameraFront(),
-                                          Core::Vec3(0.0f, 1.0f, 0.0f));
+                                          glm::vec3(0.0f, 1.0f, 0.0f));
 
             // 渲染
             shader.Use();
@@ -147,13 +147,13 @@ int main()
             shader.SetMat4("view", view);
 
             // Light position and visualization
-            Core::Vec3 lightPos = Core::Vec3(5.0f, 5.0f, 5.0f);
+            glm::vec3 lightPos = glm::vec3(5.0f, 5.0f, 5.0f);
             shader.SetVec3("lightPos", lightPos);
 
             // Update light cube position
             lightCube.SetPosition(lightPos);
 
-            shader.SetVec3("lightColor", Core::Vec3(1.0f, 1.0f, 1.0f));
+            shader.SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
             shader.SetVec3("viewPos", cameraPos);
             shader.SetFloat("shininess", 32.0f);
 

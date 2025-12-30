@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/MathTypes.hpp"
 #include <GLFW/glfw3.h>
+#include "Core/GLM.hpp"
 #include <functional>
 
 namespace Core
@@ -23,7 +23,7 @@ namespace Core
         bool IsFirstMouse() const { return m_firstMouse; }
 
         // 摄像机控制方法
-        Core::Vec3 GetCameraFront() const { return m_cameraFront; }
+        glm::vec3 GetCameraFront() const { return m_cameraFront; }
         void UpdateCameraVectors();
 
         // 回调设置方法
@@ -52,8 +52,8 @@ namespace Core
         float m_scrollSensitivity;
 
         // 摄像机方向
-        Core::Vec3 m_cameraFront;
-        Core::Vec3 m_cameraUp;
+        glm::vec3 m_cameraFront;
+        glm::vec3 m_cameraUp;
 
         // 静态实例指针（用于回调函数访问实例成员）
         static MouseController *s_instance;
