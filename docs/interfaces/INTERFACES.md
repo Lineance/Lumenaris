@@ -15,6 +15,7 @@
   - [Cube 类](#cube-类)
   - [Sphere 类](#sphere-类)
   - [OBJModel 类](#objmodel-类)
+  - [InstancedMesh 类](#instancedmesh-类)
 - [几何体接口](#几何体接口)
 - [使用示例](#使用示例)
 
@@ -485,6 +486,190 @@ public:
 
 ---
 
+### InstancedMesh 类
+
+实例化网格类，支持批量渲染大量相同几何体，大幅提升渲染性能。
+
+```cpp
+namespace Renderer {
+// 实例数据结构
+struct InstanceData {
+    glm::mat4 modelMatrix;     // 实例的模型变换矩阵
+    glm::vec3 color;           // 实例的颜色属性
+};
+
+class InstancedMesh : public IMesh {
+public:
+    InstancedMesh() = default;
+    ~InstancedMesh();
+
+    // IMesh接口实现
+    void Create() override;
+    void Draw() const override;
+
+    // 顶点数据设置
+    void SetVertexData(const float* vertices, size_t vertexCount, size_t stride);
+    void SetVertexLayout(const std::vector<size_t>& offsets, const std::vector<int>& sizes);
+    void SetIndexData(const unsigned int* indices, size_t indexCount);
+
+    // 纹理和材质
+    void SetTexture(Texture* texture);
+    void SetMaterialColor(const glm::vec3& color);
+    const glm::vec3& GetMaterialColor() const;
+
+    // 实例管理
+    void AddInstance(const glm::vec3& position, const glm::vec3& rotation,
+                     const glm::vec3& scale, const glm::vec3& color);
+    void ClearInstances();
+    void UpdateInstanceBuffers();
+    void SetInstances(const std::vector<InstanceData>& instances);
+
+    // 信息查询
+    size_t GetInstanceCount() const;
+    size_t GetVertexCount() const;
+    size_t GetIndexCount() const;
+    bool HasIndices() const;
+    bool HasTexture() const;
+
+    // 静态工厂方法
+    static InstancedMesh CreateFromCube(size_t instanceCount);
+    static std::vector<InstancedMesh> CreateFromOBJ(const std::string& objPath, size_t instanceCount);
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Create()` | 无 | void | 创建OpenGL缓冲对象（VAO、VBO、EBO、实例VBO） |
+| `Draw()` | 无 | void | 执行实例化渲染（glDrawElementsInstanced 或 glDrawArraysInstanced） |
+| `SetVertexData()` | float* vertices, size_t vertexCount, size_t stride | void | 设置顶点数据 |
+| `SetIndexData()` | unsigned int* indices, size_t indexCount | void | 设置索引数据（用于EBO） |
+| `SetTexture()` | Texture* texture | void | 设置纹理（纹理由InstancedMesh管理生命周期） |
+| `SetMaterialColor()` | glm::vec3 color | void | 设置材质颜色 |
+| `AddInstance()` | position, rotation, scale, color | void | 添加一个实例到实例列表 |
+| `ClearInstances()` | 无 | void | 清空所有实例 |
+| `UpdateInstanceBuffers()` | 无 | void | 更新GPU实例数据 |
+| `CreateFromCube()` | size_t instanceCount | InstancedMesh | 静态方法：从立方体模板创建实例化网格 |
+| `CreateFromOBJ()` | string objPath, size_t instanceCount | vector<InstancedMesh> | 静态方法：从OBJ模型创建多个材质实例化网格 |
+
+#### 功能特性
+
+**实例化渲染**：
+- 单次绘制调用渲染数百个相同几何体
+- 每个实例独立的变换矩阵（位置、旋转、缩放）
+- 每个实例独立的颜色属性
+- 使用 glVertexAttribDivisor 实现属性实例化
+
+**材质支持**：
+- 支持纹理映射（纹理自动内存管理）
+- 支持材质颜色（从OBJ文件的.mtl文件读取）
+- 多材质OBJ模型：为每个材质创建独立的实例化网格
+
+**内存管理**：
+- 纹理由 InstancedMesh 管理，析构时自动释放
+- 实例数据包含模型矩阵和颜色
+- 支持动态更新实例缓冲
+
+#### 使用示例
+
+```cpp
+// 示例1：从立方体模板创建
+Renderer::InstancedMesh instancedCubes = Renderer::InstancedMesh::CreateFromCube(0);
+
+// 添加100个实例（10x10网格）
+for (int x = 0; x < 10; ++x) {
+    for (int z = 0; z < 10; ++z) {
+        glm::vec3 position(x * 2.0f, 0.0f, z * 2.0f);
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+        glm::vec3 scale(1.0f, 1.0f, 1.0f);
+        glm::vec3 color(1.0f, 0.5f, 0.3f); // 橙色
+        instancedCubes.AddInstance(position, rotation, scale, color);
+    }
+}
+
+instancedCubes.Create();
+
+// 渲染
+shader.Use();
+shader.SetBool("useTexture", false);
+shader.SetBool("useInstanceColor", true);
+instancedCubes.Draw();
+
+// 示例2：从OBJ模型创建（多材质）
+std::string carPath = "assets/models/cars/sportsCar.obj";
+std::vector<Renderer::InstancedMesh> instancedCarMeshes =
+    Renderer::InstancedMesh::CreateFromOBJ(carPath, 0);
+
+// 为每个材质网格添加12个实例（圆形排列）
+for (auto& mesh : instancedCarMeshes) {
+    for (int i = 0; i < 12; ++i) {
+        float angle = (float)i / 12.0f * 3.14159f * 2.0f;
+        glm::vec3 position(std::cos(angle) * 15.0f, 0.0f, std::sin(angle) * 15.0f);
+        glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
+        glm::vec3 scale(0.5f, 0.5f, 0.5f);
+        glm::vec3 color(1.0f, 1.0f, 1.0f); // 白色（使用材质颜色）
+        mesh.AddInstance(position, rotation, scale, color);
+    }
+    mesh.Create();
+}
+
+// 渲染（每个材质一个draw call）
+for (const auto& carMesh : instancedCarMeshes) {
+    shader.SetBool("useTexture", carMesh.HasTexture());
+    shader.SetVec3("objectColor", carMesh.GetMaterialColor());
+    shader.SetBool("useInstanceColor", false); // 使用材质颜色
+    carMesh.Draw();
+}
+```
+
+#### 着色器要求
+
+**顶点着色器**（`assets/shader/instanced.vert`）：
+```glsl
+layout (location = 3) in mat4 aInstanceMatrix;  // 实例变换矩阵
+layout (location = 7) in vec3 aInstanceColor;   // 实例颜色
+
+void main() {
+    mat4 model = aInstanceMatrix;
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    InstanceColor = aInstanceColor;  // 传递到片段着色器
+}
+```
+
+**片段着色器**（`assets/shader/instanced.frag`）：
+```glsl
+uniform bool useTexture;        // 是否使用纹理
+uniform bool useInstanceColor;  // 是否使用实例颜色
+uniform vec3 objectColor;       // 材质颜色
+uniform sampler2D textureSampler;
+
+in vec3 InstanceColor;
+
+void main() {
+    vec3 baseColor;
+    if (useTexture) {
+        baseColor = texture(textureSampler, TexCoord).rgb;
+    } else if (useInstanceColor) {
+        baseColor = InstanceColor;
+    } else {
+        baseColor = objectColor;
+    }
+
+    // 应用光照...
+    FragColor = vec4(result, 1.0);
+}
+```
+
+#### 性能优势
+
+- **传统渲染**：12辆车 × 38个材质 = 456次绘制调用
+- **实例化渲染**：38个材质 = 38次绘制调用
+- **性能提升**：约12倍（取决于场景复杂度）
+
+---
+
 ## 几何体接口
 
 ### 统一几何体创建接口
@@ -583,6 +768,59 @@ sphere->Create();
 shader.Use();
 cube->Draw();
 sphere->Draw();
+```
+
+### 4. 实例化渲染使用
+
+```cpp
+#include "Renderer/InstancedMesh.hpp"
+
+// 示例1：批量渲染立方体
+Renderer::InstancedMesh instancedCubes = Renderer::InstancedMesh::CreateFromCube(0);
+
+// 添加实例（10x10网格）
+for (int x = 0; x < 10; ++x) {
+    for (int z = 0; z < 10; ++z) {
+        glm::vec3 position(x * 2.0f, 0.0f, z * 2.0f);
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+        glm::vec3 scale(1.0f, 1.0f, 1.0f);
+        glm::vec3 color(1.0f, 0.5f, 0.3f);
+        instancedCubes.AddInstance(position, rotation, scale, color);
+    }
+}
+
+instancedCubes.Create();
+
+// 渲染（单次绘制调用）
+shader.Use();
+shader.SetBool("useTexture", false);
+shader.SetBool("useInstanceColor", true);
+instancedCubes.Draw();
+
+// 示例2：批量渲染OBJ模型（多材质）
+std::vector<Renderer::InstancedMesh> instancedCarMeshes =
+    Renderer::InstancedMesh::CreateFromOBJ("assets/models/car.obj", 0);
+
+// 为每个材质添加实例
+for (auto& mesh : instancedCarMeshes) {
+    for (int i = 0; i < 12; ++i) {
+        float angle = (float)i / 12.0f * 6.28318f;
+        glm::vec3 position(std::cos(angle) * 15.0f, 0.0f, std::sin(angle) * 15.0f);
+        glm::vec3 rotation(0.0f, -angle * 57.2958f, 0.0f);
+        glm::vec3 scale(0.5f, 0.5f, 0.5f);
+        glm::vec3 color(1.0f, 1.0f, 1.0f);
+        mesh.AddInstance(position, rotation, scale, color);
+    }
+    mesh.Create();
+}
+
+// 渲染（每个材质一次绘制调用）
+for (const auto& carMesh : instancedCarMeshes) {
+    shader.SetBool("useTexture", carMesh.HasTexture());
+    shader.SetVec3("objectColor", carMesh.GetMaterialColor());
+    shader.SetBool("useInstanceColor", false);
+    carMesh.Draw();
+}
 ```
 
 ---

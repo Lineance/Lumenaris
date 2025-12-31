@@ -8,17 +8,14 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 // 摄像机参数
-glm::vec3 cameraPos = glm::vec3(0.0f, 10.0f, 30.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 10.0f, 25.0f);
 float cameraSpeed = 10.0f;
 
 int main()
 {
-    // 初始化日志系统
+    // 初始化日志系统（启用异步写入和按大小轮转）
     Core::LogRotationConfig rotationConfig;
     rotationConfig.type = Core::RotationType::SIZE;
     rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
@@ -29,12 +26,12 @@ int main()
 
     try
     {
-        Core::Logger::GetInstance().Info("Starting Instanced Rendering Application");
-        Core::Logger::GetInstance().Info("Application version: Cube & OBJ Instanced Rendering with Textures");
+        Core::Logger::GetInstance().Info("Starting Instanced Rendering Test Application");
+        Core::Logger::GetInstance().Info("Application version: Instanced Rendering Demo");
         Core::Logger::GetInstance().Info("Window resolution: 1920x1080");
 
         Core::Logger::GetInstance().Info("Creating application window...");
-        Core::Window window(1920, 1080, "Instanced Rendering - Cube & OBJ with Textures");
+        Core::Window window(1920, 1080, "Instanced Rendering Test - 20x20x5 Cubes");
         window.Init();
 
         Core::Logger::GetInstance().Info("Initializing input controllers...");
@@ -60,92 +57,121 @@ int main()
         Renderer::Shader instancedShader;
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
-        // ==========================================
-        // 1. 创建立方体实例化网格
-        // ==========================================
-        Core::Logger::GetInstance().Info("Creating instanced cubes from Cube template...");
-        Renderer::InstancedMesh instancedCubes = Renderer::InstancedMesh::CreateFromCube(0);
+        // 创建实例化网格
+        Core::Logger::GetInstance().Info("Creating instanced mesh...");
+        Renderer::InstancedMesh instancedCubes;
 
-        // 创建 10x10 的立方体地面阵列
-        int gridSize = 10;
-        float spacing = 2.0f;
-        float startX = -((gridSize - 1) * spacing) / 2.0f;
-        float startZ = -((gridSize - 1) * spacing) / 2.0f;
+        // 准备立方体顶点数据
+        std::vector<float> cubeVertices;
+        cubeVertices.insert(cubeVertices.end(), {
+            // 前面
+            -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+             0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
+             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
 
-        for (int x = 0; x < gridSize; ++x)
+            // 后面
+            -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+             0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,
+
+            // 左面
+            -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+
+            // 右面
+             0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+             0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+             0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
+             0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
+             0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
+             0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
+
+            // 下面
+            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+             0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
+             0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+             0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
+
+            // 上面
+            -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+             0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
+             0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f
+        });
+
+        instancedCubes.SetVertices(cubeVertices.data(), cubeVertices.size());
+        instancedCubes.SetVertexLayout(8, {0, 3, 6}, {3, 3, 2});
+
+        // 创建 20x20x5 的立方体阵列 (2000个实例)
+        int gridSizeX = 20;
+        int gridSizeZ = 20;
+        int gridSizeY = 5;
+        float spacing = 1.5f;
+        float startX = -((gridSizeX - 1) * spacing) / 2.0f;
+        float startZ = -((gridSizeZ - 1) * spacing) / 2.0f;
+
+        Core::Logger::GetInstance().Info("Generating " + std::to_string(gridSizeX * gridSizeZ * gridSizeY) + " instances...");
+
+        for (int x = 0; x < gridSizeX; ++x)
         {
-            for (int z = 0; z < gridSize; ++z)
+            for (int z = 0; z < gridSizeZ; ++z)
             {
-                glm::vec3 position(startX + x * spacing, -1.0f, startZ + z * spacing);
-                glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-                glm::vec3 scale(1.5f, 0.5f, 1.5f);
+                for (int y = 0; y < gridSizeY; ++y)
+                {
+                    glm::vec3 position(
+                        startX + x * spacing,
+                        y * spacing,
+                        startZ + z * spacing
+                    );
 
-                // 生成方格颜色
-                bool isWhite = (x + z) % 2 == 0;
-                glm::vec3 color = isWhite ? glm::vec3(0.9f, 0.9f, 0.9f) : glm::vec3(0.3f, 0.3f, 0.3f);
+                    // 每个立方体有独特的旋转
+                    glm::vec3 rotation(
+                        x * 3.0f,
+                        y * 5.0f + (x % 3) * 15.0f,
+                        z * 3.0f
+                    );
 
-                instancedCubes.AddInstance(position, rotation, scale, color);
+                    glm::vec3 scale(0.7f, 0.7f, 0.7f);
+
+                    // 生成彩虹渐变颜色
+                    float t = static_cast<float>(x) / (gridSizeX - 1);
+                    float t2 = static_cast<float>(z) / (gridSizeZ - 1);
+                    float t3 = static_cast<float>(y) / (gridSizeY - 1);
+                    glm::vec3 color(
+                        0.3f + 0.7f * std::abs(std::sin(t * 3.14159f * 2.0f)),
+                        0.3f + 0.7f * std::abs(std::sin(t2 * 3.14159f * 2.0f)),
+                        0.3f + 0.7f * std::abs(std::cos(t3 * 3.14159f * 2.0f))
+                    );
+
+                    instancedCubes.AddInstance(position, rotation, scale, color);
+                }
             }
         }
 
         instancedCubes.Create();
-        Core::Logger::GetInstance().Info("Instanced cubes created: " + std::to_string(instancedCubes.GetInstanceCount()) + " instances");
-
-        // ==========================================
-        // 2. 创建 OBJ 模型实例化渲染（支持多材质和纹理）
-        // ==========================================
-        std::string carPath = "assets/models/cars/sportsCar.obj";
-        std::vector<Renderer::InstancedMesh> instancedCarMeshes;
-
-        if (fs::exists(carPath))
-        {
-            Core::Logger::GetInstance().Info("Creating instanced cars from OBJ: " + carPath);
-
-            // 创建多个实例化网格（每个材质一个）
-            instancedCarMeshes = Renderer::InstancedMesh::CreateFromOBJ(carPath, 0);
-
-            if (!instancedCarMeshes.empty())
-            {
-                // 为每个材质网格添加相同的实例
-                int carCount = 12;
-                float radius = 15.0f;
-
-                for (auto& mesh : instancedCarMeshes)
-                {
-                    for (int i = 0; i < carCount; ++i)
-                    {
-                        float angle = (static_cast<float>(i) / carCount) * 3.14159f * 2.0f;
-                        float x = std::cos(angle) * radius;
-                        float z = std::sin(angle) * radius;
-                        float y = 0.0f;
-
-                        glm::vec3 position(x, y, z);
-                        glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
-                        glm::vec3 scale(0.5f, 0.5f, 0.5f);
-
-                        // 使用白色，让纹理显示真实颜色
-                        glm::vec3 color(1.0f, 1.0f, 1.0f);
-
-                        mesh.AddInstance(position, rotation, scale, color);
-                    }
-
-                    mesh.Create();
-                }
-
-                Core::Logger::GetInstance().Info("Instanced car meshes created: " + std::to_string(instancedCarMeshes.size()) +
-                                                 " materials, " + std::to_string(carCount) + " instances each");
-            }
-        }
-        else
-        {
-            Core::Logger::GetInstance().Warning("Car OBJ file not found: " + carPath);
-        }
+        Core::Logger::GetInstance().Info("Instanced mesh created with " +
+                                         std::to_string(instancedCubes.GetInstanceCount()) + " instances");
+        Core::Logger::GetInstance().Info("Performance: Single draw call for all instances!");
 
         Core::Logger::GetInstance().Info("Enabling OpenGL depth testing");
         glEnable(GL_DEPTH_TEST);
 
-        // 设置背景色
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        // 设置背景色 - 深色背景以突出彩色立方体
+        glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
 
         // 预设光照参数
         glm::vec3 lightPos = glm::vec3(10.0f, 20.0f, 10.0f);
@@ -158,9 +184,7 @@ int main()
         // Initial parameters
         Core::Logger::GetInstance().Info("Controls: WASD=Move, Q/E=Up/Down, Mouse=Look Around");
         Core::Logger::GetInstance().Info("TAB=Toggle Mouse Capture, ESC=Exit");
-        Core::Logger::GetInstance().Info("Scene: " + std::to_string(instancedCubes.GetInstanceCount()) + " cubes, " +
-                                         std::to_string(instancedCarMeshes.empty() ? 0 : instancedCarMeshes[0].GetInstanceCount()) + " cars (multi-material)");
-        Core::Logger::GetInstance().Info("Performance: Each material group uses only 1 draw call!");
+        Core::Logger::GetInstance().Info("Instances: " + std::to_string(instancedCubes.GetInstanceCount()) + " cubes");
         Core::Logger::GetInstance().Info("Starting render loop...");
 
         while (!window.ShouldClose())
@@ -173,6 +197,8 @@ int main()
             {
                 double fps = fps_frameCount / (fps_currentTime - fps_lastTime);
                 Core::Logger::GetInstance().SetFPS(static_cast<int>(fps));
+
+                // 每0.5秒更新一次统计摘要
                 Core::Logger::GetInstance().LogStatisticsSummary();
 
                 fps_frameCount = 0;
@@ -198,9 +224,9 @@ int main()
             if (keyboardController.IsKeyPressed(GLFW_KEY_D))
                 moveDirection += glm::normalize(glm::cross(mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f)));
             if (keyboardController.IsKeyPressed(GLFW_KEY_Q))
-                moveDirection -= glm::vec3(0.0f, 1.0f, 0.0f);
+                moveDirection -= glm::vec3(0.0f, 1.0f, 0.0f); // 向下飞行
             if (keyboardController.IsKeyPressed(GLFW_KEY_E))
-                moveDirection += glm::vec3(0.0f, 1.0f, 0.0f);
+                moveDirection += glm::vec3(0.0f, 1.0f, 0.0f); // 向上飞行
 
             if (glm::length(moveDirection) > 0.0f)
             {
@@ -208,7 +234,7 @@ int main()
                 cameraPos += moveDirection * moveSpeed;
             }
 
-            // 动态计算窗口宽高比
+            // 动态计算窗口宽高比以适应窗口大小变化
             float aspectRatio = static_cast<float>(window.GetWidth()) / static_cast<float>(window.GetHeight());
             glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
                                                     aspectRatio, 0.1f, 200.0f);
@@ -217,18 +243,14 @@ int main()
                                          glm::vec3(0.0f, 1.0f, 0.0f));
 
             // 设置渲染上下文
-            size_t totalDrawCalls = (instancedCubes.GetInstanceCount() > 0 ? 1 : 0) +
-                                   instancedCarMeshes.size();
             Core::LogContext renderContext;
             renderContext.renderPass = "Instanced";
             renderContext.batchIndex = 0;
-            renderContext.drawCallCount = static_cast<int>(totalDrawCalls);
-            renderContext.currentShader = "Instanced with Textures";
+            renderContext.drawCallCount = 1; // 实例化渲染只有1次绘制调用！
+            renderContext.currentShader = "Instanced";
             Core::Logger::GetInstance().SetContext(renderContext);
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // 设置通用着色器参数
+            // 渲染实例化网格
             instancedShader.Use();
             instancedShader.SetMat4("projection", projection);
             instancedShader.SetMat4("view", view);
@@ -236,38 +258,14 @@ int main()
             instancedShader.SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
             instancedShader.SetVec3("viewPos", cameraPos);
             instancedShader.SetFloat("ambientStrength", 0.3f);
-            instancedShader.SetFloat("specularStrength", 0.5f);
-            instancedShader.SetFloat("shininess", 32.0f);
+            instancedShader.SetFloat("specularStrength", 0.6f);
+            instancedShader.SetFloat("shininess", 64.0f);
             instancedShader.SetBool("useInstanceColor", true);
 
-            // 渲染立方体地面（无纹理）
-            if (instancedCubes.GetInstanceCount() > 0)
-            {
-                instancedShader.SetBool("useTexture", false);
-                instancedShader.SetBool("useInstanceColor", true); // 立方体使用实例颜色
-                instancedCubes.Draw();
-            }
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // 渲染车模型（每个材质一个实例化网格，支持纹理）
-            if (!instancedCarMeshes.empty())
-            {
-                for (const auto& carMesh : instancedCarMeshes)
-                {
-                    if (carMesh.GetInstanceCount() > 0)
-                    {
-                        // 如果此网格有纹理，启用纹理
-                        instancedShader.SetBool("useTexture", carMesh.HasTexture());
-
-                        // 设置材质颜色
-                        instancedShader.SetVec3("objectColor", carMesh.GetMaterialColor());
-
-                        // 设置材质光泽度
-                        instancedShader.SetBool("useInstanceColor", false); // 使用材质颜色而不是实例颜色
-
-                        carMesh.Draw();
-                    }
-                }
-            }
+            // 单次绘制调用渲染所有实例！
+            instancedCubes.Draw();
 
             window.SwapBuffers();
             window.PollEvents();
@@ -285,6 +283,7 @@ int main()
         return -1;
     }
 
+    Core::Logger::GetInstance().Info("Shutting down logger system...");
     Core::Logger::GetInstance().Shutdown();
     return 0;
 }

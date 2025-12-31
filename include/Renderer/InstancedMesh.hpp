@@ -1,5 +1,6 @@
 #pragma once
 #include "Renderer/Mesh.hpp"
+#include "Renderer/Texture.hpp"
 #include "Core/GLM.hpp"
 #include <vector>
 #include <glad/glad.h>
@@ -14,7 +15,7 @@ namespace Renderer
         glm::vec3 color;
     };
 
-    // 实例化网格类
+    // 通用实例化网格类 - 支持从任意 IMesh 派生类创建实例化渲染
     class InstancedMesh : public IMesh
     {
     public:
@@ -25,9 +26,17 @@ namespace Renderer
         void Create() override;
         void Draw() const override;
 
-        // 设置基础网格数据（在调用Create之前）
-        void SetVertices(const float* vertices, size_t count);
-        void SetVertexLayout(size_t stride, const std::vector<size_t>& offsets, const std::vector<int>& sizes);
+        // 从现有网格复制顶点数据
+        void SetVertexData(const float* vertices, size_t vertexCount, size_t stride);
+        void SetVertexLayout(const std::vector<size_t>& offsets, const std::vector<int>& sizes);
+
+        // 设置索引数据（用于 EBO）
+        void SetIndexData(const unsigned int* indices, size_t indexCount);
+
+        // 设置纹理和材质颜色
+        void SetTexture(Texture* texture);
+        void SetMaterialColor(const glm::vec3& color) { m_materialColor = color; }
+        const glm::vec3& GetMaterialColor() const { return m_materialColor; }
 
         // 实例管理
         void AddInstance(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale, const glm::vec3& color);
@@ -40,14 +49,30 @@ namespace Renderer
         // 获取信息
         size_t GetInstanceCount() const { return m_instances.size(); }
         size_t GetVertexCount() const { return m_vertexCount; }
+        size_t GetIndexCount() const { return m_indexCount; }
+        bool HasIndices() const { return m_hasIndices; }
+        bool HasTexture() const { return m_texture != nullptr; }
+
+        // 静态辅助方法：从 Cube 创建
+        static InstancedMesh CreateFromCube(size_t instanceCount);
+
+        // 静态辅助方法：从 OBJModel 创建（返回多个实例化网格，每个材质一个）
+        static std::vector<InstancedMesh> CreateFromOBJ(const std::string& objPath, size_t instanceCount);
 
     private:
         // 基础网格数据
-        unsigned int m_vao = 0, m_vbo = 0;
+        unsigned int m_vao = 0, m_vbo = 0, m_ebo = 0;
         unsigned int m_instanceVBO = 0;
         std::vector<float> m_vertices;
+        std::vector<unsigned int> m_indices;
         size_t m_vertexStride = 0;
         size_t m_vertexCount = 0;
+        size_t m_indexCount = 0;
+        bool m_hasIndices = false;
+
+        // 纹理和材质
+        Texture* m_texture = nullptr;
+        glm::vec3 m_materialColor = glm::vec3(1.0f, 1.0f, 1.0f); // 默认白色
 
         // 实例数据
         std::vector<InstanceData> m_instances;

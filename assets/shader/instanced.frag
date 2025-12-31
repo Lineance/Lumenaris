@@ -14,12 +14,16 @@ uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
 uniform bool useInstanceColor;
+uniform bool useTexture;
 
 // 材质属性
 uniform vec3 objectColor;
 uniform float ambientStrength;
 uniform float specularStrength;
 uniform float shininess;
+
+// 纹理采样器
+uniform sampler2D textureSampler;
 
 void main()
 {
@@ -38,8 +42,21 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
     vec3 specular = specularStrength * spec * lightColor;
 
-    // 选择使用实例颜色还是物体颜色
-    vec3 baseColor = useInstanceColor ? InstanceColor : objectColor;
+    // 基础颜色选择
+    vec3 baseColor;
+    if (useTexture)
+    {
+        vec4 texColor = texture(textureSampler, TexCoord);
+        baseColor = texColor.rgb;
+    }
+    else if (useInstanceColor)
+    {
+        baseColor = InstanceColor;
+    }
+    else
+    {
+        baseColor = objectColor;
+    }
 
     // 最终颜色
     vec3 result = (ambient + diffuse + specular) * baseColor;

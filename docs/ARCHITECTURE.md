@@ -161,11 +161,15 @@ LearningOpenGL/
 
 **InstancedMesh 类** (`src/Renderer/InstancedMesh.cpp`)
 - 实例化渲染网格实现，大幅提升批量渲染性能
-- 支持每个实例独立的模型矩阵变换
-- 支持每个实例独立的颜色属性
+- 支持从 Cube 和 OBJ 模型创建实例化网格
+- 支持每个实例独立的模型矩阵变换（位置、旋转、缩放）
+- 支持每个实例独立的颜色属性（基于材质颜色）
 - 使用 glVertexAttribDivisor 实现实例化属性
+- 支持索引渲染（EBO）和纹理映射
+- 多材质支持：为每个材质创建独立的实例化网格
+- 内存管理：自动管理纹理生命周期
 - 一次绘制调用渲染数百个相同几何体
-- 适用于大量重复物体的场景（植被、建筑、粒子等）
+- 适用于大量重复物体的场景（植被、建筑、车辆等）
 
 #### 1.4 主程序 (`src/main.cpp`)
 
@@ -292,16 +296,34 @@ class OBJModel : public IMesh {
 - ✅ 每个实例独立颜色属性
 - ✅ 使用实例化数组减少CPU-GPU通信
 - ✅ glVertexAttribDivisor 实现属性实例化
+- ✅ 支持索引渲染（EBO）和纹理映射
+- ✅ 多材质模型支持（每个材质一个实例化网格）
+- ✅ 材质颜色自动应用
 
 **适用场景**:
-- 大量重复物体的场景渲染（植被、建筑、粒子）
-- 主程序演示：10x10x2 = 200个立方体的实例化渲染
+- 大量重复物体的场景渲染（植被、建筑、车辆）
+- 主程序演示：
+  - 10x10 = 100个立方体地面（1次绘制调用）
+  - 12辆车×38个材质 = 456次传统调用 vs 38次实例化调用
 - 性能提升：相比逐个绘制，实例化渲染可提升10-100倍性能
 
 **技术实现**:
-- 顶点着色器：接收实例矩阵和颜色作为属性输入
-- VBO布局：location 3-6 存储矩阵，location 7 存储颜色
-- 绘制调用：glDrawArraysInstanced 一次渲染所有实例
+- 顶点着色器（`assets/shader/instanced.vert`）：
+  - 接收实例矩阵和颜色作为属性输入
+  - VBO布局：location 3-6 存储矩阵，location 7 存储颜色
+- 片段着色器（`assets/shader/instanced.frag`）：
+  - 支持纹理和材质颜色混合
+  - `useTexture` uniform 控制纹理启用
+  - `useInstanceColor` uniform 控制实例颜色或材质颜色
+- 绘制调用：`glDrawElementsInstanced` 一次渲染所有实例
+- 工厂方法：
+  - `CreateFromCube()`: 从立方体模板创建
+  - `CreateFromOBJ()`: 从OBJ模型创建多个材质网格
+
+**内存管理**:
+- 纹理由 InstancedMesh 管理，析构时自动释放
+- 实例数据包含模型矩阵和颜色
+- 支持动态更新实例缓冲（`UpdateInstanceBuffers()`）
 
 #### 2.3 资源管理
 
@@ -313,6 +335,7 @@ class OBJModel : public IMesh {
 
 **着色器资源**:
 - 基础着色器: Phong光照模型
+- 实例化着色器: 支持实例化渲染和材质颜色
 - 风格化着色器: 8种艺术风格
 - 调试图形: 线框和法线可视化
 
@@ -486,7 +509,11 @@ class OBJModel : public IMesh {
 #### 3.1 基础几何体
 - ✅ **Cube类**: 优化的立方体网格生成，支持变换
 - ✅ **Sphere类**: 参数化球体生成（已实现但未在主程序中使用）
-- ✅ **InstancedMesh类**: 实例化渲染网格，支持批量渲染
+- ✅ **InstancedMesh类**: 实例化渲染网格，支持批量渲染和材质颜色
+  - 从Cube模板创建实例化网格
+  - 从OBJ模型创建多材质实例化网格
+  - 支持纹理和材质颜色混合渲染
+  - 自动内存管理（纹理在析构时释放）
 - ✅ **网格工厂**: 支持运行时几何体类型注册
 
 #### 3.2 OBJ模型系统
@@ -528,7 +555,11 @@ class OBJModel : public IMesh {
 - ✅ 资源复用：着色器预加载避免重复编译
 - ✅ 智能指针：unique_ptr管理资源生命周期
 - ✅ 顶点缓存：OBJ模型顶点数据缓存
-- ✅ 实例化渲染：InstancedMesh实现批量渲染，单次绘制调用渲染数百个实例
+- ✅ 实例化渲染：InstancedMesh实现批量渲染
+  - 单次绘制调用渲染数百个实例
+  - 支持材质颜色和纹理映射
+  - 多材质模型优化（每个材质一次绘制调用）
+  - 纹理自动内存管理
 
 #### 5.2 代码质量
 - ✅ 现代C++：使用C++17特性
@@ -562,6 +593,10 @@ class OBJModel : public IMesh {
 - **Cube.cpp**: 立方体实现（循环编码优化）
 - **Sphere.cpp**: 球体实现（参数化生成）
 - **InstancedMesh.cpp**: 实例化网格实现（批量渲染优化）
+  - 支持从Cube和OBJ模型创建
+  - 多材质支持（每个材质一个实例化网格）
+  - 材质颜色自动应用
+  - 纹理内存管理
 - **OBJLoader.cpp**: OBJ模型和材质文件解析
 - **OBJModel.cpp**: OBJ模型渲染（材质和纹理支持）
 
@@ -570,6 +605,10 @@ class OBJModel : public IMesh {
 - **Renderer/Mesh.hpp**: IMesh接口和MeshFactory
 - **Renderer/OBJLoader.hpp**: OBJ解析器接口
 - **Renderer/OBJModel.hpp**: OBJ模型渲染器接口
+- **Renderer/InstancedMesh.hpp**: 实例化网格接口
+  - 实例数据结构定义
+  - 工厂方法声明
+  - 材质颜色管理
 
 ## 🛠️ 技术特点
 
