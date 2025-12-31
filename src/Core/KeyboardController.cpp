@@ -1,4 +1,5 @@
 #include "Core/KeyboardController.hpp"
+#include "Core/Logger.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -34,17 +35,18 @@ namespace Core
     {
         if (!window)
         {
-            std::cerr << "错误: 无效的GLFW窗口指针" << std::endl;
+            Core::Logger::GetInstance().Error("KeyboardController initialization failed: invalid GLFW window pointer");
             return;
         }
 
+        Core::Logger::GetInstance().Info("Initializing KeyboardController...");
         m_window = window;
 
         // 设置GLFW键盘回调函数
         glfwSetKeyCallback(window, KeyboardController::KeyCallback);
 
         m_initialized = true;
-        std::cout << "键盘控制器初始化完成" << std::endl;
+        Core::Logger::GetInstance().Info("KeyboardController initialized successfully");
     }
 
     void KeyboardController::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -165,6 +167,10 @@ namespace Core
         {
             it->second.callback = nullptr;
             it->second.repeatEnabled = false;
+        }
+        else
+        {
+            Core::Logger::GetInstance().Warning("Attempted to unregister callback for unregistered key " + std::to_string(key));
         }
     }
 

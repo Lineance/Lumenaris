@@ -1,4 +1,5 @@
 #include "Renderer/Sphere.hpp"
+#include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <vector>
 #include <cmath>
@@ -14,6 +15,10 @@ namespace Renderer
 
     void Sphere::Create()
     {
+        Core::Logger::GetInstance().Info("Creating sphere mesh - Radius: " + std::to_string(m_radius) +
+                                         ", Stacks: " + std::to_string(m_stacks) +
+                                         ", Slices: " + std::to_string(m_slices));
+
         // 计算顶点和索引数量
         m_vertexCount = (m_stacks + 1) * (m_slices + 1);
         m_indexCount = m_stacks * m_slices * 6; // 每个面6个索引
@@ -109,6 +114,11 @@ namespace Renderer
         glEnableVertexAttribArray(2);
 
         glBindVertexArray(0);
+        Core::Logger::GetInstance().Info("Sphere mesh created successfully - Vertices: " +
+                                         std::to_string(m_vertexCount) + ", Indices: " +
+                                         std::to_string(m_indexCount) + ", VAO: " +
+                                         std::to_string(m_vao) + ", VBO: " + std::to_string(m_vbo) +
+                                         ", EBO: " + std::to_string(m_ebo));
     }
 
     void Sphere::Draw() const
@@ -116,6 +126,7 @@ namespace Renderer
         glBindVertexArray(m_vao);
         glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
+        Core::Logger::GetInstance().LogDrawCall(m_indexCount / 3); // 每个三角形3个索引
     }
 
     glm::mat4 Sphere::GetModelMatrix() const

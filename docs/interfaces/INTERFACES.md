@@ -3,9 +3,10 @@
 ## 📋 目录
 
 - [Core 模块接口](#core-模块接口)
-  - [Window 类](#window-类)
-  - [MouseController 类](#mousecontroller-类)
-  - [KeyboardController 类](#keyboardcontroller-类)
+- [Window 类](#window-类)
+- [MouseController 类](#mousecontroller-类)
+- [KeyboardController 类](#keyboardcontroller-类)
+- [Logger 类](#logger-类)
 - [Renderer 模块接口](#renderer-模块接口)
   - [IMesh 抽象接口](#imesh-抽象接口)
   - [MeshFactory 工厂类](#meshfactory-工厂类)
@@ -112,6 +113,110 @@ public:
 | `SetMouseSensitivity()` | float | void | 设置鼠标移动灵敏度 |
 
 ---
+
+### Logger 类
+
+日志记录系统，支持分级日志输出和文件保存。
+
+```cpp
+namespace Core {
+// 日志级别枚举
+enum class LogLevel {
+    DEBUG,
+    INFO,
+    WARNING,
+    ERROR
+};
+
+// 轮转类型枚举
+enum class RotationType {
+    NONE,       ///< 不轮转
+    SIZE,       ///< 按文件大小轮转
+    DAILY,      ///< 每日轮转
+    HOURLY      ///< 每小时轮转
+};
+
+// 轮转配置结构体
+struct LogRotationConfig {
+    RotationType type = RotationType::NONE;    ///< 轮转类型
+    size_t maxFileSize = 10 * 1024 * 1024;     ///< 最大文件大小（字节，默认10MB）
+    int maxFiles = 5;                          ///< 最大历史文件数量
+    bool compressOldLogs = false;              ///< 是否压缩旧日志文件
+};
+
+class Logger {
+public:
+    // 获取单例实例
+    static Logger& GetInstance();
+
+    // 初始化（支持异步和轮转配置）
+    void Initialize(const std::string& logFilePath = "logs/application.log",
+                   bool consoleOutput = true,
+                   LogLevel minLevel = LogLevel::DEBUG,
+                   bool async = true,
+                   const LogRotationConfig& rotationConfig = LogRotationConfig());
+
+    // 配置方法
+    void SetMinLevel(LogLevel level);
+    void SetConsoleOutput(bool enabled);
+
+    // 日志记录方法
+    void Debug(const std::string& message);
+    void Info(const std::string& message);
+    void Warning(const std::string& message);
+    void Error(const std::string& message);
+
+    // 清理资源
+    void Shutdown();
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `GetInstance()` | 无 | Logger& | 获取Logger单例实例 |
+| `Initialize()` | string logFilePath, bool consoleOutput, LogLevel minLevel, bool async, LogRotationConfig rotationConfig | void | 初始化日志系统，支持异步写入和轮转配置 |
+| `SetMinLevel()` | LogLevel level | void | 设置最小日志级别，低于此级别的日志将被过滤 |
+| `SetConsoleOutput()` | bool enabled | void | 启用或禁用控制台输出 |
+| `Debug()` | string message | void | 记录DEBUG级别日志 |
+| `Info()` | string message | void | 记录INFO级别日志 |
+| `Warning()` | string message | void | 记录WARNING级别日志 |
+| `Error()` | string message | void | 记录ERROR级别日志 |
+| `Shutdown()` | 无 | void | 关闭日志系统并清理资源 |
+
+#### 高级功能说明
+
+**异步写入**: 默认启用异步模式，使用后台线程写入日志，避免阻塞主线程。
+
+**日志轮转**: 支持三种轮转模式：
+- `SIZE`: 文件大小超过限制时轮转
+- `DAILY`: 每日轮转
+- `HOURLY`: 每小时轮转
+
+**配置示例**:
+```cpp
+// 基本配置（异步，不轮转）
+Core::Logger::GetInstance().Initialize("logs/app.log", true, Core::LogLevel::INFO);
+
+// 带轮转配置（按大小轮转，最大5个文件）
+Core::LogRotationConfig rotationConfig;
+rotationConfig.type = Core::RotationType::SIZE;
+rotationConfig.maxFileSize = 10 * 1024 * 1024; // 10MB
+rotationConfig.maxFiles = 5;
+
+Core::Logger::GetInstance().Initialize("logs/app.log", true, Core::LogLevel::DEBUG,
+                                       true, rotationConfig);
+
+// 同步模式（适合调试）
+Core::Logger::GetInstance().Initialize("logs/debug.log", true, Core::LogLevel::DEBUG,
+                                       false); // 同步模式
+```
+
+---
+
+### 使用示例
 
 ### KeyboardController 类
 

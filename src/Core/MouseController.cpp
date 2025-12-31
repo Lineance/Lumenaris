@@ -1,4 +1,5 @@
 #include "Core/MouseController.hpp"
+#include "Core/Logger.hpp"
 #include <iostream>
 
 namespace Core
@@ -19,9 +20,11 @@ namespace Core
     {
         if (!window)
         {
-            std::cerr << "错误: 无效的GLFW窗口指针" << std::endl;
+            Core::Logger::GetInstance().Error("MouseController initialization failed: invalid GLFW window pointer");
             return;
         }
+
+        Core::Logger::GetInstance().Info("Initializing MouseController...");
 
         // 设置静态实例指针
         s_instance = this;
@@ -32,8 +35,7 @@ namespace Core
 
         // 隐藏并捕捉光标
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-        std::cout << "鼠标控制器初始化完成" << std::endl;
+        Core::Logger::GetInstance().Info("MouseController initialized successfully - cursor captured");
     }
 
     void MouseController::SetMouseCallback(GLFWwindow *window)
@@ -72,9 +74,13 @@ namespace Core
 
         // 限制俯仰角
         if (s_instance->m_pitch > 89.0f)
+        {
             s_instance->m_pitch = 89.0f;
+        }
         if (s_instance->m_pitch < -89.0f)
+        {
             s_instance->m_pitch = -89.0f;
+        }
 
         s_instance->UpdateCameraVectors();
     }
@@ -84,11 +90,22 @@ namespace Core
         if (!s_instance)
             return;
 
+        float oldFov = s_instance->m_fov;
         s_instance->m_fov -= static_cast<float>(yoffset) * s_instance->m_scrollSensitivity;
+
+        bool clamped = false;
         if (s_instance->m_fov < 1.0f)
+        {
             s_instance->m_fov = 1.0f;
+            clamped = true;
+        }
         if (s_instance->m_fov > 45.0f)
+        {
             s_instance->m_fov = 45.0f;
+            clamped = true;
+        }
+
+        // FOV clamped or changed - no debug logging
     }
 
     void MouseController::UpdateCameraVectors()
@@ -111,6 +128,7 @@ namespace Core
             return;
 
         m_mouseCaptured = captured;
+        Core::Logger::GetInstance().Info("Mouse capture " + std::string(captured ? "enabled" : "disabled"));
 
         GLFWwindow *window = glfwGetCurrentContext();
         if (window)
@@ -126,6 +144,10 @@ namespace Core
                 // 显示并释放光标
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             }
+        }
+        else
+        {
+            Core::Logger::GetInstance().Warning("Failed to change mouse capture mode: no current GLFW context");
         }
     }
 

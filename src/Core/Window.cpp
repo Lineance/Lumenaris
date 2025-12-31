@@ -1,4 +1,5 @@
 #include "Core/Window.hpp"
+#include "Core/Logger.hpp"
 #include <iostream>
 
 namespace Core
@@ -15,11 +16,17 @@ namespace Core
         {
             win->SetSize(width, height);
         }
+        else
+        {
+            Core::Logger::GetInstance().Warning("Window resize callback received null window pointer");
+        }
     }
 
     // 构造函数：仅初始化成员变量，不执行实际创建操作，延迟初始化窗口
     Window::Window(int width, int height, const std::string &title)
-        : m_width(width), m_height(height), m_title(title) {}
+        : m_width(width), m_height(height), m_title(title)
+    {
+    }
 
     Window::~Window()
     {
@@ -27,16 +34,21 @@ namespace Core
         {
             glfwDestroyWindow(m_window); // 销毁窗口
         }
-        glfwTerminate(); // 终止glfw
+        glfwTerminate(); // 终止GLFW
+        Core::Logger::GetInstance().Info("GLFW terminated");
     }
 
     void Window::Init() // 创建窗口
     {
+        Core::Logger::GetInstance().Info("Initializing window system...");
+
         // 初始化GLFW
         if (!glfwInit())
         {
+            Core::Logger::GetInstance().Error("Failed to initialize GLFW");
             throw std::runtime_error("Failed to initialize GLFW");
         }
+        Core::Logger::GetInstance().Info("GLFW initialized successfully");
 
         // 配置OpenGL上下文版本和模式
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -50,8 +62,11 @@ namespace Core
 
         if (!m_window)
         {
+            Core::Logger::GetInstance().Error("Failed to create GLFW window: " + m_title);
             throw std::runtime_error("Failed to create GLFW window");
         }
+        Core::Logger::GetInstance().Info("GLFW window created successfully: " + m_title +
+                                         " (" + std::to_string(m_width) + "x" + std::to_string(m_height) + ")");
 
         glfwMakeContextCurrent(m_window);                                    // 设置为当前OpenGL上下文
         glfwSetWindowUserPointer(m_window, this);                         // 设置用户指针以便回调函数访问
@@ -60,9 +75,13 @@ namespace Core
         // 初始化GLAD，加载OpenGL函数指针
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         {
+            Core::Logger::GetInstance().Error("Failed to initialize GLAD");
             throw std::runtime_error("Failed to initialize GLAD");
         }
+        Core::Logger::GetInstance().Info("GLAD initialized successfully - OpenGL functions loaded");
+
         // 加载成功后，GLAD 会在进行你所有调用，故glClearColor可以直接调用
+        Core::Logger::GetInstance().Info("Window system initialization completed");
     }
 
     // 对于glfw的封装

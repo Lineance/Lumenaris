@@ -1,4 +1,5 @@
 #include "Renderer/Cube.hpp"
+#include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <vector>
 
@@ -7,6 +8,7 @@ namespace Renderer
 
     void Cube::Create()
     {
+        Core::Logger::GetInstance().Info("Creating cube mesh...");
         std::vector<float> vertices;
 
         // 定义6个面的顶点数据：位置、法线、UV坐标
@@ -107,6 +109,9 @@ namespace Renderer
         glEnableVertexAttribArray(2);
 
         glBindVertexArray(0);
+        Core::Logger::GetInstance().Info("Cube mesh created successfully - Vertices: " +
+                                         std::to_string(vertices.size() / 8) + ", VAO: " +
+                                         std::to_string(m_vao) + ", VBO: " + std::to_string(m_vbo));
     }
 
     void Cube::Draw() const
@@ -114,6 +119,7 @@ namespace Renderer
         glBindVertexArray(m_vao);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
+        Core::Logger::GetInstance().LogDrawCall(12); // 立方体有12个三角形
     }
 
     glm::mat4 Cube::GetModelMatrix() const

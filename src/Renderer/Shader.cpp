@@ -1,4 +1,5 @@
 #include "Renderer/Shader.hpp"
+#include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <fstream>
 #include <sstream>
@@ -17,13 +18,22 @@ namespace Renderer
 
     void Shader::Load(const std::string &vertexPath, const std::string &fragmentPath)
     {
+        Core::Logger::GetInstance().Info("Loading shader program from: " + vertexPath + " and " + fragmentPath);
+
         // 读取文件
         std::ifstream vFile(vertexPath);
         std::ifstream fFile(fragmentPath);
 
-        if (!vFile.is_open() || !fFile.is_open())
+        if (!vFile.is_open())
         {
-            throw std::runtime_error("Failed to open shader files: " + vertexPath + " or " + fragmentPath);
+            Core::Logger::GetInstance().Error("Failed to open vertex shader file: " + vertexPath);
+            throw std::runtime_error("Failed to open vertex shader file: " + vertexPath);
+        }
+
+        if (!fFile.is_open())
+        {
+            Core::Logger::GetInstance().Error("Failed to open fragment shader file: " + fragmentPath);
+            throw std::runtime_error("Failed to open fragment shader file: " + fragmentPath);
         }
 
         std::stringstream vStream, fStream;
@@ -33,7 +43,7 @@ namespace Renderer
         std::string vertexCode = vStream.str();
         std::string fragmentCode = fStream.str();
 
-        // 编译
+        // 编译顶点着色器
         unsigned int vertex = glCreateShader(GL_VERTEX_SHADER);
         const char *vCode = vertexCode.c_str();
         glShaderSource(vertex, 1, &vCode, nullptr);
@@ -45,9 +55,12 @@ namespace Renderer
         if (!success)
         {
             glGetShaderInfoLog(vertex, 512, nullptr, infoLog);
+            Core::Logger::GetInstance().Error("Vertex shader compilation failed: " + std::string(infoLog));
+            glDeleteShader(vertex);
             throw std::runtime_error("Vertex Shader compilation failed: " + std::string(infoLog));
         }
 
+        // 编译片段着色器
         unsigned int fragment = glCreateShader(GL_FRAGMENT_SHADER);
         const char *fCode = fragmentCode.c_str();
         glShaderSource(fragment, 1, &fCode, nullptr);
@@ -57,10 +70,13 @@ namespace Renderer
         if (!success)
         {
             glGetShaderInfoLog(fragment, 512, nullptr, infoLog);
+            Core::Logger::GetInstance().Error("Fragment shader compilation failed: " + std::string(infoLog));
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
             throw std::runtime_error("Fragment Shader compilation failed: " + std::string(infoLog));
         }
 
-        // 链接
+        // 链接着色器程序
         m_id = glCreateProgram();
         glAttachShader(m_id, vertex);
         glAttachShader(m_id, fragment);
@@ -70,8 +86,15 @@ namespace Renderer
         if (!success)
         {
             glGetProgramInfoLog(m_id, 512, nullptr, infoLog);
+            Core::Logger::GetInstance().Error("Shader program linking failed: " + std::string(infoLog));
+            glDeleteProgram(m_id);
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
+            m_id = 0;
             throw std::runtime_error("Shader Program linking failed: " + std::string(infoLog));
         }
+
+        Core::Logger::GetInstance().Info("Shader program linked successfully, ID: " + std::to_string(m_id));
 
         // 清理
         glDeleteShader(vertex);
@@ -82,6 +105,7 @@ namespace Renderer
     void Shader::Use() const
     {
         glUseProgram(m_id);
+        Core::Logger::GetInstance().LogShaderActivation(m_id);
     }
 
     // 传递矩阵、向量、整数与浮点数到着色器

@@ -1,5 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "Renderer/Texture.hpp"
+#include "Core/Logger.hpp"
 #include <iostream>
 #include <stb_image.h>
 #include <filesystem>
@@ -21,6 +22,8 @@ namespace Renderer
 
     bool Texture::LoadFromFile(const std::string& filepath)
     {
+        Core::Logger::GetInstance().Info("Loading texture from: " + filepath);
+
         // 如果已经有纹理，先清理
         Cleanup();
 
@@ -29,7 +32,7 @@ namespace Renderer
         // 检查文件是否存在
         if (!fs::exists(filepath))
         {
-            std::cerr << "Texture file not found: " << filepath << std::endl;
+            Core::Logger::GetInstance().Error("Texture file not found: " + filepath);
             return false;
         }
 
@@ -40,8 +43,8 @@ namespace Renderer
 
         if (!data)
         {
-            std::cerr << "Failed to load texture: " << filepath << std::endl;
-            std::cerr << "STB Image error: " << stbi_failure_reason() << std::endl;
+            Core::Logger::GetInstance().Error("Failed to load texture: " + filepath);
+            Core::Logger::GetInstance().Error("STB Image error: " + std::string(stbi_failure_reason()));
             return false;
         }
 
@@ -65,7 +68,7 @@ namespace Renderer
             format = GL_RED;
         else
         {
-            std::cerr << "Unsupported texture format with " << channels << " channels" << std::endl;
+            Core::Logger::GetInstance().Error("Unsupported texture format with " + std::to_string(channels) + " channels");
             stbi_image_free(data);
             Cleanup();
             return false;
@@ -82,7 +85,7 @@ namespace Renderer
         GLenum error = glGetError();
         if (error != GL_NO_ERROR)
         {
-            std::cerr << "OpenGL error loading texture: " << error << std::endl;
+            Core::Logger::GetInstance().Error("OpenGL error loading texture: " + std::to_string(error));
             Cleanup();
             return false;
         }
@@ -91,7 +94,9 @@ namespace Renderer
         glBindTexture(GL_TEXTURE_2D, 0);
 
         m_loaded = true;
-        std::cout << "Loaded texture: " << filepath << " (" << width << "x" << height << ", " << channels << " channels)" << std::endl;
+        Core::Logger::GetInstance().Info("Texture loaded successfully: " + filepath + " (" +
+                                        std::to_string(width) + "x" + std::to_string(height) + ", " +
+                                        std::to_string(channels) + " channels, ID: " + std::to_string(m_textureID) + ")");
 
         return true;
     }
@@ -103,6 +108,7 @@ namespace Renderer
 
         glActiveTexture(textureUnit);
         glBindTexture(GL_TEXTURE_2D, m_textureID);
+        Core::Logger::GetInstance().LogTextureBind(m_textureID);
     }
 
     void Texture::Unbind() const

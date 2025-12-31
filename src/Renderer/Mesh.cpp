@@ -1,4 +1,5 @@
 #include "Renderer/Mesh.hpp"
+#include "Core/Logger.hpp"
 #include <stdexcept>
 
 namespace Renderer
@@ -19,6 +20,7 @@ namespace Renderer
         {
             return it->second();
         }
+        Core::Logger::GetInstance().Warning("Unknown mesh type requested: " + type);
         return nullptr;
     }
 

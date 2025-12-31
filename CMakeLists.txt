@@ -15,6 +15,7 @@ add_library(Core STATIC
     src/Core/Window.cpp
     src/Core/MouseController.cpp
     src/Core/KeyboardController.cpp
+    src/Core/Logger.cpp
 )
 target_include_directories(Core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -83,9 +84,31 @@ target_include_directories(HelloWindow PRIVATE
 )
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 
+# # 7. 测试程序
+# add_executable(TestLogger test_logger.cpp)
+# target_include_directories(TestLogger PRIVATE
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+# )
+# target_link_libraries(TestLogger PRIVATE Core)
+
+# 3C原则测试程序
+add_executable(Test3CLogger test/test_3c_logger.cpp)
+target_include_directories(Test3CLogger PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(Test3CLogger PRIVATE Core)
+
+# Release模式测试程序
+add_executable(TestReleaseMode test/test_release_mode.cpp)
+target_include_directories(TestReleaseMode PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(TestReleaseMode PRIVATE Core)
+
 # 项目特性：
 # - 3D网格渲染 (Cube, Sphere, OBJ模型)
 # - 实时着色器切换 (Phong, Toon, Glass, etc.)
 # - 3D相机控制 (WASD移动 + 鼠标旋转)
 # - GLM数学库统一封装
 # - 模块化架构设计
+# - 日志系统 (Logger)

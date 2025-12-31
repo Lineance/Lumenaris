@@ -1,4 +1,5 @@
 #include "Renderer/OBJModel.hpp"
+#include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <iostream>
 
@@ -21,12 +22,17 @@ namespace Renderer
 
     bool OBJModel::LoadFromFile(const std::string& filepath)
     {
+        Core::Logger::GetInstance().Info("Loading OBJ model from: " + filepath);
         m_filepath = filepath;
+
         if (!m_loader.LoadFromFile(filepath))
         {
-            std::cerr << "Failed to load OBJ model: " << filepath << std::endl;
+            Core::Logger::GetInstance().Error("Failed to load OBJ model: " + filepath);
             return false;
         }
+
+        Core::Logger::GetInstance().Info("OBJ model loaded successfully, vertices: " +
+                                        std::to_string(m_loader.GetVertices().size()));
 
         // 自动加载材质和纹理
         LoadMaterialsAndTextures();
@@ -36,9 +42,11 @@ namespace Renderer
 
     void OBJModel::Create()
     {
+        Core::Logger::GetInstance().Info("Creating OpenGL buffers for OBJ model: " + m_filepath);
+
         if (m_loader.GetVertices().empty())
         {
-            std::cerr << "No vertex data loaded. Call LoadFromFile() first." << std::endl;
+            Core::Logger::GetInstance().Error("No vertex data loaded. Call LoadFromFile() first.");
             return;
         }
 
@@ -50,13 +58,12 @@ namespace Renderer
 
         // 检查VBO生成是否成功
         if (m_vbo == 0) {
-            std::cerr << "Failed to generate VBO!" << std::endl;
+            Core::Logger::GetInstance().Error("Failed to generate VBO!");
             return;
         }
 
         // 绑定VAO
         glBindVertexArray(m_vao);
-        std::cout << "Bound VAO: " << m_vao << std::endl;
 
         // 绑定并设置VBO数据
         glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
@@ -65,7 +72,7 @@ namespace Renderer
         // 检查OpenGL错误
         GLenum error2 = glGetError();
         if (error2 != GL_NO_ERROR) {
-            std::cerr << "OpenGL error before setting vertex attributes: " << error2 << std::endl;
+            Core::Logger::GetInstance().Error("OpenGL error before setting vertex attributes: " + std::to_string(error2));
         }
 
         // 设置顶点属性指针
@@ -103,7 +110,7 @@ namespace Renderer
     {
         if (m_vao == 0)
         {
-            std::cerr << "OBJModel not created. Call Create() first." << std::endl;
+            Core::Logger::GetInstance().Error("OBJModel not created. Call Create() first.");
             return;
         }
 
@@ -201,10 +208,12 @@ namespace Renderer
         const auto& materials = m_loader.GetMaterials();
         if (materials.empty())
         {
-            std::cout << "No materials found in OBJ file" << std::endl;
+            Core::Logger::GetInstance().Info("No materials found in OBJ file: " + m_filepath);
             m_materialsLoaded = true;
             return;
         }
+
+        Core::Logger::GetInstance().Info("Loading materials and textures for " + std::to_string(materials.size()) + " materials");
 
         // 为每个材质加载纹理
         m_textures.resize(materials.size());
@@ -219,17 +228,17 @@ namespace Renderer
                 std::string texPath = m_loader.GetBasePath() + "/" + material.diffuseTexname;
                 if (m_textures[i].LoadFromFile(texPath))
                 {
-                    std::cout << "Loaded texture for material '" << material.name << "': " << texPath << std::endl;
+                    // Texture loaded successfully
                 }
                 else
                 {
-                    std::cerr << "Failed to load texture for material '" << material.name << "': " << texPath << std::endl;
+                    Core::Logger::GetInstance().Warning("Failed to load texture for material '" + material.name + "': " + texPath);
                 }
             }
         }
 
         m_materialsLoaded = true;
-        std::cout << "Loaded " << materials.size() << " materials with textures" << std::endl;
+        Core::Logger::GetInstance().Info("Loaded " + std::to_string(materials.size()) + " materials with textures");
     }
 
     void OBJModel::SetCurrentMaterialIndex(int index)
@@ -241,7 +250,8 @@ namespace Renderer
         }
         else
         {
-            std::cerr << "Invalid material index: " << index << std::endl;
+            Core::Logger::GetInstance().Warning("Invalid material index: " + std::to_string(index) +
+                                               " (valid range: 0-" + std::to_string(materials.size() - 1) + ")");
         }
     }
 

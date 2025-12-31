@@ -1,5 +1,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "Renderer/OBJLoader.hpp"
+#include "Core/Logger.hpp"
 #include <iostream>
 #include <filesystem>
 
@@ -20,6 +21,7 @@ namespace Renderer
 
     bool OBJLoader::LoadFromFile(const std::string& filepath)
     {
+        Core::Logger::GetInstance().Info("Loading OBJ file: " + filepath);
         Clear();
 
         // 获取文件所在目录，用于加载材质文件
@@ -44,14 +46,14 @@ namespace Renderer
         if (!err.empty()) {
             // 检查是否包含警告信息
             if (err.find("WARN") != std::string::npos) {
-                std::cout << "OBJ Loader Warning: " << err << std::endl;
+                Core::Logger::GetInstance().Warning("OBJ Loader Warning: " + err);
             } else {
-                std::cerr << "OBJ Loader Error: " << err << std::endl;
+                Core::Logger::GetInstance().Error("OBJ Loader Error: " + err);
             }
         }
 
         if (!ret) {
-            std::cerr << "Failed to load OBJ file: " << filepath << std::endl;
+            Core::Logger::GetInstance().Error("Failed to load OBJ file: " + filepath);
             return false;
         }
 
@@ -61,7 +63,10 @@ namespace Renderer
 
         m_loaded = true;
 
-        // OBJ文件加载成功
+        Core::Logger::GetInstance().Info("OBJ file loaded successfully: " + filepath +
+                                         " (Vertices: " + std::to_string(attrib.vertices.size() / 3) +
+                                         ", Shapes: " + std::to_string(shapes.size()) +
+                                         ", Materials: " + std::to_string(materials.size()) + ")");
 
         return true;
     }

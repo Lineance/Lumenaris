@@ -43,6 +43,8 @@
 + loader的架构和集合体model的创建需要放在render文件夹内部吗，是不是应该分开
 这里有点挤。类似shader material texture mesh放在一起 剩下其余集合体的实现放在其他地方
 
++ DEBUG日志输出问题 常规的输出过于繁琐 影响性能 只能删除所有debug级别的日志。
+
 ## 还没有理解
 
 + OpenGL 3D渲染逻辑
