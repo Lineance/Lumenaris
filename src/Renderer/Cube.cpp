@@ -119,7 +119,9 @@ namespace Renderer
         glBindVertexArray(m_vao);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
+#if ENABLE_RENDER_STATS
         Core::Logger::GetInstance().LogDrawCall(12); // 立方体有12个三角形
+#endif
     }
 
     glm::mat4 Cube::GetModelMatrix() const

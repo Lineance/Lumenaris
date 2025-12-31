@@ -17,6 +17,11 @@
 #define LOG_DEBUG_ENABLED 1
 #endif
 
+// 编译时控制性能关键路径的日志
+#ifndef ENABLE_RENDER_STATS
+#define ENABLE_RENDER_STATS 0
+#endif
+
 namespace Core {
 
 /**

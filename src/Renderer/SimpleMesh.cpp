@@ -125,12 +125,16 @@ namespace Renderer
     {
         if (m_vertices.empty())
         {
+#if LOG_DEBUG_ENABLED
             Core::Logger::GetInstance().Error("SimpleMesh::Create() called with no vertices!");
+#endif
             return;
         }
 
+#if LOG_DEBUG_ENABLED
         Core::Logger::GetInstance().Info("Creating SimpleMesh with " +
                                          std::to_string(m_vertexCount) + " vertices...");
+#endif
 
         // 创建 VAO 和 VBO
         glGenVertexArrays(1, &m_vao);
@@ -156,14 +160,18 @@ namespace Renderer
             glGenBuffers(1, &m_ebo);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(unsigned int), m_indices.data(), GL_STATIC_DRAW);
+#if LOG_DEBUG_ENABLED
             Core::Logger::GetInstance().Info("Created EBO with " + std::to_string(m_indices.size()) + " indices");
+#endif
         }
 
         glBindVertexArray(0);
 
+#if LOG_DEBUG_ENABLED
         Core::Logger::GetInstance().Info("SimpleMesh created successfully - VAO: " +
                                          std::to_string(m_vao) + ", VBO: " + std::to_string(m_vbo) +
                                          (m_hasIndices ? ", EBO: " + std::to_string(m_ebo) : ""));
+#endif
     }
 
     void SimpleMesh::Draw() const
@@ -200,7 +208,9 @@ namespace Renderer
         }
 
         size_t triangleCount = (m_hasIndices ? m_indexCount : m_vertexCount) / 3;
+#if ENABLE_RENDER_STATS
         Core::Logger::GetInstance().LogDrawCall(triangleCount);
+#endif
     }
 
     // 静态方法：从 Cube 创建 SimpleMesh

@@ -24,29 +24,18 @@ namespace Renderer
 
     void InstancedRenderer::SetMesh(std::shared_ptr<SimpleMesh> mesh)
     {
-        m_mesh = mesh;  // 存储 shared_ptr
-        m_materialColor = mesh->GetMaterialColor();  // 复制材质颜色
+        m_mesh = mesh;
+        m_materialColor = mesh->GetMaterialColor();
         if (mesh->HasTexture())
         {
-            m_texture = mesh->GetTexture();  // 复制纹理指针
+            m_texture = mesh->GetTexture();
         }
     }
 
-    void InstancedRenderer::SetInstances(const InstanceData& data)
+    void InstancedRenderer::SetInstances(const std::shared_ptr<InstanceData>& data)
     {
         m_instances = data;
-        m_instanceCount = data.GetCount();
-    }
-
-    void InstancedRenderer::SetTexture(Texture* texture)
-    {
-        m_texture = texture;
-    }
-
-    void InstancedRenderer::UpdateInstances(const InstanceData& data)
-    {
-        SetInstances(data);
-        UploadInstanceData();
+        m_instanceCount = data ? data->GetCount() : 0;
     }
 
     void InstancedRenderer::Initialize()
@@ -58,7 +47,7 @@ namespace Renderer
             return;
         }
 
-        if (m_instances.IsEmpty())
+        if (!m_instances || m_instances->IsEmpty())
         {
             Core::Logger::GetInstance().Error("InstancedRenderer::Initialize() - No instances set!");
             return;
@@ -94,8 +83,8 @@ namespace Renderer
             return;
         }
 
-        const auto& matrices = m_instances.GetModelMatrices();
-        const auto& colors = m_instances.GetColors();
+        const auto& matrices = m_instances->GetModelMatrices();
+        const auto& colors = m_instances->GetColors();
 
         size_t matrixDataSize = matrices.size() * sizeof(glm::mat4);
         size_t colorDataSize = colors.size() * sizeof(glm::vec3);
@@ -125,7 +114,7 @@ namespace Renderer
         }
 
         // 设置实例颜色属性 (location 7)
-        size_t matrixDataSize = m_instances.GetModelMatrices().size() * sizeof(glm::mat4);
+        size_t matrixDataSize = m_instances->GetModelMatrices().size() * sizeof(glm::mat4);
         glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)matrixDataSize);
         glEnableVertexAttribArray(7);
         glVertexAttribDivisor(7, 1);  // 每个实例更新一次
@@ -141,7 +130,7 @@ namespace Renderer
             return;
         }
 
-        if (m_instances.IsEmpty())
+        if (!m_instances || m_instances->IsEmpty())
         {
             Core::Logger::GetInstance().Warning("InstancedRenderer::Render() - No instances to render!");
             return;
@@ -183,12 +172,14 @@ namespace Renderer
         }
 
         // 记录绘制调用
+#if ENABLE_RENDER_STATS
         size_t triangleCount = ((m_mesh->HasIndices() ? m_mesh->GetIndexCount() : m_mesh->GetVertexCount()) / 3) * m_instanceCount;
         Core::Logger::GetInstance().LogDrawCall(triangleCount);
+#endif
     }
 
     // 静态方法：为 Cube 创建实例化渲染器
-    InstancedRenderer InstancedRenderer::CreateForCube(const InstanceData& instances)
+    InstancedRenderer InstancedRenderer::CreateForCube(const std::shared_ptr<InstanceData>& instances)
     {
         InstancedRenderer renderer;
         renderer.SetInstances(instances);
@@ -199,8 +190,8 @@ namespace Renderer
     }
 
     // 静态方法：为 OBJ 模型创建实例化渲染器（返回多个渲染器，每个材质一个）
-    std::pair<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>>
-    InstancedRenderer::CreateForOBJ(const std::string& objPath, const InstanceData& instances)
+    std::tuple<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>, std::shared_ptr<InstanceData>>
+    InstancedRenderer::CreateForOBJ(const std::string& objPath, const std::shared_ptr<InstanceData>& instances)
     {
         std::vector<InstancedRenderer> renderers;
         std::vector<std::shared_ptr<SimpleMesh>> meshPointers;
@@ -212,7 +203,7 @@ namespace Renderer
         if (materialDataList.empty())
         {
             Core::Logger::GetInstance().Error("Failed to get material vertex data from: " + objPath);
-            return std::make_pair(std::move(renderers), std::move(meshPointers));
+            return std::make_tuple(std::move(renderers), std::move(meshPointers), nullptr);
         }
 
         Core::Logger::GetInstance().Info("Creating InstancedRenderers from OBJ: " + objPath +
@@ -233,7 +224,7 @@ namespace Renderer
             // 创建 InstancedRenderer
             InstancedRenderer renderer;
             renderer.SetMesh(mesh);  // 传递 shared_ptr
-            renderer.SetInstances(instances);
+            renderer.SetInstances(instances);  // 共享同一个 InstanceData shared_ptr（零拷贝）
             renderer.Initialize();
 
             renderers.push_back(std::move(renderer));
@@ -243,7 +234,7 @@ namespace Renderer
                                              " with " + std::to_string(materialData.indices.size()) + " indices");
         }
 
-        return std::make_pair(std::move(renderers), std::move(meshPointers));
+        return std::make_tuple(std::move(renderers), std::move(meshPointers), instances);
     }
 
 } // namespace Renderer

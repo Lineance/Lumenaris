@@ -126,7 +126,9 @@ namespace Renderer
         glBindVertexArray(m_vao);
         glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
+#if ENABLE_RENDER_STATS
         Core::Logger::GetInstance().LogDrawCall(m_indexCount / 3); // 每个三角形3个索引
+#endif
     }
 
     glm::mat4 Sphere::GetModelMatrix() const

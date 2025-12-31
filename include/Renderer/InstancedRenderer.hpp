@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <utility>
+#include <tuple>
 #include <glad/glad.h>
 
 namespace Renderer
@@ -69,10 +70,7 @@ namespace Renderer
         void SetMesh(std::shared_ptr<SimpleMesh> mesh);
 
         // 设置实例数据
-        void SetInstances(const InstanceData& data);
-
-        // 更新实例数据（动态更新）
-        void UpdateInstances(const InstanceData& data);
+        void SetInstances(const std::shared_ptr<InstanceData>& data);
 
         // 设置材质颜色
         void SetMaterialColor(const glm::vec3& color) { m_materialColor = color; }
@@ -84,15 +82,15 @@ namespace Renderer
 
         // 获取信息
         size_t GetInstanceCount() const { return m_instanceCount; }
-        const std::shared_ptr<SimpleMesh> GetMesh() const { return m_mesh; }
+        const std::shared_ptr<SimpleMesh>& GetMesh() const { return m_mesh; }
 
         // 静态辅助方法：为 Cube 创建实例化渲染器
-        static InstancedRenderer CreateForCube(const InstanceData& instances);
+        static InstancedRenderer CreateForCube(const std::shared_ptr<InstanceData>& instances);
 
         // 静态辅助方法：为 OBJ 模型创建实例化渲染器（返回多个渲染器，每个材质一个）
-        // 同时返回 mesh 的 shared_ptr 以保持生命周期
-        static std::pair<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>>
-        CreateForOBJ(const std::string& objPath, const InstanceData& instances);
+        // 同时返回 mesh 和 instanceData 的 shared_ptr 以保持生命周期
+        static std::tuple<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>, std::shared_ptr<InstanceData>>
+        CreateForOBJ(const std::string& objPath, const std::shared_ptr<InstanceData>& instances);
 
         // 禁用拷贝（但允许移动，用于放入vector）
         InstancedRenderer(const InstancedRenderer&) = delete;
@@ -104,15 +102,15 @@ namespace Renderer
 
     private:
         // 网格和实例数据
-        std::shared_ptr<SimpleMesh> m_mesh;     // 网格模板（使用 shared_ptr 管理所有权）
-        InstanceData m_instances;               // 实例数据副本
-        size_t m_instanceCount = 0;             // 实例数量
+        std::shared_ptr<SimpleMesh> m_mesh;         // 网格（使用 shared_ptr 管理所有权）
+        std::shared_ptr<InstanceData> m_instances;  // 实例数据（使用 shared_ptr 避免拷贝）
+        size_t m_instanceCount = 0;                 // 实例数量
 
         // OpenGL 对象
-        GLuint m_instanceVBO = 0;               // 实例化 VBO（存储矩阵和颜色）
+        GLuint m_instanceVBO = 0;                   // 实例化 VBO（存储矩阵和颜色）
 
         // 材质和纹理
-        Texture* m_texture = nullptr;           // 纹理（不拥有所有权）
+        Texture* m_texture = nullptr;               // 纹理（不拥有所有权）
         glm::vec3 m_materialColor = glm::vec3(1.0f);
 
         // 内部方法

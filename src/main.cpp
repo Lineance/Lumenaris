@@ -78,7 +78,7 @@ int main()
         // ==========================================
         Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData for cubes...");
 
-        Renderer::InstanceData cubeInstances;
+        auto cubeInstances = std::make_shared<Renderer::InstanceData>();
 
         // 创建 10x10 的立方体地面阵列
         int gridSize = 10;
@@ -98,11 +98,11 @@ int main()
                 bool isWhite = (x + z) % 2 == 0;
                 glm::vec3 color = isWhite ? glm::vec3(0.9f, 0.9f, 0.9f) : glm::vec3(0.3f, 0.3f, 0.3f);
 
-                cubeInstances.Add(position, rotation, scale, color);
+                cubeInstances->Add(position, rotation, scale, color);
             }
         }
 
-        Core::Logger::GetInstance().Info("Prepared " + std::to_string(cubeInstances.GetCount()) + " cube instances");
+        Core::Logger::GetInstance().Info("Prepared " + std::to_string(cubeInstances->GetCount()) + " cube instances");
 
         // ==========================================
         // 3. 创建立方体渲染器（InstancedRenderer）
@@ -111,7 +111,7 @@ int main()
 
         Renderer::InstancedRenderer cubeRenderer;
         cubeRenderer.SetMesh(cubeMesh);  // 传递 shared_ptr
-        cubeRenderer.SetInstances(cubeInstances);
+        cubeRenderer.SetInstances(cubeInstances);  // 传递 shared_ptr（零拷贝）
         cubeRenderer.Initialize();
 
         Core::Logger::GetInstance().Info("Cube renderer initialized with " +
@@ -123,13 +123,14 @@ int main()
         std::string carPath = "assets/models/cars/sportsCar.obj";
         std::vector<Renderer::InstancedRenderer> carRenderers;
         std::vector<std::shared_ptr<Renderer::SimpleMesh>> carMeshes;  // 保持 mesh 存活
+        std::shared_ptr<Renderer::InstanceData> carInstancesData;  // 保持 instanceData 存活
 
         if (fs::exists(carPath))
         {
             Core::Logger::GetInstance().Info("Step 4: Creating InstancedRenderers for OBJ model: " + carPath);
 
             // 准备汽车实例数据
-            Renderer::InstanceData carInstances;
+            auto carInstances = std::make_shared<Renderer::InstanceData>();
             int carCount = 12;
             float radius = 15.0f;
 
@@ -147,13 +148,14 @@ int main()
                 // 使用白色，让材质显示真实颜色
                 glm::vec3 color(1.0f, 1.0f, 1.0f);
 
-                carInstances.Add(position, rotation, scale, color);
+                carInstances->Add(position, rotation, scale, color);
             }
 
-            // 创建实例化渲染器（每个材质一个），同时获取 mesh 的 shared_ptr
-            auto [renderers, meshes] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
+            // 创建实例化渲染器（每个材质一个），同时获取 mesh 和 instanceData 的 shared_ptr
+            auto [renderers, meshes, instances] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
             carRenderers = std::move(renderers);
             carMeshes = std::move(meshes);  // 保持 mesh 存活
+            carInstancesData = instances;   // 保持 instanceData 存活
 
             if (!carRenderers.empty())
             {
