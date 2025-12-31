@@ -18,8 +18,6 @@ float cameraSpeed = 5.0f;
 
 int main()
 {
-    // Initialize random seed for consistent cloud rotations
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
     try
     {
@@ -89,10 +87,10 @@ int main()
                                                { mouseController.ToggleMouseCapture(); });
 
         Renderer::Shader shader;
-        // 测试不同的着色器
-        shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag"); // 卡通渲染
 
-        glEnable(GL_DEPTH_TEST);
+        shader.Load("assets/shader/basic.vert", "assets/shader/basic.frag"); 
+
+        glEnable(GL_DEPTH_TEST); // 关键启用OpenGL渲染深度参数
 
         float lastTime = static_cast<float>(glfwGetTime());
         double fps_lastTime = glfwGetTime();
@@ -126,6 +124,8 @@ int main()
 
             float moveSpeed = cameraSpeed * deltaTime;
             glm::vec3 moveDirection(0.0f);
+
+            // TODO 这里的操作逻辑到底是什么
             if (keyboardController.IsKeyPressed(GLFW_KEY_W))
                 moveDirection += mouseController.GetCameraFront();
             if (keyboardController.IsKeyPressed(GLFW_KEY_S))
@@ -166,7 +166,8 @@ int main()
 
             // 设置蓝天背景色 (天空蓝色渐变)
             glClearColor(0.5f, 0.7f, 1.0f, 1.0f); // 淡蓝色天空
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO 关键深度渲染代码，但是顺序需要讨论
 
             // Render all cloud models
             for (auto &cloudModel : cloudModels)

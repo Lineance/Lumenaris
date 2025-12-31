@@ -96,7 +96,7 @@ namespace Renderer
 
     void OBJModel::Draw() const
     {
-        DrawWithMaterial(m_currentMaterialIndex);
+        DrawWithMaterial(m_currentMaterialIndex); // TODO 这里有必要吗，是不是最好统一 即使是普通问题也应该包含material，只不过会被设定为默认值
     }
 
     void OBJModel::DrawWithMaterial(int materialIndex) const

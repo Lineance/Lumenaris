@@ -112,7 +112,7 @@ namespace Core
 
         m_mouseCaptured = captured;
 
-        GLFWwindow* window = glfwGetCurrentContext();
+        GLFWwindow *window = glfwGetCurrentContext();
         if (window)
         {
             if (captured)
@@ -120,13 +120,11 @@ namespace Core
                 // 隐藏并捕捉光标
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                 m_firstMouse = true; // 重置鼠标状态以避免跳跃
-                std::cout << "鼠标已捕获 (按Tab键释放)" << std::endl;
             }
             else
             {
                 // 显示并释放光标
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                std::cout << "鼠标已释放 (按Tab键捕获)" << std::endl;
             }
         }
     }
