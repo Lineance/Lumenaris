@@ -62,6 +62,7 @@ add_library(Geometry OBJECT
     src/Renderer/Sphere.cpp
     src/Renderer/OBJLoader.cpp    # OBJ文件解析器
     src/Renderer/OBJModel.cpp     # OBJ模型渲染器
+    src/Renderer/InstancedMesh.cpp # 实例化网格渲染器
 )
 
 target_include_directories(Geometry PUBLIC
@@ -92,18 +93,18 @@ target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 # target_link_libraries(TestLogger PRIVATE Core)
 
 # 3C原则测试程序
-add_executable(Test3CLogger test/test_3c_logger.cpp)
-target_include_directories(Test3CLogger PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(Test3CLogger PRIVATE Core)
+# add_executable(Test3CLogger test/test_3c_logger.cpp)
+# target_include_directories(Test3CLogger PRIVATE
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+# )
+# target_link_libraries(Test3CLogger PRIVATE Core)
 
-# Release模式测试程序
-add_executable(TestReleaseMode test/test_release_mode.cpp)
-target_include_directories(TestReleaseMode PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(TestReleaseMode PRIVATE Core)
+# # Release模式测试程序
+# add_executable(TestReleaseMode test/test_release_mode.cpp)
+# target_include_directories(TestReleaseMode PRIVATE
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+# )
+# target_link_libraries(TestReleaseMode PRIVATE Core)
 
 # 项目特性：
 # - 3D网格渲染 (Cube, Sphere, OBJ模型)
