@@ -3,7 +3,7 @@
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
 #include "Renderer/Shader.hpp"
-#include "Renderer/InstancedMesh.hpp"
+#include "Renderer/InstancedRenderer.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
@@ -59,7 +59,7 @@ int main()
 
         // 创建实例化网格
         Core::Logger::GetInstance().Info("Creating instanced mesh...");
-        Renderer::InstancedMesh instancedCubes;
+        Renderer::InstancedRenderer instancedCubes;
 
         // 准备立方体顶点数据
         std::vector<float> cubeVertices;

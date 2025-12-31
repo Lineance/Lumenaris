@@ -137,14 +137,4 @@ namespace Renderer
         return model;
     }
 
-    int Sphere::GetVertexCount() const
-    {
-        return m_vertexCount;
-    }
-
-    int Sphere::GetIndexCount() const
-    {
-        return m_indexCount;
-    }
-
 } // namespace Renderer

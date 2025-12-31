@@ -1,7 +1,12 @@
 /**
- * 实例化渲染测试程序
+ * 实例化渲染测试程序 - 新架构
  *
- * 本程序演示如何使用 InstancedMesh 类进行高效的批量渲染
+ * 本程序演示如何使用新架构进行高效的批量渲染
+ *
+ * 架构设计：
+ * - SimpleMesh: 网格数据
+ * - InstanceData: 实例数据
+ * - InstancedRenderer: 渲染逻辑
  *
  * 功能演示：
  * 1. 创建 10x10x2 = 200 个立方体的实例化渲染
@@ -27,8 +32,9 @@
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
 #include "Renderer/Shader.hpp"
-#include "Renderer/InstancedMesh.hpp"
-#include "Renderer/Cube.hpp"
+#include "Renderer/SimpleMesh.hpp"
+#include "Renderer/InstancedRenderer.hpp"
+#include "Renderer/InstanceData.hpp"
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
@@ -45,16 +51,16 @@ int main()
     rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
     rotationConfig.maxFiles = 3;
 
-    Core::Logger::GetInstance().Initialize("logs/instanced_rendering.log", true, Core::LogLevel::DEBUG,
+    Core::Logger::GetInstance().Initialize("logs/instanced_rendering_test.log", true, Core::LogLevel::DEBUG,
                                            true, rotationConfig);
 
     try
     {
-        Core::Logger::GetInstance().Info("Starting Instanced Rendering Test");
+        Core::Logger::GetInstance().Info("Starting Instanced Rendering Test - New Architecture");
         Core::Logger::GetInstance().Info("Window resolution: 1280x720");
 
         // 创建窗口
-        Core::Window window(1280, 720, "Instanced Rendering Test");
+        Core::Window window(1280, 720, "Instanced Rendering Test - New Architecture");
         window.Init();
 
         // 初始化输入控制器
@@ -79,64 +85,19 @@ int main()
         Renderer::Shader instancedShader;
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
-        // 创建实例化网格
-        Core::Logger::GetInstance().Info("Creating instanced cubes...");
-        Renderer::InstancedMesh instancedCubes;
+        // ==========================================
+        // 步骤 1: 创建网格（SimpleMesh）
+        // ==========================================
+        Core::Logger::GetInstance().Info("Step 1: Creating SimpleMesh from Cube template...");
+        Renderer::SimpleMesh cubeMesh = Renderer::SimpleMesh::CreateFromCube();
+        cubeMesh.Create();
 
-        // 准备立方体顶点数据
-        std::vector<float> cubeVertices;
-        cubeVertices.insert(cubeVertices.end(), {
-            // 前面
-            -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
-             0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-             0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
+        // ==========================================
+        // 步骤 2: 准备实例数据（InstanceData）
+        // ==========================================
+        Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData...");
 
-            // 后面
-            -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
-             0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,
-
-            // 左面
-            -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-
-            // 右面
-             0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-             0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-             0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-             0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-
-            // 下面
-            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
-             0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
-             0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
-
-            // 上面
-            -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f
-        });
-
-        instancedCubes.SetVertices(cubeVertices.data(), cubeVertices.size());
-        instancedCubes.SetVertexLayout(8, {0, 3, 6}, {3, 3, 2});
+        Renderer::InstanceData instances;
 
         // 创建 10x10x2 的立方体阵列
         int gridSize = 10;
@@ -174,13 +135,25 @@ int main()
                         0.5f + 0.5f * std::cos(t * 3.14159f)
                     );
 
-                    instancedCubes.AddInstance(position, rotation, scale, color);
+                    instances.Add(position, rotation, scale, color);
                 }
             }
         }
 
-        instancedCubes.Create();
-        Core::Logger::GetInstance().Info("Created " + std::to_string(instancedCubes.GetInstanceCount()) + " instances");
+        Core::Logger::GetInstance().Info("Prepared " + std::to_string(instances.GetCount()) + " instances");
+
+        // ==========================================
+        // 步骤 3: 创建渲染器（InstancedRenderer）
+        // ==========================================
+        Core::Logger::GetInstance().Info("Step 3: Creating InstancedRenderer...");
+
+        Renderer::InstancedRenderer renderer;
+        renderer.SetMesh(cubeMesh);
+        renderer.SetInstances(instances);
+        renderer.Initialize();
+
+        Core::Logger::GetInstance().Info("InstancedRenderer initialized with " +
+                                         std::to_string(renderer.GetInstanceCount()) + " instances");
 
         // 启用深度测试
         glEnable(GL_DEPTH_TEST);
@@ -266,8 +239,10 @@ int main()
             instancedShader.SetFloat("specularStrength", 0.5f);
             instancedShader.SetFloat("shininess", 32.0f);
             instancedShader.SetBool("useInstanceColor", true);
+            instancedShader.SetBool("useTexture", false);
 
-            instancedCubes.Draw();
+            // 执行渲染
+            renderer.Render();
 
             window.SwapBuffers();
             window.PollEvents();

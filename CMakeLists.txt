@@ -62,7 +62,9 @@ add_library(Geometry OBJECT
     src/Renderer/Sphere.cpp
     src/Renderer/OBJLoader.cpp    # OBJ文件解析器
     src/Renderer/OBJModel.cpp     # OBJ模型渲染器
-    src/Renderer/InstancedMesh.cpp # 实例化网格渲染器
+    src/Renderer/InstanceData.cpp # 实例数据容器
+    src/Renderer/SimpleMesh.cpp   # 简单网格类
+    src/Renderer/InstancedRenderer.cpp # 实例化渲染器（职责分离架构）
 )
 
 target_include_directories(Geometry PUBLIC

@@ -27,9 +27,12 @@ namespace Renderer
         float GetRadius() const { return m_radius; }
         glm::mat4 GetModelMatrix() const;
 
-        // 获取顶点和索引数量
-        int GetVertexCount() const;
-        int GetIndexCount() const;
+        // IMesh接口实现
+        unsigned int GetVAO() const override { return m_vao; }
+        size_t GetVertexCount() const override { return m_vertexCount; }
+        size_t GetIndexCount() const override { return m_indexCount; }
+        bool HasIndices() const override { return m_ebo != 0; }
+        bool HasTexture() const override { return false; }
 
     private:
         unsigned int m_vao = 0, m_vbo = 0, m_ebo = 0;

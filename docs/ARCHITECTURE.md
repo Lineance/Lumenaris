@@ -159,17 +159,30 @@ LearningOpenGL/
 - 提供完整的变换控制（位置、缩放、旋转）
 - 支持材质属性访问和查询
 
-**InstancedMesh 类** (`src/Renderer/InstancedMesh.cpp`)
-- 实例化渲染网格实现，大幅提升批量渲染性能
-- 支持从 Cube 和 OBJ 模型创建实例化网格
+**InstancedRenderer 类** (`src/Renderer/InstancedRenderer.cpp`)
+- 实例化渲染器实现，大幅提升批量渲染性能
+- 采用职责分离设计：
+  - SimpleMesh: 网格数据容器（使用 shared_ptr 管理生命周期）
+  - InstanceData: 实例数据容器（矩阵和颜色）
+  - InstancedRenderer: 渲染逻辑（持有 shared_ptr）
+- 支持从 Cube 和 OBJ 模型创建实例化渲染器
 - 支持每个实例独立的模型矩阵变换（位置、旋转、缩放）
 - 支持每个实例独立的颜色属性（基于材质颜色）
 - 使用 glVertexAttribDivisor 实现实例化属性
 - 支持索引渲染（EBO）和纹理映射
-- 多材质支持：为每个材质创建独立的实例化网格
-- 内存管理：自动管理纹理生命周期
+- 多材质支持：为每个材质创建独立的实例化渲染器
+- 内存安全：使用 shared_ptr 自动管理 mesh 生命周期，避免悬空指针
 - 一次绘制调用渲染数百个相同几何体
 - 适用于大量重复物体的场景（植被、建筑、车辆等）
+
+**SimpleMesh 类** (`src/Renderer/SimpleMesh.cpp`)
+- 纯粹的数据容器，存储网格几何数据（顶点、索引、VAO/VBO/EBO）
+- 支持深拷贝语义：拷贝时创建新的OpenGL缓冲对象
+- 支持移动语义：高效的资源转移
+- 与 InstancedRenderer 配合使用：SimpleMesh 提供数据，InstancedRenderer 提供逻辑
+- 纹理指针由外部管理，SimpleMesh 不拥有所有权
+- 静态工厂方法：CreateFromCube() 和 CreateFromMaterialData()
+- **使用方式**：通过 shared_ptr 传递给 InstancedRenderer，自动管理生命周期
 
 #### 1.4 主程序 (`src/main.cpp`)
 
@@ -308,6 +321,15 @@ class OBJModel : public IMesh {
 - 性能提升：相比逐个绘制，实例化渲染可提升10-100倍性能
 
 **技术实现**:
+- 职责分离架构（方案C）：
+  - SimpleMesh: 纯数据容器（顶点、索引、VAO/VBO/EBO）
+  - InstanceData: 实例数据容器（变换矩阵、颜色）
+  - InstancedRenderer: 渲染逻辑（持有 shared_ptr）
+- 智能指针管理：
+  - InstancedRenderer 使用 `shared_ptr<SimpleMesh>` 管理网格生命周期
+  - CreateForOBJ() 返回 pair<渲染器vector, mesh的shared_ptrvector>
+  - 自动内存管理，消除悬空指针风险
+  - 多个 InstancedRenderer 可以安全共享同一个 SimpleMesh
 - 顶点着色器（`assets/shader/instanced.vert`）：
   - 接收实例矩阵和颜色作为属性输入
   - VBO布局：location 3-6 存储矩阵，location 7 存储颜色
@@ -317,13 +339,15 @@ class OBJModel : public IMesh {
   - `useInstanceColor` uniform 控制实例颜色或材质颜色
 - 绘制调用：`glDrawElementsInstanced` 一次渲染所有实例
 - 工厂方法：
-  - `CreateFromCube()`: 从立方体模板创建
-  - `CreateFromOBJ()`: 从OBJ模型创建多个材质网格
+  - `CreateForCube()`: 创建立方体实例化渲染器
+  - `CreateForOBJ()`: 从OBJ模型创建多个材质渲染器（返回pair）
 
 **内存管理**:
-- 纹理由 InstancedMesh 管理，析构时自动释放
+- 使用 shared_ptr 自动管理 SimpleMesh 生命周期
+- 主程序需要保持 mesh 的 shared_ptr 存活
+- 纹理由外部管理，InstancedRenderer 仅持有指针
 - 实例数据包含模型矩阵和颜色
-- 支持动态更新实例缓冲（`UpdateInstanceBuffers()`）
+- 支持动态更新实例缓冲（`UpdateInstances()`）
 
 #### 2.3 资源管理
 
@@ -359,7 +383,7 @@ class OBJModel : public IMesh {
 #### 3.1 性能优化方向
 
 **渲染性能优化**:
-- ✅ **实例化渲染**: InstancedMesh类实现，一次绘制数百个实例
+- ✅ **实例化渲染**: InstancedRenderer类实现，一次绘制数百个实例
 - **LOD系统**: 根据距离动态调整几何体细节层次
 - **视锥剔除**: 只渲染可见几何体，减少无效绘制
 - **遮挡剔除**: 避免渲染被其他物体遮挡的几何体
@@ -509,11 +533,16 @@ class OBJModel : public IMesh {
 #### 3.1 基础几何体
 - ✅ **Cube类**: 优化的立方体网格生成，支持变换
 - ✅ **Sphere类**: 参数化球体生成（已实现但未在主程序中使用）
-- ✅ **InstancedMesh类**: 实例化渲染网格，支持批量渲染和材质颜色
-  - 从Cube模板创建实例化网格
-  - 从OBJ模型创建多材质实例化网格
+- ✅ **SimpleMesh类**: 纯粹的数据容器，支持深拷贝和移动语义
+  - 从Cube模板创建网格
+  - 从OBJ材质数据创建网格
+  - 值语义设计，避免生命周期问题
+- ✅ **InstancedRenderer类**: 实例化渲染器，支持批量渲染
+  - 采用职责分离设计（SimpleMesh + InstanceData + InstancedRenderer）
+  - 从Cube模板创建实例化渲染器
+  - 从OBJ模型创建多材质实例化渲染器
   - 支持纹理和材质颜色混合渲染
-  - 自动内存管理（纹理在析构时释放）
+  - 内存安全：拥有SimpleMesh副本，避免悬空指针
 - ✅ **网格工厂**: 支持运行时几何体类型注册
 
 #### 3.2 OBJ模型系统
@@ -555,11 +584,12 @@ class OBJModel : public IMesh {
 - ✅ 资源复用：着色器预加载避免重复编译
 - ✅ 智能指针：unique_ptr管理资源生命周期
 - ✅ 顶点缓存：OBJ模型顶点数据缓存
-- ✅ 实例化渲染：InstancedMesh实现批量渲染
+- ✅ 实例化渲染：InstancedRenderer实现批量渲染
+  - 职责分离架构（SimpleMesh + InstanceData + InstancedRenderer）
   - 单次绘制调用渲染数百个实例
   - 支持材质颜色和纹理映射
   - 多材质模型优化（每个材质一次绘制调用）
-  - 纹理自动内存管理
+  - 值语义设计：SimpleMesh 深拷贝，避免生命周期问题
 
 #### 5.2 代码质量
 - ✅ 现代C++：使用C++17特性
@@ -592,11 +622,15 @@ class OBJModel : public IMesh {
 - **Mesh.cpp**: 网格抽象和工厂实现
 - **Cube.cpp**: 立方体实现（循环编码优化）
 - **Sphere.cpp**: 球体实现（参数化生成）
-- **InstancedMesh.cpp**: 实例化网格实现（批量渲染优化）
+- **SimpleMesh.cpp**: 网格数据容器实现
+  - 深拷贝语义：拷贝时创建新OpenGL对象
+  - 移动语义：高效资源转移
+  - 与InstancedRenderer配合使用
+- **InstancedRenderer.cpp**: 实例化渲染器实现（批量渲染优化）
+  - 职责分离设计（SimpleMesh + InstanceData + InstancedRenderer）
   - 支持从Cube和OBJ模型创建
-  - 多材质支持（每个材质一个实例化网格）
-  - 材质颜色自动应用
-  - 纹理内存管理
+  - 多材质支持（每个材质一个渲染器）
+  - 值语义：拥有SimpleMesh副本，避免生命周期问题
 - **OBJLoader.cpp**: OBJ模型和材质文件解析
 - **OBJModel.cpp**: OBJ模型渲染（材质和纹理支持）
 
@@ -605,9 +639,13 @@ class OBJModel : public IMesh {
 - **Renderer/Mesh.hpp**: IMesh接口和MeshFactory
 - **Renderer/OBJLoader.hpp**: OBJ解析器接口
 - **Renderer/OBJModel.hpp**: OBJ模型渲染器接口
-- **Renderer/InstancedMesh.hpp**: 实例化网格接口
+- **Renderer/SimpleMesh.hpp**: 网格数据容器接口
+  - 深拷贝和移动语义声明
+  - 静态工厂方法声明
+- **Renderer/InstancedRenderer.hpp**: 实例化渲染器接口
+  - 职责分离架构设计
   - 实例数据结构定义
-  - 工厂方法声明
+  - 静态工厂方法声明
   - 材质颜色管理
 
 ## 🛠️ 技术特点

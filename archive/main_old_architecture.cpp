@@ -3,9 +3,7 @@
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
 #include "Renderer/Shader.hpp"
-#include "Renderer/SimpleMesh.hpp"
 #include "Renderer/InstancedRenderer.hpp"
-#include "Renderer/InstanceData.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>
@@ -31,16 +29,12 @@ int main()
 
     try
     {
-        Core::Logger::GetInstance().Info("=== Instanced Rendering Application - New Architecture ===");
-        Core::Logger::GetInstance().Info("Architecture: Responsibility Separation Design");
-        Core::Logger::GetInstance().Info("  - IMesh: Mesh data (SimpleMesh)");
-        Core::Logger::GetInstance().Info("  - InstanceData: Instance data (matrices, colors)");
-        Core::Logger::GetInstance().Info("  - InstancedRenderer: Rendering logic");
+        Core::Logger::GetInstance().Info("Starting Instanced Rendering Application");
         Core::Logger::GetInstance().Info("Application version: Cube & OBJ Instanced Rendering with Textures");
         Core::Logger::GetInstance().Info("Window resolution: 1920x1080");
 
         Core::Logger::GetInstance().Info("Creating application window...");
-        Core::Window window(1920, 1080, "Instanced Rendering - New Architecture");
+        Core::Window window(1920, 1080, "Instanced Rendering - Cube & OBJ with Textures");
         window.Init();
 
         Core::Logger::GetInstance().Info("Initializing input controllers...");
@@ -67,18 +61,10 @@ int main()
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
         // ==========================================
-        // 1. 创建立方体网格（SimpleMesh）
+        // 1. 创建立方体实例化网格
         // ==========================================
-        Core::Logger::GetInstance().Info("Step 1: Creating SimpleMesh from Cube template...");
-        auto cubeMesh = std::make_shared<Renderer::SimpleMesh>(Renderer::SimpleMesh::CreateFromCube());
-        cubeMesh->Create();  // 创建 OpenGL 对象
-
-        // ==========================================
-        // 2. 准备立方体实例数据（InstanceData）
-        // ==========================================
-        Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData for cubes...");
-
-        Renderer::InstanceData cubeInstances;
+        Core::Logger::GetInstance().Info("Creating instanced cubes from Cube template...");
+        Renderer::InstancedRenderer instancedCubes = Renderer::InstancedRenderer::CreateFromCube(0);
 
         // 创建 10x10 的立方体地面阵列
         int gridSize = 10;
@@ -98,68 +84,56 @@ int main()
                 bool isWhite = (x + z) % 2 == 0;
                 glm::vec3 color = isWhite ? glm::vec3(0.9f, 0.9f, 0.9f) : glm::vec3(0.3f, 0.3f, 0.3f);
 
-                cubeInstances.Add(position, rotation, scale, color);
+                instancedCubes.AddInstance(position, rotation, scale, color);
             }
         }
 
-        Core::Logger::GetInstance().Info("Prepared " + std::to_string(cubeInstances.GetCount()) + " cube instances");
+        instancedCubes.Create();
+        Core::Logger::GetInstance().Info("Instanced cubes created: " + std::to_string(instancedCubes.GetInstanceCount()) + " instances");
 
         // ==========================================
-        // 3. 创建立方体渲染器（InstancedRenderer）
-        // ==========================================
-        Core::Logger::GetInstance().Info("Step 3: Creating InstancedRenderer for cubes...");
-
-        Renderer::InstancedRenderer cubeRenderer;
-        cubeRenderer.SetMesh(cubeMesh);  // 传递 shared_ptr
-        cubeRenderer.SetInstances(cubeInstances);
-        cubeRenderer.Initialize();
-
-        Core::Logger::GetInstance().Info("Cube renderer initialized with " +
-                                         std::to_string(cubeRenderer.GetInstanceCount()) + " instances");
-
-        // ==========================================
-        // 4. 创建 OBJ 模型实例化渲染（支持多材质和纹理）
+        // 2. 创建 OBJ 模型实例化渲染（支持多材质和纹理）
         // ==========================================
         std::string carPath = "assets/models/cars/sportsCar.obj";
-        std::vector<Renderer::InstancedRenderer> carRenderers;
-        std::vector<std::shared_ptr<Renderer::SimpleMesh>> carMeshes;  // 保持 mesh 存活
+        std::vector<Renderer::InstancedRenderer> instancedCarMeshes;
 
         if (fs::exists(carPath))
         {
-            Core::Logger::GetInstance().Info("Step 4: Creating InstancedRenderers for OBJ model: " + carPath);
+            Core::Logger::GetInstance().Info("Creating instanced cars from OBJ: " + carPath);
 
-            // 准备汽车实例数据
-            Renderer::InstanceData carInstances;
-            int carCount = 12;
-            float radius = 15.0f;
+            // 创建多个实例化网格（每个材质一个）
+            instancedCarMeshes = Renderer::InstancedRenderer::CreateFromOBJ(carPath, 0);
 
-            for (int i = 0; i < carCount; ++i)
+            if (!instancedCarMeshes.empty())
             {
-                float angle = (static_cast<float>(i) / carCount) * 3.14159f * 2.0f;
-                float x = std::cos(angle) * radius;
-                float z = std::sin(angle) * radius;
-                float y = 0.0f;
+                // 为每个材质网格添加相同的实例
+                int carCount = 12;
+                float radius = 15.0f;
 
-                glm::vec3 position(x, y, z);
-                glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
-                glm::vec3 scale(0.5f, 0.5f, 0.5f);
+                for (auto& mesh : instancedCarMeshes)
+                {
+                    for (int i = 0; i < carCount; ++i)
+                    {
+                        float angle = (static_cast<float>(i) / carCount) * 3.14159f * 2.0f;
+                        float x = std::cos(angle) * radius;
+                        float z = std::sin(angle) * radius;
+                        float y = 0.0f;
 
-                // 使用白色，让材质显示真实颜色
-                glm::vec3 color(1.0f, 1.0f, 1.0f);
+                        glm::vec3 position(x, y, z);
+                        glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
+                        glm::vec3 scale(0.5f, 0.5f, 0.5f);
 
-                carInstances.Add(position, rotation, scale, color);
-            }
+                        // 使用白色，让纹理显示真实颜色
+                        glm::vec3 color(1.0f, 1.0f, 1.0f);
 
-            // 创建实例化渲染器（每个材质一个），同时获取 mesh 的 shared_ptr
-            auto [renderers, meshes] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
-            carRenderers = std::move(renderers);
-            carMeshes = std::move(meshes);  // 保持 mesh 存活
+                        mesh.AddInstance(position, rotation, scale, color);
+                    }
 
-            if (!carRenderers.empty())
-            {
-                Core::Logger::GetInstance().Info("Created " + std::to_string(carRenderers.size()) +
-                                                 " car renderers (multi-material) with " +
-                                                 std::to_string(carCount) + " instances each");
+                    mesh.Create();
+                }
+
+                Core::Logger::GetInstance().Info("Instanced car meshes created: " + std::to_string(instancedCarMeshes.size()) +
+                                                 " materials, " + std::to_string(carCount) + " instances each");
             }
         }
         else
@@ -184,8 +158,8 @@ int main()
         // Initial parameters
         Core::Logger::GetInstance().Info("Controls: WASD=Move, Q/E=Up/Down, Mouse=Look Around");
         Core::Logger::GetInstance().Info("TAB=Toggle Mouse Capture, ESC=Exit");
-        Core::Logger::GetInstance().Info("Scene: " + std::to_string(cubeRenderer.GetInstanceCount()) + " cubes, " +
-                                         (carRenderers.empty() ? "0" : std::to_string(carRenderers[0].GetInstanceCount())) + " cars (multi-material)");
+        Core::Logger::GetInstance().Info("Scene: " + std::to_string(instancedCubes.GetInstanceCount()) + " cubes, " +
+                                         std::to_string(instancedCarMeshes.empty() ? 0 : instancedCarMeshes[0].GetInstanceCount()) + " cars (multi-material)");
         Core::Logger::GetInstance().Info("Performance: Each material group uses only 1 draw call!");
         Core::Logger::GetInstance().Info("Starting render loop...");
 
@@ -243,7 +217,8 @@ int main()
                                          glm::vec3(0.0f, 1.0f, 0.0f));
 
             // 设置渲染上下文
-            size_t totalDrawCalls = 1 + carRenderers.size();
+            size_t totalDrawCalls = (instancedCubes.GetInstanceCount() > 0 ? 1 : 0) +
+                                   instancedCarMeshes.size();
             Core::LogContext renderContext;
             renderContext.renderPass = "Instanced";
             renderContext.batchIndex = 0;
@@ -263,36 +238,33 @@ int main()
             instancedShader.SetFloat("ambientStrength", 0.3f);
             instancedShader.SetFloat("specularStrength", 0.5f);
             instancedShader.SetFloat("shininess", 32.0f);
+            instancedShader.SetBool("useInstanceColor", true);
 
-            // ==========================================
             // 渲染立方体地面（无纹理）
-            // ==========================================
-            if (cubeRenderer.GetInstanceCount() > 0)
+            if (instancedCubes.GetInstanceCount() > 0)
             {
                 instancedShader.SetBool("useTexture", false);
                 instancedShader.SetBool("useInstanceColor", true); // 立方体使用实例颜色
-                cubeRenderer.Render();
+                instancedCubes.Draw();
             }
 
-            // ==========================================
-            // 渲染车模型（每个材质一个实例化渲染器，支持纹理）
-            // ==========================================
-            if (!carRenderers.empty())
+            // 渲染车模型（每个材质一个实例化网格，支持纹理）
+            if (!instancedCarMeshes.empty())
             {
-                for (const auto& carRenderer : carRenderers)
+                for (const auto& carMesh : instancedCarMeshes)
                 {
-                    if (carRenderer.GetInstanceCount() > 0)
+                    if (carMesh.GetInstanceCount() > 0)
                     {
-                        // 如果此渲染器有纹理，启用纹理
-                        instancedShader.SetBool("useTexture", carRenderer.HasTexture());
+                        // 如果此网格有纹理，启用纹理
+                        instancedShader.SetBool("useTexture", carMesh.HasTexture());
 
                         // 设置材质颜色
-                        instancedShader.SetVec3("objectColor", carRenderer.GetMaterialColor());
+                        instancedShader.SetVec3("objectColor", carMesh.GetMaterialColor());
 
                         // 设置材质光泽度
                         instancedShader.SetBool("useInstanceColor", false); // 使用材质颜色而不是实例颜色
 
-                        carRenderer.Render();
+                        carMesh.Draw();
                     }
                 }
             }

@@ -20,6 +20,13 @@ namespace Renderer
         void Create() override;
         void Draw() const override;
 
+        // IMesh 接口实现
+        unsigned int GetVAO() const override { return m_vao; }
+        size_t GetVertexCount() const override { return m_loader.GetVertices().size(); }
+        size_t GetIndexCount() const override { return m_loader.GetIndices().size(); }
+        bool HasIndices() const override { return m_loader.HasIndices(); }
+        bool HasTexture() const override;
+
         // 按材质渲染
         void DrawWithMaterial(int materialIndex) const;
 
@@ -40,9 +47,6 @@ namespace Renderer
         const std::string& GetFilePath() const { return m_filepath; }
         glm::mat4 GetModelMatrix() const;
 
-        // 获取顶点数量
-        size_t GetVertexCount() const { return m_loader.GetVertices().size(); }
-
         // 获取材质数量
         size_t GetMaterialCount() const { return m_loader.GetMaterials().size(); }
 
@@ -55,11 +59,18 @@ namespace Renderer
         // 设置当前使用的材质索引
         void SetCurrentMaterialIndex(int index);
 
-        // 检查是否有纹理
-        bool HasTexture() const;
-
         // 获取当前材质
         const OBJMaterial* GetCurrentMaterial() const;
+
+        // 静态方法：为实例化渲染提供按材质分离的顶点数据
+        struct MaterialVertexData {
+            std::vector<float> vertices;      // 扩展的顶点数据（位置+法线+UV）
+            std::vector<unsigned int> indices; // 此材质的索引
+            OBJMaterial material;             // 材质信息
+            std::string texturePath;          // 纹理路径
+        };
+
+        static std::vector<MaterialVertexData> GetMaterialVertexData(const std::string& objPath);
 
     private:
         // OpenGL缓冲区对象

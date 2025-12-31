@@ -22,6 +22,17 @@ namespace Renderer
         const glm::vec3 &GetColor() const { return m_color; }
         glm::mat4 GetModelMatrix() const;
 
+        // 静态方法：获取立方体的顶点数据（用于实例化渲染）
+        static std::vector<float> GetVertexData();
+        static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
+
+        // IMesh接口实现
+        unsigned int GetVAO() const override { return m_vao; }
+        size_t GetVertexCount() const override { return 36; } // 6面 × 6顶点/面
+        size_t GetIndexCount() const override { return 0; }   // Cube 不使用索引
+        bool HasIndices() const override { return false; }
+        bool HasTexture() const override { return false; }
+
     private:
         unsigned int m_vao = 0, m_vbo = 0;
 

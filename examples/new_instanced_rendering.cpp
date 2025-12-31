@@ -1,3 +1,18 @@
+/**
+ * 新架构示例程序 - 演示方案C的职责分离设计
+ *
+ * 架构设计：
+ * - IMesh: 网格数据接口（Cube, SimpleMesh）
+ * - InstanceData: 实例数据容器（矩阵、颜色）
+ * - InstancedRenderer: 渲染逻辑执行者
+ *
+ * 使用流程：
+ * 1. 创建网格（SimpleMesh）
+ * 2. 准备实例数据（InstanceData）
+ * 3. 创建渲染器并设置（InstancedRenderer）
+ * 4. 执行渲染（Render）
+ */
+
 #include "Core/Window.hpp"
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
@@ -10,9 +25,6 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <filesystem>
-
-namespace fs = std::filesystem;
 
 // 摄像机参数
 glm::vec3 cameraPos = glm::vec3(0.0f, 10.0f, 30.0f);
@@ -26,21 +38,20 @@ int main()
     rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
     rotationConfig.maxFiles = 3;
 
-    Core::Logger::GetInstance().Initialize("logs/instanced_rendering.log", true, Core::LogLevel::DEBUG,
+    Core::Logger::GetInstance().Initialize("logs/new_architecture.log", true, Core::LogLevel::DEBUG,
                                            true, rotationConfig);
 
     try
     {
-        Core::Logger::GetInstance().Info("=== Instanced Rendering Application - New Architecture ===");
-        Core::Logger::GetInstance().Info("Architecture: Responsibility Separation Design");
+        Core::Logger::GetInstance().Info("=== New Architecture Example ===");
+        Core::Logger::GetInstance().Info("Demonstrating Responsibility Separation Design");
+        Core::Logger::GetInstance().Info("Architecture:");
         Core::Logger::GetInstance().Info("  - IMesh: Mesh data (SimpleMesh)");
         Core::Logger::GetInstance().Info("  - InstanceData: Instance data (matrices, colors)");
         Core::Logger::GetInstance().Info("  - InstancedRenderer: Rendering logic");
-        Core::Logger::GetInstance().Info("Application version: Cube & OBJ Instanced Rendering with Textures");
-        Core::Logger::GetInstance().Info("Window resolution: 1920x1080");
 
         Core::Logger::GetInstance().Info("Creating application window...");
-        Core::Window window(1920, 1080, "Instanced Rendering - New Architecture");
+        Core::Window window(1920, 1080, "New Architecture - Responsibility Separation");
         window.Init();
 
         Core::Logger::GetInstance().Info("Initializing input controllers...");
@@ -51,10 +62,9 @@ int main()
         keyboardController.Initialize(glfwGetCurrentContext());
 
         // Keyboard controls
-        Core::Logger::GetInstance().Info("Registering keyboard controls...");
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
                                                {
-                                                   Core::Logger::GetInstance().Info("Application exit requested by user (ESC key)");
+                                                   Core::Logger::GetInstance().Info("Exit requested");
                                                    exit(0);
                                                });
         keyboardController.RegisterKeyCallback(GLFW_KEY_TAB, [&mouseController]()
@@ -67,18 +77,18 @@ int main()
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
         // ==========================================
-        // 1. 创建立方体网格（SimpleMesh）
+        // 步骤 1: 创建网格（SimpleMesh）
         // ==========================================
         Core::Logger::GetInstance().Info("Step 1: Creating SimpleMesh from Cube template...");
-        auto cubeMesh = std::make_shared<Renderer::SimpleMesh>(Renderer::SimpleMesh::CreateFromCube());
-        cubeMesh->Create();  // 创建 OpenGL 对象
+        Renderer::SimpleMesh cubeMesh = Renderer::SimpleMesh::CreateFromCube();
+        cubeMesh.Create();
 
         // ==========================================
-        // 2. 准备立方体实例数据（InstanceData）
+        // 步骤 2: 准备实例数据（InstanceData）
         // ==========================================
-        Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData for cubes...");
+        Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData...");
 
-        Renderer::InstanceData cubeInstances;
+        Renderer::InstanceData instances;
 
         // 创建 10x10 的立方体地面阵列
         int gridSize = 10;
@@ -98,74 +108,29 @@ int main()
                 bool isWhite = (x + z) % 2 == 0;
                 glm::vec3 color = isWhite ? glm::vec3(0.9f, 0.9f, 0.9f) : glm::vec3(0.3f, 0.3f, 0.3f);
 
-                cubeInstances.Add(position, rotation, scale, color);
+                instances.Add(position, rotation, scale, color);
             }
         }
 
-        Core::Logger::GetInstance().Info("Prepared " + std::to_string(cubeInstances.GetCount()) + " cube instances");
+        Core::Logger::GetInstance().Info("Prepared " + std::to_string(instances.GetCount()) + " instances");
 
         // ==========================================
-        // 3. 创建立方体渲染器（InstancedRenderer）
+        // 步骤 3: 创建渲染器并设置（InstancedRenderer）
         // ==========================================
-        Core::Logger::GetInstance().Info("Step 3: Creating InstancedRenderer for cubes...");
+        Core::Logger::GetInstance().Info("Step 3: Creating and configuring InstancedRenderer...");
 
-        Renderer::InstancedRenderer cubeRenderer;
-        cubeRenderer.SetMesh(cubeMesh);  // 传递 shared_ptr
-        cubeRenderer.SetInstances(cubeInstances);
-        cubeRenderer.Initialize();
+        Renderer::InstancedRenderer renderer;
+        renderer.SetMesh(cubeMesh);
+        renderer.SetInstances(instances);
+        renderer.Initialize();
 
-        Core::Logger::GetInstance().Info("Cube renderer initialized with " +
-                                         std::to_string(cubeRenderer.GetInstanceCount()) + " instances");
+        Core::Logger::GetInstance().Info("InstancedRenderer initialized with " +
+                                         std::to_string(renderer.GetInstanceCount()) + " instances");
 
         // ==========================================
-        // 4. 创建 OBJ 模型实例化渲染（支持多材质和纹理）
+        // 步骤 4: 执行渲染（Render Loop）
         // ==========================================
-        std::string carPath = "assets/models/cars/sportsCar.obj";
-        std::vector<Renderer::InstancedRenderer> carRenderers;
-        std::vector<std::shared_ptr<Renderer::SimpleMesh>> carMeshes;  // 保持 mesh 存活
-
-        if (fs::exists(carPath))
-        {
-            Core::Logger::GetInstance().Info("Step 4: Creating InstancedRenderers for OBJ model: " + carPath);
-
-            // 准备汽车实例数据
-            Renderer::InstanceData carInstances;
-            int carCount = 12;
-            float radius = 15.0f;
-
-            for (int i = 0; i < carCount; ++i)
-            {
-                float angle = (static_cast<float>(i) / carCount) * 3.14159f * 2.0f;
-                float x = std::cos(angle) * radius;
-                float z = std::sin(angle) * radius;
-                float y = 0.0f;
-
-                glm::vec3 position(x, y, z);
-                glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
-                glm::vec3 scale(0.5f, 0.5f, 0.5f);
-
-                // 使用白色，让材质显示真实颜色
-                glm::vec3 color(1.0f, 1.0f, 1.0f);
-
-                carInstances.Add(position, rotation, scale, color);
-            }
-
-            // 创建实例化渲染器（每个材质一个），同时获取 mesh 的 shared_ptr
-            auto [renderers, meshes] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
-            carRenderers = std::move(renderers);
-            carMeshes = std::move(meshes);  // 保持 mesh 存活
-
-            if (!carRenderers.empty())
-            {
-                Core::Logger::GetInstance().Info("Created " + std::to_string(carRenderers.size()) +
-                                                 " car renderers (multi-material) with " +
-                                                 std::to_string(carCount) + " instances each");
-            }
-        }
-        else
-        {
-            Core::Logger::GetInstance().Warning("Car OBJ file not found: " + carPath);
-        }
+        Core::Logger::GetInstance().Info("Step 4: Starting render loop...");
 
         Core::Logger::GetInstance().Info("Enabling OpenGL depth testing");
         glEnable(GL_DEPTH_TEST);
@@ -181,12 +146,8 @@ int main()
         int fps_frameCount = 0;
         int totalFrameCount = 0;
 
-        // Initial parameters
         Core::Logger::GetInstance().Info("Controls: WASD=Move, Q/E=Up/Down, Mouse=Look Around");
         Core::Logger::GetInstance().Info("TAB=Toggle Mouse Capture, ESC=Exit");
-        Core::Logger::GetInstance().Info("Scene: " + std::to_string(cubeRenderer.GetInstanceCount()) + " cubes, " +
-                                         (carRenderers.empty() ? "0" : std::to_string(carRenderers[0].GetInstanceCount())) + " cars (multi-material)");
-        Core::Logger::GetInstance().Info("Performance: Each material group uses only 1 draw call!");
         Core::Logger::GetInstance().Info("Starting render loop...");
 
         while (!window.ShouldClose())
@@ -243,12 +204,12 @@ int main()
                                          glm::vec3(0.0f, 1.0f, 0.0f));
 
             // 设置渲染上下文
-            size_t totalDrawCalls = 1 + carRenderers.size();
+            size_t totalDrawCalls = 1;
             Core::LogContext renderContext;
-            renderContext.renderPass = "Instanced";
+            renderContext.renderPass = "NewArchitecture";
             renderContext.batchIndex = 0;
             renderContext.drawCallCount = static_cast<int>(totalDrawCalls);
-            renderContext.currentShader = "Instanced with Textures";
+            renderContext.currentShader = "Instanced Shader";
             Core::Logger::GetInstance().SetContext(renderContext);
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -263,39 +224,13 @@ int main()
             instancedShader.SetFloat("ambientStrength", 0.3f);
             instancedShader.SetFloat("specularStrength", 0.5f);
             instancedShader.SetFloat("shininess", 32.0f);
+            instancedShader.SetBool("useInstanceColor", true);
+            instancedShader.SetBool("useTexture", false);
 
             // ==========================================
-            // 渲染立方体地面（无纹理）
+            // 执行渲染！
             // ==========================================
-            if (cubeRenderer.GetInstanceCount() > 0)
-            {
-                instancedShader.SetBool("useTexture", false);
-                instancedShader.SetBool("useInstanceColor", true); // 立方体使用实例颜色
-                cubeRenderer.Render();
-            }
-
-            // ==========================================
-            // 渲染车模型（每个材质一个实例化渲染器，支持纹理）
-            // ==========================================
-            if (!carRenderers.empty())
-            {
-                for (const auto& carRenderer : carRenderers)
-                {
-                    if (carRenderer.GetInstanceCount() > 0)
-                    {
-                        // 如果此渲染器有纹理，启用纹理
-                        instancedShader.SetBool("useTexture", carRenderer.HasTexture());
-
-                        // 设置材质颜色
-                        instancedShader.SetVec3("objectColor", carRenderer.GetMaterialColor());
-
-                        // 设置材质光泽度
-                        instancedShader.SetBool("useInstanceColor", false); // 使用材质颜色而不是实例颜色
-
-                        carRenderer.Render();
-                    }
-                }
-            }
+            renderer.Render();
 
             window.SwapBuffers();
             window.PollEvents();

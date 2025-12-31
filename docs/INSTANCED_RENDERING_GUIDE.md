@@ -63,11 +63,11 @@ void main() {
 }
 ```
 
-### 2. InstancedMesh 类
+### 2. InstancedRenderer 类
 
 #### 类接口
 ```cpp
-class InstancedMesh : public IMesh {
+class InstancedRenderer : public IMesh {
 public:
     // 设置顶点数据
     void SetVertices(const float* vertices, size_t count);
@@ -100,7 +100,7 @@ public:
 #### 使用示例
 ```cpp
 // 1. 创建实例化网格
-Renderer::InstancedMesh instancedCubes;
+Renderer::InstancedRenderer instancedCubes;
 
 // 2. 设置基础几何体数据
 instancedCubes.SetVertices(cubeVertices, vertexCount);
@@ -149,7 +149,7 @@ glVertexAttribDivisor(7, 1);  // 每个实例更新一次
 
 #### 绘制调用
 ```cpp
-void InstancedMesh::Draw() const {
+void InstancedRenderer::Draw() const {
     glBindVertexArray(m_vao);
     // 关键：使用 glDrawArraysInstanced
     glDrawArraysInstanced(GL_TRIANGLES, 0, m_vertexCount, m_instances.size());
@@ -270,9 +270,9 @@ uniqueObject.Draw();
 ```cpp
 // 根据距离选择不同细节的实例化网格
 if (distance < 10.0f) {
-    highDetailInstancedMesh.Draw();
+    highDetailInstancedRenderer.Draw();
 } else {
-    lowDetailInstancedMesh.Draw();
+    lowDetailInstancedRenderer.Draw();
 }
 ```
 
@@ -302,7 +302,7 @@ if (distance < 10.0f) {
 
 ## 总结
 
-实例化渲染是现代 OpenGL 应用中不可或缺的优化技术，特别适合需要渲染大量重复物体的场景。本项目通过 `InstancedMesh` 类提供了简洁易用的接口，使得开发者可以轻松实现高效的批量渲染。
+实例化渲染是现代 OpenGL 应用中不可或缺的优化技术，特别适合需要渲染大量重复物体的场景。本项目通过 `InstancedRenderer` 类提供了简洁易用的接口，使得开发者可以轻松实现高效的批量渲染。
 
 **关键点：**
 - ✅ 单次绘制调用渲染数百个实例
