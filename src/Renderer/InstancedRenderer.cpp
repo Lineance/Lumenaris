@@ -223,7 +223,7 @@ namespace Renderer
         // 为每个材质创建一个 SimpleMesh 和 InstancedRenderer
         for (const auto& materialData : materialDataList)
         {
-            // 创建 SimpleMesh 作为网格模板
+            // 创建 SimpleMesh 作为网格模板（直接构造，避免拷贝）
             auto mesh = std::make_shared<SimpleMesh>(SimpleMesh::CreateFromMaterialData(materialData));
             mesh->Create();  // 创建 OpenGL 对象
 

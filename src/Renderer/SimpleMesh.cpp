@@ -44,8 +44,11 @@ namespace Renderer
           m_vbo(0),
           m_ebo(0)
     {
-        // 深拷贝：创建新的 OpenGL 资源
-        Create();
+        // 深拷贝：只在源对象已创建时才创建新的 OpenGL 资源
+        if (other.m_vao != 0)
+        {
+            Create();
+        }
     }
 
     // 拷贝赋值运算符（深拷贝）
@@ -81,9 +84,11 @@ namespace Renderer
             m_materialColor = other.m_materialColor;
             m_vertexAttributes = other.m_vertexAttributes;
 
-            // 深拷贝：创建新的 OpenGL 资源
-            // 注意：总是创建 OpenGL 对象
-            Create();
+            // 深拷贝：只在源对象已创建时才创建新的 OpenGL 资源
+            if (other.m_vao != 0)
+            {
+                Create();
+            }
         }
         return *this;
     }
