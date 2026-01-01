@@ -127,9 +127,13 @@ namespace Renderer
     MeshData MeshDataFactory::CreateTorusData(float majorRadius, float minorRadius,
                                                int majorSegments, int minorSegments)
     {
-        // 使用 Torus 类的静态方法获取顶点数据
-        std::vector<float> vertices = Renderer::Torus::GetVertexData();
-        std::vector<unsigned int> indices = Renderer::Torus::GetIndexData();
+        // ⭐ 传递参数到静态方法，而不是使用硬编码值
+        std::vector<float> vertices = Renderer::Torus::GetVertexData(
+            majorRadius, minorRadius, majorSegments, minorSegments
+        );
+        std::vector<unsigned int> indices = Renderer::Torus::GetIndexData(
+            majorSegments, minorSegments
+        );
 
         MeshData data;
         data.SetVertices(std::move(vertices), 8);
@@ -147,9 +151,13 @@ namespace Renderer
     MeshData MeshDataFactory::CreatePlaneData(float width, float height,
                                                int widthSegments, int heightSegments)
     {
-        // 使用 Plane 类的静态方法获取顶点数据
-        std::vector<float> vertices = Renderer::Plane::GetVertexData();
-        std::vector<unsigned int> indices = Renderer::Plane::GetIndexData();
+        // ⭐ 传递参数到静态方法，而不是使用硬编码值
+        std::vector<float> vertices = Renderer::Plane::GetVertexData(
+            width, height, widthSegments, heightSegments
+        );
+        std::vector<unsigned int> indices = Renderer::Plane::GetIndexData(
+            widthSegments, heightSegments
+        );
 
         MeshData data;
         data.SetVertices(std::move(vertices), 8);

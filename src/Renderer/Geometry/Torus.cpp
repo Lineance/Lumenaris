@@ -159,13 +159,13 @@ namespace Renderer
         return model;
     }
 
-    std::vector<float> Torus::GetVertexData()
+    std::vector<float> Torus::GetVertexData(
+        float majorRadius,
+        float minorRadius,
+        int majorSegments,
+        int minorSegments)
     {
-        const float majorRadius = 1.0f;
-        const float minorRadius = 0.3f;
-        const int majorSegments = 32;
-        const int minorSegments = 24;
-
+        // ⭐ 使用传入的参数，而不是硬编码
         std::vector<float> vertices;
         float majorStep = 2.0f * PI / majorSegments;
         float minorStep = 2.0f * PI / minorSegments;
@@ -200,11 +200,11 @@ namespace Renderer
         return vertices;
     }
 
-    std::vector<unsigned int> Torus::GetIndexData()
+    std::vector<unsigned int> Torus::GetIndexData(
+        int majorSegments,
+        int minorSegments)
     {
-        const int majorSegments = 32;
-        const int minorSegments = 24;
-
+        // ⭐ 使用传入的参数，而不是硬编码
         std::vector<unsigned int> indices;
 
         for (int i = 0; i < majorSegments; ++i)

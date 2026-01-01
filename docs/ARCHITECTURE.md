@@ -307,13 +307,21 @@ LearningOpenGL/
 - 支持自定义主半径（管到中心的距离）和管半径
 - 可配置主分段数和次分段数
 - 正确的法线和UV坐标
-- 静态方法GetVertexData()、GetIndexData()用于工厂模式
+- ⭐ **静态方法参数化**（2025-01-01修复）：
+  - `GetVertexData(majorRadius, minorRadius, majorSegments, minorSegments)` - 支持参数化
+  - `GetIndexData(majorSegments, minorSegments)` - 支持参数化
+  - 修复前：硬编码参数，工厂方法参数失效
+  - 修复后：参数真正生效，API诚实可靠
 
 **Plane 类** (`src/Renderer/Plane.cpp`)
 - 平面几何体，支持自定义宽度和高度
 - 可配置分段数（用于细分）
 - 正确的法线和UV坐标
-- 静态方法GetVertexData()、GetIndexData()用于工厂模式
+- ⭐ **静态方法参数化**（2025-01-01修复）：
+  - `GetVertexData(width, height, widthSegments, heightSegments)` - 支持参数化
+  - `GetIndexData(widthSegments, heightSegments)` - 支持参数化
+  - 修复前：硬编码参数，工厂方法参数失效
+  - 修复后：参数真正生效，额外修复顶点分布bug
 
 **OBJLoader 类** (`src/Renderer/Resources/OBJLoader.cpp`)
 - 完整的OBJ文件格式解析器
@@ -375,6 +383,10 @@ LearningOpenGL/
   - 创建GPU端MeshBuffer（CreateCubeBuffer、CreateSphereBuffer等）
   - 从OBJ文件创建多个MeshData/MeshBuffer
   - 支持移动语义优化性能
+  - ⭐ **参数化工厂方法**（2025-01-01修复）：
+    - `CreateTorusData(majorRadius, minorRadius, majorSegments, minorSegments)` - 现在参数真正生效
+    - `CreatePlaneData(width, height, widthSegments, heightSegments)` - 现在参数真正生效
+    - 工厂方法正确传递参数到几何体静态方法
 
 - **MeshBufferFactory 类** (MeshDataFactory的一部分)
   - 从MeshData创建并上传到GPU

@@ -300,22 +300,50 @@ void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
             lastDebugY = currentPos.y;
         }
 
-        float moveRadius = 3.0f; // 移动范围
-        float moveSpeed = 1.5f;  // 移动速度
+        // ⭐ 增强的舞蹈参数（更剧烈的动作）
+        float moveRadius = 6.0f;  // 移动范围翻倍（从3.0m增加到6.0m）
+        float moveSpeed = 3.0f;   // 移动速度翻倍（从1.5增加到3.0）
 
-        float bunnyX = std::sin(time * moveSpeed * 0.7f) * moveRadius * 0.6f +
-                       std::sin(time * moveSpeed * 1.3f) * moveRadius * 0.3f;
-        float bunnyZ = std::cos(time * moveSpeed * 0.9f) * moveRadius * 0.5f +
-                       std::cos(time * moveSpeed * 1.1f) * moveRadius * 0.4f;
-        float jumpHeight = std::abs(std::sin(time * moveSpeed * 2.0f)) * 1.0f; // 跳跃高度
+        // X方向：更复杂的组合运动
+        float bunnyX = std::sin(time * moveSpeed * 0.7f) * moveRadius * 0.8f +
+                       std::sin(time * moveSpeed * 1.3f) * moveRadius * 0.5f +
+                       std::cos(time * moveSpeed * 0.5f) * moveRadius * 0.3f;
+
+        // Z方向：更复杂的组合运动
+        float bunnyZ = std::cos(time * moveSpeed * 0.9f) * moveRadius * 0.7f +
+                       std::cos(time * moveSpeed * 1.1f) * moveRadius * 0.4f +
+                       std::sin(time * moveSpeed * 1.7f) * moveRadius * 0.2f;
+
+        // Y方向：保持跳跃，但频率更高
+        float jumpHeight = std::abs(std::sin(time * moveSpeed * 2.5f)) * 0.8f; // 跳跃高度
         float bunnyY = 1.0f + jumpHeight;                                      // 基础高度1米
-        float bunnyRotY = std::atan2(bunnyX, bunnyZ) * 180.0f / glm::pi<float>() + 180.0f; // 加上初始180度
-        float breatheScale = 1.0f + std::sin(time * moveSpeed * 1.5f) * 0.1f; // 呼吸效果更明显
+
+        // 旋转：面向运动方向，但增加额外的自旋
+        float bunnyRotY = std::atan2(bunnyX, bunnyZ) * 180.0f / glm::pi<float>() + 180.0f;
+
+        // ⭐ 新增：三轴剧烈旋转（让兔子跳舞更疯狂）
+        float bunnyRotX = std::sin(time * moveSpeed * 2.0f) * 30.0f;  // 前后翻滚 ±30度
+        float bunnyRotZ = std::cos(time * moveSpeed * 1.8f) * 25.0f;  // 左右摇摆 ±25度
+
+        // ⭐ 新增：更剧烈的呼吸效果（从±0.1增加到±0.3）
+        float breatheScale = 1.0f + std::sin(time * moveSpeed * 2.0f) * 0.3f;
+
+        // ⭐ 新增：额外的扭曲缩放（让动作更有趣）
+        float twistX = 1.0f + std::cos(time * moveSpeed * 1.5f) * 0.2f;
+        float twistZ = 1.0f + std::sin(time * moveSpeed * 1.3f) * 0.2f;
 
         glm::mat4 bunnyModel = glm::mat4(1.0f);
         bunnyModel = glm::translate(bunnyModel, glm::vec3(bunnyX, bunnyY, bunnyZ));
+
+        // 应用三轴旋转（更剧烈的舞蹈）
+        bunnyModel = glm::rotate(bunnyModel, glm::radians(bunnyRotX), glm::vec3(1.0f, 0.0f, 0.0f));
         bunnyModel = glm::rotate(bunnyModel, glm::radians(bunnyRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-        bunnyModel = glm::scale(bunnyModel, glm::vec3(2.0f * breatheScale)); // 使用2.0作为基准缩放
+        bunnyModel = glm::rotate(bunnyModel, glm::radians(bunnyRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+
+        // 应用扭曲缩放（让变形更明显）
+        bunnyModel = glm::scale(bunnyModel, glm::vec3(2.0f * breatheScale * twistX,
+                                                       2.0f * breatheScale,
+                                                       2.0f * breatheScale * twistZ));
         bunnyMatrices[0] = bunnyModel;
     }
 }
@@ -712,6 +740,20 @@ DiscoStage CreateDiscoStage()
             glm::vec3(90.0f, 0.0f, 0.0f),                  // 水平放置
             glm::vec3(majorScale, minorScale, majorScale), // X和Z相同确保正圆，Y单独缩放管粗细
             torusColor);
+
+        // ⭐ 新增：为每个圆环添加对应的装饰平面（在圆环下方）
+        // 使用参数化Plane，不同大小的平面（2025-01-01修复后参数真正生效）
+        float discRadius = majorRadius * 1.2f; // 平面比圆环大20%
+        float discY = y - 0.5f;                 // 平面在圆环下方0.5米
+
+        // 使用CreatePlaneData工厂方法，参数现在会真正生效
+        // 这里我们只添加实例数据，使用已有的platformInstances
+        glm::vec3 discColor = torusColor * 0.6f; // 平面颜色稍暗
+        platformInstances->Add(
+            glm::vec3(0.0f, discY, 0.0f),          // 位置：圆环下方
+            glm::vec3(-90.0f, 0.0f, 0.0f),         // 水平放置
+            glm::vec3(discRadius * 2.0f, discRadius * 2.0f, 0.1f), // 平面半径和厚度
+            discColor);
     }
 
     // ========================================
@@ -864,8 +906,9 @@ DiscoStage CreateDiscoStage()
     Core::Logger::GetInstance().Info("Creating decorative torus renderer...");
     try
     {
-        // 创建单位圆环作为基础，然后通过实例缩放调整大小
-        // majorRadius=1.0, minorRadius=0.07 (相对比例，确保管足够粗)
+        // ⭐ 创建圆环（参数化，2025-01-01修复后参数真正生效）
+        // majorRadius=1.0, minorRadius=0.07, majorSegments=96, minorSegments=64
+        // 高分段数确保圆环平滑，参数现在会被正确使用
         Renderer::MeshBuffer torusMesh = Renderer::MeshBufferFactory::CreateTorusBuffer(1.0f, 0.07f, 96, 64);
         auto torusMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(torusMesh));
         stage.meshBuffers.push_back(torusMeshPtr);

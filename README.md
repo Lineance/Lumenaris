@@ -19,6 +19,8 @@
 🎉 Enjoy the chaos! 🎆
 </div>
 
+
+
 ---
 
 ## 🛠️ 技术栈
@@ -251,12 +253,17 @@ auto config = SkyboxLoader::CreateFromCustomScheme(
 
 ## 🛣️ 不开发路线图
 
+### P-1 - 潜在问题（目前放弃）
+
+- ❌ **天空盒**：存在状态泄露的风险（当有异常产生状态未恢复），需要 RAII管理 OpenGLContext，拓展imgui时需要关注content的恢复！！！
+
 ### P0 - 核心组件（目前放弃）
 
 - ❌ **场景图系统**：`SceneNode`层级管理
 - ❌ **PBR材质系统**：金属度/粗糙度工作流
 - ❌ **资源管理器**：自动缓存+异步加载
-- ❌ **天空盒/IBL**：环境光照
+- ❌ **IBL**：环境光照
+- ❌ **Framebuffer**
 
 ### P1 - 锦上添花（目前放弃）
 
@@ -278,11 +285,7 @@ auto config = SkyboxLoader::CreateFromCustomScheme(
 
 ## 特别注意
 
-索引混乱：bunny OBJ模型可能有多个材质（每个材质创建一个独立的renderer），但代码中使用硬编码的索引[0, 2, 3, 4, 5]，导致：
-
-- 如果bunny有多个材质，会占用renderers[0], renderers[1], ...等多个位置
-- 后续的floor、cube等渲染器的索引会被向后推移
-- 但动画代码仍在使用固定的索引，导致更新了错误的几何体
+- 不要管任何archive里面的文件，项目经过重构数次，早已不适配。
 
 ---
 

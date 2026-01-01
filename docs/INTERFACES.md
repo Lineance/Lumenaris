@@ -1389,8 +1389,19 @@ public:
     glm::mat4 GetModelMatrix() const;
 
     // 静态方法：获取圆环体的标准顶点数据（用于工厂模式）
-    static std::vector<float> GetVertexData();
-    static std::vector<unsigned int> GetIndexData();
+    // ⭐ 支持参数化，避免硬编码（2025-01-01修复）
+    static std::vector<float> GetVertexData(
+        float majorRadius = 1.0f,
+        float minorRadius = 0.3f,
+        int majorSegments = 32,
+        int minorSegments = 24
+    );
+
+    static std::vector<unsigned int> GetIndexData(
+        int majorSegments = 32,
+        int minorSegments = 24
+    );
+
     static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 
     // IMesh 接口扩展
@@ -1417,12 +1428,15 @@ public:
 | `SetMinorRadius()` | float radius | void | 设置管半径（管的粗细） |
 | `GetMajorRadius()` | 无 | float | 获取主半径 |
 | `GetMinorRadius()` | 无 | float | 获取管半径 |
+| `GetVertexData()` | majorRadius, minorRadius, majorSegments, minorSegments | vector<float> | 获取顶点数据（参数化） |
+| `GetIndexData()` | majorSegments, minorSegments | vector<uint> | 获取索引数据（参数化） |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点布局 |
 | `GetModelMatrix()` | 无 | glm::mat4 | 获取模型矩阵 |
 
 #### 使用示例
 
 ```cpp
-// 创建一个甜甜圈形状
+// 示例1：创建一个甜甜圈形状
 Renderer::Torus torus(1.0f, 0.3f, 48, 32);  // 主半径1.0，管半径0.3，高精度
 torus.SetPosition(glm::vec3(3.0f, 0.5f, 0.0f));
 torus.SetRotation(glm::vec3(90.0f, 0.0f, 0.0f));  // 绕X轴旋转90度
@@ -1434,6 +1448,19 @@ shader.Use();
 shader.SetMat4("model", torus.GetModelMatrix());
 shader.SetVec3("color", torus.GetColor());
 torus.Draw();
+
+// 示例2：使用静态方法获取顶点数据（用于实例化渲染）
+// ⭐ 支持参数化（2025-01-01修复）
+auto vertices = Renderer::Torus::GetVertexData(2.0f, 0.5f, 64, 48);
+auto indices = Renderer::Torus::GetIndexData(64, 48);
+std::vector<size_t> offsets;
+std::vector<int> sizes;
+Renderer::Torus::GetVertexLayout(offsets, sizes);
+
+// 示例3：通过工厂创建不同大小的圆环
+auto torus1 = Renderer::MeshDataFactory::CreateTorusData(1.0f, 0.3f, 32, 24);
+auto torus2 = Renderer::MeshDataFactory::CreateTorusData(2.0f, 0.5f, 64, 48);
+// 现在这些参数会真正生效！
 ```
 
 ---
@@ -1473,8 +1500,19 @@ public:
     glm::mat4 GetModelMatrix() const;
 
     // 静态方法：获取平面的标准顶点数据（用于工厂模式）
-    static std::vector<float> GetVertexData();
-    static std::vector<unsigned int> GetIndexData();
+    // ⭐ 支持参数化，避免硬编码（2025-01-01修复）
+    static std::vector<float> GetVertexData(
+        float width = 1.0f,
+        float height = 1.0f,
+        int widthSegments = 1,
+        int heightSegments = 1
+    );
+
+    static std::vector<unsigned int> GetIndexData(
+        int widthSegments = 1,
+        int heightSegments = 1
+    );
+
     static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 
     // IMesh 接口扩展
@@ -1502,6 +1540,9 @@ public:
 | `SetHeightSegments()` | int segments | void | 设置高度方向分段数 |
 | `GetWidth()` | 无 | float | 获取宽度 |
 | `GetHeight()` | 无 | float | 获取高度 |
+| `GetVertexData()` | width, height, widthSegments, heightSegments | vector<float> | 获取顶点数据（参数化） |
+| `GetIndexData()` | widthSegments, heightSegments | vector<uint> | 获取索引数据（参数化） |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点布局 |
 | `GetModelMatrix()` | 无 | glm::mat4 | 获取模型矩阵 |
 
 #### 使用示例
@@ -1518,6 +1559,16 @@ ground.Create();
 Renderer::Plane terrain(50.0f, 50.0f, 100, 100);  // 100x100细分
 terrain.SetPosition(glm::vec3(-25.0f, -2.0f, -25.0f));
 terrain.Create();
+
+// 示例3：使用静态方法获取顶点数据（用于实例化渲染）
+// ⭐ 支持参数化（2025-01-01修复）
+auto vertices = Renderer::Plane::GetVertexData(10.0f, 10.0f, 10, 10);
+auto indices = Renderer::Plane::GetIndexData(10, 10);
+
+// 示例4：通过工厂创建不同尺寸的平面
+auto plane1 = Renderer::MeshDataFactory::CreatePlaneData(5.0f, 5.0f, 1, 1);
+auto plane2 = Renderer::MeshDataFactory::CreatePlaneData(20.0f, 20.0f, 20, 20);
+// 现在这些参数会真正生效！
 ```
 
 ---

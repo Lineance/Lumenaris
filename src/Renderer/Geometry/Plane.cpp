@@ -148,25 +148,25 @@ namespace Renderer
         return model;
     }
 
-    std::vector<float> Plane::GetVertexData()
+    std::vector<float> Plane::GetVertexData(
+        float width,
+        float height,
+        int widthSegments,
+        int heightSegments)
     {
-        const float width = 1.0f;
-        const float height = 1.0f;
-        const int widthSegments = 1;
-        const int heightSegments = 1;
-
+        // ⭐ 使用传入的参数，而不是硬编码
         std::vector<float> vertices;
         float halfWidth = width * 0.5f;
         float halfHeight = height * 0.5f;
 
         for (int y = 0; y <= heightSegments; ++y)
         {
-            float yPos = -halfHeight + y * height;
+            float yPos = -halfHeight + y * (height / heightSegments);
             float v = static_cast<float>(y) / heightSegments;
 
             for (int x = 0; x <= widthSegments; ++x)
             {
-                float xPos = -halfWidth + x * width;
+                float xPos = -halfWidth + x * (width / widthSegments);
                 float u = static_cast<float>(x) / widthSegments;
 
                 vertices.insert(vertices.end(), {xPos, yPos, 0.0f, 0.0f, 0.0f, 1.0f, u, v});
@@ -176,11 +176,11 @@ namespace Renderer
         return vertices;
     }
 
-    std::vector<unsigned int> Plane::GetIndexData()
+    std::vector<unsigned int> Plane::GetIndexData(
+        int widthSegments,
+        int heightSegments)
     {
-        const int widthSegments = 1;
-        const int heightSegments = 1;
-
+        // ⭐ 使用传入的参数，而不是硬编码
         std::vector<unsigned int> indices;
 
         for (int y = 0; y < heightSegments; ++y)

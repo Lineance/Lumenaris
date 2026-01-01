@@ -52,8 +52,19 @@ namespace Renderer
         glm::mat4 GetModelMatrix() const;
 
         // 静态方法：获取圆环体的标准顶点数据（用于工厂模式）
-        static std::vector<float> GetVertexData();
-        static std::vector<unsigned int> GetIndexData();
+        // ⭐ 支持参数化，避免硬编码
+        static std::vector<float> GetVertexData(
+            float majorRadius = 1.0f,
+            float minorRadius = 0.3f,
+            int majorSegments = 32,
+            int minorSegments = 24
+        );
+
+        static std::vector<unsigned int> GetIndexData(
+            int majorSegments = 32,
+            int minorSegments = 24
+        );
+
         static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 
         // IMesh 接口扩展
