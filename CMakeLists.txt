@@ -50,6 +50,9 @@ add_library(Renderer STATIC
     src/Renderer/Resources/Texture.cpp
     src/Renderer/Lighting/Light.cpp
     src/Renderer/Lighting/LightManager.cpp
+    src/Renderer/Environment/Skybox.cpp
+    src/Renderer/Environment/SkyboxLoader.cpp
+    src/Renderer/Environment/AmbientLighting.cpp
 )
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

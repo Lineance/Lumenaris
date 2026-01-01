@@ -76,12 +76,16 @@ LearningOpenGL/
 │       ├── Lighting/       # 光照系统
 │       │   ├── Light.hpp         # 光照基类
 │       │   └── LightManager.hpp  # 光照管理器
+│       ├── Environment/    # 环境渲染系统 (NEW)
+│       │   ├── Skybox.hpp        # 天空盒渲染器
+│       │   └── IBL.hpp           # 基于图像的光照系统
 │       ├── Renderer/       # 渲染器实现
 │       │   └── InstancedRenderer.hpp # 实例化渲染器
 │       └── Resources/      # 资源管理
 │           ├── OBJLoader.hpp     # OBJ文件解析器
 │           ├── Shader.hpp        # 着色器管理
-│           └── Texture.hpp       # 纹理加载
+│           ├── Texture.hpp       # 纹理加载
+│           └── Cubemap.hpp       # 立方体贴图管理 (NEW)
 ├── src/                      # 源代码
 │   ├── Core/                # 核心系统实现
 │   │   ├── Camera.cpp
@@ -94,6 +98,9 @@ LearningOpenGL/
 │   │   │   ├── InstanceData.cpp
 │   │   │   ├── MeshBuffer.cpp
 │   │   │   └── MeshData.cpp
+│   │   ├── Environment/    # 环境渲染实现 (NEW)
+│   │   │   ├── Skybox.cpp
+│   │   │   └── IBL.cpp
 │   │   ├── Factory/        # 工厂实现
 │   │   │   └── MeshDataFactory.cpp
 │   │   ├── Geometry/       # 几何体实现
@@ -111,7 +118,8 @@ LearningOpenGL/
 │   │   └── Resources/      # 资源实现
 │   │       ├── OBJLoader.cpp
 │   │       ├── Shader.cpp
-│   │       └── Texture.cpp
+│   │       ├── Texture.cpp
+│   │       └── Cubemap.cpp  # 立方体贴图实现 (NEW)
 │   ├── main.cpp             # 应用程序入口
 │   └── glad.c               # OpenGL加载器实现
 ├── vendor/                  # 第三方库
