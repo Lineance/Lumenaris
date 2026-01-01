@@ -1,7 +1,7 @@
 #include "Renderer/InstancedRenderer.hpp"
-#include "Renderer/SimpleMesh.hpp"
+#include "Renderer/MeshBuffer.hpp"
+#include "Renderer/MeshDataFactory.hpp"
 #include "Renderer/OBJModel.hpp"
-#include "Renderer/Cube.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 
@@ -19,16 +19,16 @@ namespace Renderer
             m_instanceVBO = 0;
         }
 
-        // 注意：纹理和网格由 shared_ptr 自动管理，无需手动删除
+        // 注意：网格缓冲区和纹理由 shared_ptr 自动管理，无需手动删除
     }
 
-    void InstancedRenderer::SetMesh(std::shared_ptr<SimpleMesh> mesh)
+    void InstancedRenderer::SetMesh(std::shared_ptr<MeshBuffer> meshBuffer)
     {
-        m_mesh = mesh;
-        m_materialColor = mesh->GetMaterialColor();
-        if (mesh->HasTexture())
+        m_meshBuffer = meshBuffer;
+        m_materialColor = meshBuffer->GetMaterialColor();
+        if (meshBuffer->HasTexture())
         {
-            m_texture = mesh->GetTexture();  // 共享纹理的 shared_ptr
+            m_texture = meshBuffer->GetTexture();  // 共享纹理的 shared_ptr
         }
     }
 
@@ -40,10 +40,10 @@ namespace Renderer
 
     void InstancedRenderer::Initialize()
     {
-        // 网格必须已经被创建
-        if (!m_mesh || m_mesh->GetVAO() == 0)
+        // 网格缓冲区必须已经上传到 GPU
+        if (!m_meshBuffer || m_meshBuffer->GetVAO() == 0)
         {
-            Core::Logger::GetInstance().Error("InstancedRenderer::Initialize() - Mesh not created! Call mesh.Create() first.");
+            Core::Logger::GetInstance().Error("InstancedRenderer::Initialize() - MeshBuffer not uploaded to GPU! Call meshBuffer.UploadToGPU() first.");
             return;
         }
 
@@ -59,14 +59,17 @@ namespace Renderer
         // 上传实例数据
         UploadInstanceData();
 
-        // 绑定网格的 VAO 来设置实例化属性
-        GLuint meshVAO = m_mesh->GetVAO();
+        // 绑定网格缓冲区的 VAO 来设置实例化属性
+        GLuint meshVAO = m_meshBuffer->GetVAO();
         glBindVertexArray(meshVAO);
 
         // 设置实例化属性
         SetupInstanceAttributes();
 
         glBindVertexArray(0);
+
+        Core::Logger::GetInstance().Info("InstancedRenderer::Initialize() - Initialized with " +
+                                         std::to_string(m_instanceCount) + " instances");
     }
 
     void InstancedRenderer::UploadInstanceData()
@@ -129,7 +132,7 @@ namespace Renderer
 
     void InstancedRenderer::Render() const
     {
-        if (!m_mesh || m_mesh->GetVAO() == 0)
+        if (!m_meshBuffer || m_meshBuffer->GetVAO() == 0)
         {
             return;  // 静默失败，避免每帧日志
         }
@@ -145,15 +148,15 @@ namespace Renderer
             m_texture->Bind(GL_TEXTURE0);
         }
 
-        // 绑定网格的 VAO
-        GLuint meshVAO = m_mesh->GetVAO();
+        // 绑定网格缓冲区的 VAO
+        GLuint meshVAO = m_meshBuffer->GetVAO();
         glBindVertexArray(meshVAO);
 
         // 执行实例化渲染
-        if (m_mesh->HasIndices())
+        if (m_meshBuffer->HasIndices())
         {
             glDrawElementsInstanced(GL_TRIANGLES,
-                                    static_cast<GLsizei>(m_mesh->GetIndexCount()),
+                                    static_cast<GLsizei>(m_meshBuffer->GetIndexCount()),
                                     GL_UNSIGNED_INT,
                                     0,
                                     static_cast<GLsizei>(m_instanceCount));
@@ -162,7 +165,7 @@ namespace Renderer
         {
             glDrawArraysInstanced(GL_TRIANGLES,
                                   0,
-                                  static_cast<GLsizei>(m_mesh->GetVertexCount()),
+                                  static_cast<GLsizei>(m_meshBuffer->GetVertexCount()),
                                   static_cast<GLsizei>(m_instanceCount));
         }
 
@@ -176,7 +179,7 @@ namespace Renderer
 
         // 记录绘制调用
 #if ENABLE_RENDER_STATS
-        size_t triangleCount = ((m_mesh->HasIndices() ? m_mesh->GetIndexCount() : m_mesh->GetVertexCount()) / 3) * m_instanceCount;
+        size_t triangleCount = ((m_meshBuffer->HasIndices() ? m_meshBuffer->GetIndexCount() : m_meshBuffer->GetVertexCount()) / 3) * m_instanceCount;
         Core::Logger::GetInstance().LogDrawCall(triangleCount);
 #endif
     }
@@ -184,51 +187,72 @@ namespace Renderer
     // 静态方法：为 Cube 创建实例化渲染器
     InstancedRenderer InstancedRenderer::CreateForCube(const std::shared_ptr<InstanceData>& instances)
     {
+        // 使用工厂创建 MeshBuffer（已上传到 GPU）
+        MeshBuffer meshBuffer = MeshBufferFactory::CreateCubeBuffer();
+
+        // 创建 shared_ptr
+        auto meshBufferPtr = std::make_shared<MeshBuffer>(std::move(meshBuffer));
+
+        // 创建渲染器
         InstancedRenderer renderer;
+        renderer.SetMesh(meshBufferPtr);
         renderer.SetInstances(instances);
+        renderer.Initialize();
+
+        Core::Logger::GetInstance().Info("InstancedRenderer::CreateForCube() - Created renderer for " +
+                                         std::to_string(instances->GetCount()) + " instances");
 
         return renderer;
     }
 
     // 静态方法：为 OBJ 模型创建实例化渲染器（返回多个渲染器，每个材质一个）
-    std::tuple<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>, std::shared_ptr<InstanceData>>
+    std::tuple<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<MeshBuffer>>, std::shared_ptr<InstanceData>>
     InstancedRenderer::CreateForOBJ(const std::string& objPath, const std::shared_ptr<InstanceData>& instances)
     {
         std::vector<InstancedRenderer> renderers;
-        std::vector<std::shared_ptr<SimpleMesh>> meshPointers;
+        std::vector<std::shared_ptr<MeshBuffer>> meshBuffers;
 
-        // 使用 OBJModel 的静态方法获取按材质分离的顶点数据
+        // 使用工厂创建 MeshBuffer 列表（已上传到 GPU）
+        std::vector<MeshBuffer> buffers = MeshBufferFactory::CreateOBJBuffers(objPath);
+
+        Core::Logger::GetInstance().Info("InstancedRenderer::CreateForOBJ() - Creating " +
+                                         std::to_string(buffers.size()) + " renderers from " + objPath);
+
+        // 获取材质数据（用于加载纹理）
         std::vector<OBJModel::MaterialVertexData> materialDataList =
             OBJModel::GetMaterialVertexData(objPath);
 
-        if (materialDataList.empty())
+        renderers.reserve(buffers.size());
+        meshBuffers.reserve(buffers.size());
+
+        // 为每个材质创建渲染器
+        for (size_t i = 0; i < buffers.size(); ++i)
         {
-            Core::Logger::GetInstance().Error("Failed to get material vertex data from: " + objPath);
-            return std::make_tuple(std::move(renderers), std::move(meshPointers), nullptr);
-        }
+            auto meshBufferPtr = std::make_shared<MeshBuffer>(std::move(buffers[i]));
 
-        meshPointers.reserve(materialDataList.size());
+            // 如果有纹理，加载纹理
+            if (i < materialDataList.size() && !materialDataList[i].texturePath.empty())
+            {
+                auto texture = std::make_shared<Texture>();
+                if (texture->LoadFromFile(materialDataList[i].texturePath))
+                {
+                    meshBufferPtr->SetTexture(texture);
+                }
+            }
 
-        // 为每个材质创建一个 SimpleMesh 和 InstancedRenderer
-        for (const auto& materialData : materialDataList)
-        {
-            // 创建 SimpleMesh 作为网格模板（直接构造，避免拷贝）
-            auto mesh = std::make_shared<SimpleMesh>(SimpleMesh::CreateFromMaterialData(materialData));
-            mesh->Create();  // 创建 OpenGL 对象
+            meshBuffers.push_back(meshBufferPtr);
 
-            // 保存 shared_ptr
-            meshPointers.push_back(mesh);
-
-            // 创建 InstancedRenderer
+            // 创建渲染器并使用移动语义添加到 vector
             InstancedRenderer renderer;
-            renderer.SetMesh(mesh);  // 传递 shared_ptr
-            renderer.SetInstances(instances);  // 共享同一个 InstanceData shared_ptr（零拷贝）
+            renderer.SetMesh(meshBufferPtr);
+            renderer.SetInstances(instances);
             renderer.Initialize();
 
             renderers.push_back(std::move(renderer));
         }
 
-        return std::make_tuple(std::move(renderers), std::move(meshPointers), instances);
+        // 使用移动语义返回 tuple，避免拷贝
+        return std::make_tuple(std::move(renderers), std::move(meshBuffers), instances);
     }
 
 } // namespace Renderer

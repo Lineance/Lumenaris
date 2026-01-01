@@ -63,8 +63,10 @@ add_library(Geometry OBJECT
     src/Renderer/OBJLoader.cpp    # OBJ文件解析器
     src/Renderer/OBJModel.cpp     # OBJ模型渲染器
     src/Renderer/InstanceData.cpp # 实例数据容器
-    src/Renderer/SimpleMesh.cpp   # 简单网格类
-    src/Renderer/InstancedRenderer.cpp # 实例化渲染器（职责分离架构）
+    src/Renderer/MeshData.cpp     # 网格数据容器
+    src/Renderer/MeshBuffer.cpp   # 网格缓冲区
+    src/Renderer/MeshDataFactory.cpp # 网格数据工厂
+    src/Renderer/InstancedRenderer.cpp # 实例化渲染器
 )
 
 target_include_directories(Geometry PUBLIC
@@ -87,17 +89,17 @@ target_include_directories(HelloWindow PRIVATE
 )
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 
-# 性能优化测试程序
-add_executable(TestPerformanceOptimization
-    test/test_performance_optimization.cpp
-    src/glad.c
-    $<TARGET_OBJECTS:Geometry>
-)
-target_include_directories(TestPerformanceOptimization PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
-)
-target_link_libraries(TestPerformanceOptimization PRIVATE Core Renderer OpenGL::GL)
+# # 性能优化测试程序
+# add_executable(TestPerformanceOptimization
+#     test/test_performance_optimization.cpp
+#     src/glad.c
+#     $<TARGET_OBJECTS:Geometry>
+# )
+# target_include_directories(TestPerformanceOptimization PRIVATE
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+#     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
+# )
+# target_link_libraries(TestPerformanceOptimization PRIVATE Core Renderer OpenGL::GL)
 
 # # 7. 测试程序
 # add_executable(TestLogger test_logger.cpp)
