@@ -1,8 +1,8 @@
-# OpenGL学习项目构建配置
-# 支持网格渲染、OBJ模型加载、GLM数学库封装
+# Lumenaris - 轻量级3D渲染引擎构建配置
+# 支持网格渲染、OBJ模型加载、实例化渲染、风格化着色
 
 cmake_minimum_required(VERSION 3.15)
-project(DarkRoomEngine LANGUAGES C CXX)
+project(Lumenaris LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

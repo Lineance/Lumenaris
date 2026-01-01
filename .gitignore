@@ -5,3 +5,7 @@ assets/models/cars
 assets/models/CornellBox
 assets/models/clouds
 docs/fixs
+.vscode/
+.cursor/
+out/
+CLAUDE.md
