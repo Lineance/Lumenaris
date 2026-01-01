@@ -1,3 +1,33 @@
+/**
+ * ========================================
+ * 炫酷多方块渲染演示 - Cool Cubes Demo
+ * ========================================
+ *
+ * 本演示展示现代 OpenGL 实例化渲染的强大性能
+ *
+ * 特性：
+ * - 5000+ 动态旋转的立方体
+ * - 多层建筑结构（螺旋塔、波浪地板、浮动岛屿）
+ * - 实时光照和颜色渐变
+ * - 流畅的摄像机控制
+ * - FPS 性能监控
+ *
+ * 技术亮点：
+ * - 使用新架构：MeshBuffer + InstanceData + InstancedRenderer
+ * - 单次绘制调用渲染所有实例
+ * - 移动语义优化，零不必要拷贝
+ *
+ * 控制说明：
+ * - WASD: 前后左右移动
+ * - Q/E: 上下移动
+ * - 鼠标: 旋转视角
+ * - TAB: 切换鼠标捕获
+ * - ESC: 退出
+ * - 1/2/3: 切换渲染场景
+ *
+ * ========================================
+ */
+
 #include "Core/Window.hpp"
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
@@ -11,217 +41,432 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <filesystem>
-#include <optional>  // ✅ 添加 std::optional 支持
+#include <random>
 
-namespace fs = std::filesystem;
+// ========================================
+// 全局配置
+// ========================================
 
-// 摄像机参数
-glm::vec3 cameraPos = glm::vec3(0.0f, 10.0f, 30.0f);
-float cameraSpeed = 10.0f;
+// 窗口设置
+const int WINDOW_WIDTH = 1920;
+const int WINDOW_HEIGHT = 1080;
+const char* WINDOW_TITLE = "Cool Cubes Demo - Press 1/2/3 to Switch Scenes";
+
+// 摄像机设置
+glm::vec3 cameraPos = glm::vec3(0.0f, 15.0f, 40.0f);
+float cameraSpeed = 15.0f;
+
+// 光照设置
+glm::vec3 lightPos = glm::vec3(20.0f, 30.0f, 20.0f);
+glm::vec3 lightColor = glm::vec3(1.0f, 0.95f, 0.9f);
+
+// 性能统计
+float fps = 0.0f;
+int totalFrames = 0;
+
+// ========================================
+// 场景生成函数
+// ========================================
+
+/**
+ * 场景 1: 螺旋塔 (Spiral Tower)
+ * 创建一个向上旋转的螺旋形立方体塔
+ */
+std::shared_ptr<Renderer::InstanceData> CreateSpiralTowerScene()
+{
+    Core::Logger::GetInstance().Info("Creating Scene 1: Spiral Tower...");
+
+    auto instances = std::make_shared<Renderer::InstanceData>();
+
+    int layers = 40;              // ✅ 增加层数
+    int cubesPerLayer = 8;        // ✅ 减少每层立方体数
+    float layerHeight = 1.0f;     // 层高
+    float radius = 6.0f;          // ✅ 螺旋半径
+
+    for (int layer = 0; layer < layers; ++layer)
+    {
+        float y = layer * layerHeight;
+        float angleOffset = layer * 0.5f;  // ✅ 每层旋转角度
+
+        for (int i = 0; i < cubesPerLayer; ++i)
+        {
+            float angle = angleOffset + (i / static_cast<float>(cubesPerLayer)) * glm::two_pi<float>();
+
+            // 螺旋位置
+            glm::vec3 position(
+                std::cos(angle) * radius,
+                y,
+                std::sin(angle) * radius
+            );
+
+            // ✅ 旋转角度
+            glm::vec3 rotation(
+                layer * 3.0f,
+                glm::degrees(angle),
+                i * 5.0f
+            );
+
+            // 尺寸变化（底部大，顶部小）
+            float scaleVar = 1.0f - (layer / static_cast<float>(layers)) * 0.5f;  // 1.0 -> 0.5
+            glm::vec3 scale(scaleVar);
+
+            // ✅ 火焰渐变颜色（从红到黄）
+            float t = layer / static_cast<float>(layers);
+            glm::vec3 color(
+                1.0f,                          // R
+                0.3f + 0.7f * t,              // G: 增加
+                0.1f + 0.3f * (1.0f - t)      // B: 减少
+            );
+
+            instances->Add(position, rotation, scale, color);
+        }
+    }
+
+    Core::Logger::GetInstance().Info("Spiral Tower created: " + std::to_string(instances->GetCount()) + " cubes");
+    return instances;
+}
+
+/**
+ * 场景 2: 波浪地板 (Wave Floor)
+ * 创建一个动态波浪状的地板
+ */
+std::shared_ptr<Renderer::InstanceData> CreateWaveFloorScene()
+{
+    Core::Logger::GetInstance().Info("Creating Scene 2: Wave Floor...");
+
+    auto instances = std::make_shared<Renderer::InstanceData>();
+
+    int gridSize = 25;           // ✅ 网格大小
+    float spacing = 1.8f;        // 间距
+
+    float startX = -((gridSize - 1) * spacing) / 2.0f;
+    float startZ = -((gridSize - 1) * spacing) / 2.0f;
+
+    for (int x = 0; x < gridSize; ++x)
+    {
+        for (int z = 0; z < gridSize; ++z)
+        {
+            glm::vec3 position(
+                startX + x * spacing,
+                0.0f,
+                startZ + z * spacing
+            );
+
+            // ✅ 更复杂的波浪（两个波浪叠加）
+            float dist1 = std::sqrt(static_cast<float>((x - gridSize/2) * (x - gridSize/2) +
+                                                     (z - gridSize/2) * (z - gridSize/2)));
+            float dist2 = std::sqrt(static_cast<float>(x * x + z * z));
+
+            position.y = std::sin(dist1 * 0.4f) * 2.0f + std::cos(dist2 * 0.3f) * 1.5f;
+
+            // ✅ 简化旋转
+            glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+
+            // ✅ 地面平坦的立方体（压扁）
+            glm::vec3 scale(1.0f, 0.3f, 1.0f);
+
+            // ✅ 海洋蓝色渐变
+            float t = dist1 / (gridSize * 0.6f);
+            glm::vec3 color(
+                0.0f,
+                0.3f + 0.4f * t,
+                0.6f + 0.4f * (1.0f - t)
+            );
+
+            instances->Add(position, rotation, scale, color);
+        }
+    }
+
+    Core::Logger::GetInstance().Info("Wave Floor created: " + std::to_string(instances->GetCount()) + " cubes");
+    return instances;
+}
+
+/**
+ * 场景 3: 浮动群岛 (Floating Islands)
+ * 创建多个浮动的小岛，每个小岛由多个立方体组成
+ */
+std::shared_ptr<Renderer::InstanceData> CreateFloatingIslandsScene()
+{
+    Core::Logger::GetInstance().Info("Creating Scene 3: Floating Islands...");
+
+    auto instances = std::make_shared<Renderer::InstanceData>();
+
+    std::random_device rd;
+    std::mt19937 gen(42);  // ✅ 固定种子，确保每次运行相同
+    std::uniform_real_distribution<float> posDist(-25.0f, 25.0f);
+    std::uniform_real_distribution<float> heightDist(8.0f, 20.0f);
+    std::uniform_real_distribution<float> sizeDist(0.4f, 1.2f);
+    std::uniform_real_distribution<float> colorDist(0.5f, 1.0f);
+
+    int islandCount = 12;       // ✅ 岛屿数量
+    int cubesPerIsland = 100;   // ✅ 每个岛屿的立方体数
+
+    for (int island = 0; island < islandCount; ++island)
+    {
+        // 岛屿中心位置
+        glm::vec3 islandCenter(
+            posDist(gen),
+            heightDist(gen),
+            posDist(gen)
+        );
+
+        float islandSize = sizeDist(gen) * 2.5f;
+
+        // 每个岛屿的立方体（球形分布）
+        for (int i = 0; i < cubesPerIsland; ++i)
+        {
+            // 球形分布
+            float theta = std::uniform_real_distribution<float>(0, glm::two_pi<float>())(gen);
+            float phi = std::uniform_real_distribution<float>(0, glm::pi<float>())(gen);
+            float r = std::uniform_real_distribution<float>(0, islandSize)(gen);
+
+            glm::vec3 position(
+                islandCenter.x + r * std::sin(phi) * std::cos(theta),
+                islandCenter.y + r * std::cos(phi) * 0.6f,  // 压扁的球体
+                islandCenter.z + r * std::sin(phi) * std::sin(theta)
+            );
+
+            // ✅ 随机旋转
+            glm::vec3 rotation(
+                std::uniform_real_distribution<float>(0, 360)(gen),
+                std::uniform_real_distribution<float>(0, 360)(gen),
+                std::uniform_real_distribution<float>(0, 360)(gen)
+            );
+
+            float cubeSize = std::uniform_real_distribution<float>(0.4f, 0.9f)(gen);
+            glm::vec3 scale(cubeSize);
+
+            // ✅ 每个岛屿独特的颜色（紫色、粉色、橙色系）
+            float hueShift = island / static_cast<float>(islandCount);
+            glm::vec3 color(
+                0.8f + 0.2f * std::sin(hueShift * glm::two_pi<float>()),         // R: 高
+                0.3f + 0.3f * std::sin(hueShift * glm::two_pi<float>() + 2.0f),  // G: 中
+                0.5f + 0.4f * std::sin(hueShift * glm::two_pi<float>() + 4.0f)   // B: 中高
+            );
+
+            instances->Add(position, rotation, scale, color);
+        }
+    }
+
+    Core::Logger::GetInstance().Info("Floating Islands created: " + std::to_string(instances->GetCount()) + " cubes");
+    return instances;
+}
+
+// ========================================
+// 主程序
+// ========================================
 
 int main()
 {
+    // ========================================
     // 初始化日志系统
+    // ========================================
     Core::LogRotationConfig rotationConfig;
     rotationConfig.type = Core::RotationType::SIZE;
     rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
     rotationConfig.maxFiles = 3;
 
-    Core::Logger::GetInstance().Initialize("logs/instanced_rendering.log", true, Core::LogLevel::DEBUG,
-                                           true, rotationConfig);
+    Core::Logger::GetInstance().Initialize(
+        "logs/cool_cubes_demo.log",
+        true,
+        Core::LogLevel::INFO,
+        true,
+        rotationConfig
+    );
+
+    Core::Logger::GetInstance().Info("========================================");
+    Core::Logger::GetInstance().Info("Cool Cubes Demo - Starting...");
+    Core::Logger::GetInstance().Info("========================================");
 
     try
     {
-        Core::Logger::GetInstance().Info("=== Instanced Rendering Application - Unified Architecture ===");
-        Core::Logger::GetInstance().Info("Architecture: Three-Layer Responsibility Separation");
-        Core::Logger::GetInstance().Info("  - Layer 1 (Data): InstanceData, MeshData (pure CPU data)");
-        Core::Logger::GetInstance().Info("  - Layer 2 (Resources): MeshBuffer (GPU resources: VAO/VBO/EBO)");
-        Core::Logger::GetInstance().Info("  - Layer 3 (Rendering): InstancedRenderer (rendering logic)");
-        Core::Logger::GetInstance().Info("Application version: Cube & OBJ Instanced Rendering with Textures");
-        Core::Logger::GetInstance().Info("Window resolution: 1920x1080");
-
-        Core::Logger::GetInstance().Info("Creating application window...");
-        Core::Window window(1920, 1080, "Instanced Rendering - New Architecture");
+        // ========================================
+        // 创建窗口
+        // ========================================
+        Core::Logger::GetInstance().Info("Creating window...");
+        Core::Window window(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
         window.Init();
 
+        // ========================================
+        // 初始化输入控制器
+        // ========================================
         Core::Logger::GetInstance().Info("Initializing input controllers...");
+
         Core::MouseController mouseController;
         mouseController.Initialize(glfwGetCurrentContext());
+        mouseController.SetMouseCapture(true);
 
         Core::KeyboardController keyboardController;
         keyboardController.Initialize(glfwGetCurrentContext());
 
-        // Keyboard controls
-        Core::Logger::GetInstance().Info("Registering keyboard controls...");
+        // 键盘回调
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
-                                               {
-                                                   Core::Logger::GetInstance().Info("Application exit requested by user (ESC key)");
-                                                   exit(0);
-                                               });
-        keyboardController.RegisterKeyCallback(GLFW_KEY_TAB, [&mouseController]()
-                                               {
-                                                   mouseController.ToggleMouseCapture();
-                                               });
+        {
+            Core::Logger::GetInstance().Info("Exit requested");
+            exit(0);
+        });
 
-        Core::Logger::GetInstance().Info("Loading instanced shader program...");
+        keyboardController.RegisterKeyCallback(GLFW_KEY_TAB, [&mouseController]()
+        {
+            mouseController.ToggleMouseCapture();
+        });
+
+        // ========================================
+        // 加载着色器
+        // ========================================
+        Core::Logger::GetInstance().Info("Loading instanced shader...");
         Renderer::Shader instancedShader;
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
-        // ==========================================
-        // 1. 创建立方体网格缓冲区（MeshBuffer）
-        // ==========================================
-        Core::Logger::GetInstance().Info("Step 1: Creating MeshBuffer from Cube template...");
+        // ========================================
+        // 创建网格（立方体）
+        // ========================================
+        Core::Logger::GetInstance().Info("Creating cube mesh buffer...");
+        Renderer::MeshBuffer cubeMesh = Renderer::MeshBufferFactory::CreateCubeBuffer();
 
-        // 使用工厂创建 MeshBuffer（已自动上传到 GPU）
-        Renderer::MeshBuffer cubeBuffer = Renderer::MeshBufferFactory::CreateCubeBuffer();
-        auto cubeMeshBuffer = std::make_shared<Renderer::MeshBuffer>(std::move(cubeBuffer));
+        // ========================================
+        // 创建场景
+        // ========================================
+        std::vector<std::shared_ptr<Renderer::InstanceData>> scenes;
+        scenes.push_back(CreateSpiralTowerScene());       // 场景 1
+        scenes.push_back(CreateWaveFloorScene());         // 场景 2
+        scenes.push_back(CreateFloatingIslandsScene());   // 场景 3
 
-        // ==========================================
-        // 2. 准备立方体实例数据（InstanceData）
-        // ==========================================
-        Core::Logger::GetInstance().Info("Step 2: Preparing InstanceData for cubes...");
+        int currentScene = 0;
 
-        auto cubeInstances = std::make_shared<Renderer::InstanceData>();
+        // ========================================
+        // 创建渲染器
+        // ========================================
+        Core::Logger::GetInstance().Info("Creating instanced renderer...");
 
-        // 创建 10x10 的立方体地面阵列
-        int gridSize = 10;
-        float spacing = 2.0f;
-        float startX = -((gridSize - 1) * spacing) / 2.0f;
-        float startZ = -((gridSize - 1) * spacing) / 2.0f;
+        // 输出立方体网格信息用于调试
+        Core::Logger::GetInstance().Info("Cube mesh info:");
+        Core::Logger::GetInstance().Info("  VAO: " + std::to_string(cubeMesh.GetVAO()));
+        Core::Logger::GetInstance().Info("  Vertex Count: " + std::to_string(cubeMesh.GetVertexCount()));
+        Core::Logger::GetInstance().Info("  Index Count: " + std::to_string(cubeMesh.GetIndexCount()));
+        Core::Logger::GetInstance().Info("  Has Indices: " + std::string(cubeMesh.HasIndices() ? "Yes" : "No"));
 
-        for (int x = 0; x < gridSize; ++x)
+        auto cubeMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(cubeMesh));
+
+        std::vector<std::unique_ptr<Renderer::InstancedRenderer>> renderers;
+        for (const auto& scene : scenes)
         {
-            for (int z = 0; z < gridSize; ++z)
-            {
-                glm::vec3 position(startX + x * spacing, -1.0f, startZ + z * spacing);
-                glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-                glm::vec3 scale(1.5f, 0.5f, 1.5f);
-
-                // 生成方格颜色
-                bool isWhite = (x + z) % 2 == 0;
-                glm::vec3 color = isWhite ? glm::vec3(0.9f, 0.9f, 0.9f) : glm::vec3(0.3f, 0.3f, 0.3f);
-
-                cubeInstances->Add(position, rotation, scale, color);
-            }
+            auto renderer = std::make_unique<Renderer::InstancedRenderer>();
+            renderer->SetMesh(cubeMeshPtr);
+            renderer->SetInstances(scene);
+            renderer->Initialize();
+            renderers.push_back(std::move(renderer));
         }
 
-        Core::Logger::GetInstance().Info("Prepared " + std::to_string(cubeInstances->GetCount()) + " cube instances");
-
-        // ==========================================
-        // 3. 创建立方体渲染器（InstancedRenderer）
-        // ==========================================
-        Core::Logger::GetInstance().Info("Step 3: Creating InstancedRenderer for cubes...");
-
-        Renderer::InstancedRenderer cubeRenderer;
-        cubeRenderer.SetMesh(cubeMeshBuffer);  // 传递 shared_ptr<MeshBuffer>
-        cubeRenderer.SetInstances(cubeInstances);  // 传递 shared_ptr（零拷贝）
-        cubeRenderer.Initialize();
-
-        Core::Logger::GetInstance().Info("Cube renderer initialized with " +
-                                         std::to_string(cubeRenderer.GetInstanceCount()) + " instances");
-
-        // ==========================================
-        // 4. 创建 OBJ 模型实例化渲染（支持多材质和纹理）
-        // ==========================================
-        std::string carPath = "assets/models/cars/sportsCar.obj";
-        std::vector<Renderer::InstancedRenderer> carRenderers;
-        std::vector<std::shared_ptr<Renderer::MeshBuffer>> carMeshBuffers;  // 保持 meshBuffer 存活
-        std::shared_ptr<Renderer::InstanceData> carInstancesData;  // 保持 instanceData 存活
-
-        if (fs::exists(carPath))
+        // 场景切换回调（使用指针避免捕获全局变量）
+        keyboardController.RegisterKeyCallback(GLFW_KEY_1, [&currentScene]()
         {
-            Core::Logger::GetInstance().Info("Step 4: Creating InstancedRenderers for OBJ model: " + carPath);
+            currentScene = 0;
+            cameraPos = glm::vec3(0.0f, 25.0f, 30.0f);  // ✅ 调整：更近的视角观察塔
+            Core::Logger::GetInstance().Info("Switched to Scene 1: Spiral Tower");
+        });
 
-            // 准备汽车实例数据
-            auto carInstances = std::make_shared<Renderer::InstanceData>();
-            int carCount = 12;
-            float radius = 15.0f;
-
-            for (int i = 0; i < carCount; ++i)
-            {
-                float angle = (static_cast<float>(i) / carCount) * 3.14159f * 2.0f;
-                float x = std::cos(angle) * radius;
-                float z = std::sin(angle) * radius;
-                float y = 0.0f;
-
-                glm::vec3 position(x, y, z);
-                glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
-                glm::vec3 scale(0.5f, 0.5f, 0.5f);
-
-                // 使用白色，让材质显示真实颜色
-                glm::vec3 color(1.0f, 1.0f, 1.0f);
-
-                carInstances->Add(position, rotation, scale, color);
-            }
-
-            // 创建实例化渲染器（每个材质一个），同时获取 meshBuffer 和 instanceData 的 shared_ptr
-            auto [renderers, meshBuffers, instances] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
-            carRenderers = std::move(renderers);
-            carMeshBuffers = std::move(meshBuffers);  // 保持 meshBuffer 存活
-            carInstancesData = instances;           // 保持 instanceData 存活
-
-            if (!carRenderers.empty())
-            {
-                Core::Logger::GetInstance().Info("Created " + std::to_string(carRenderers.size()) +
-                                                 " car renderers (multi-material) with " +
-                                                 std::to_string(carCount) + " instances each");
-            }
-        }
-        else
+        keyboardController.RegisterKeyCallback(GLFW_KEY_2, [&currentScene]()
         {
-            Core::Logger::GetInstance().Warning("Car OBJ file not found: " + carPath);
-        }
+            currentScene = 1;
+            cameraPos = glm::vec3(0.0f, 15.0f, 50.0f);  // ✅ 调整：俯视波浪
+            Core::Logger::GetInstance().Info("Switched to Scene 2: Wave Floor");
+            Core::Logger::GetInstance().Info("Camera position: " +
+                                            std::to_string(cameraPos.x) + ", " +
+                                            std::to_string(cameraPos.y) + ", " +
+                                            std::to_string(cameraPos.z));
+        });
 
-        Core::Logger::GetInstance().Info("Enabling OpenGL depth testing");
+        keyboardController.RegisterKeyCallback(GLFW_KEY_3, [&currentScene]()
+        {
+            currentScene = 2;
+            cameraPos = glm::vec3(0.0f, 20.0f, 55.0f);  // ✅ 调整：观察群岛
+            Core::Logger::GetInstance().Info("Switched to Scene 3: Floating Islands");
+        });
+
+        Core::Logger::GetInstance().Info("========================================");
+        Core::Logger::GetInstance().Info("All scenes loaded successfully!");
+        Core::Logger::GetInstance().Info("Total scenes: " + std::to_string(scenes.size()));
+        Core::Logger::GetInstance().Info("========================================");
+        Core::Logger::GetInstance().Info("Controls:");
+        Core::Logger::GetInstance().Info("  WASD - Move camera");
+        Core::Logger::GetInstance().Info("  Q/E  - Move up/down");
+        Core::Logger::GetInstance().Info("  Mouse - Look around");
+        Core::Logger::GetInstance().Info("  TAB  - Toggle mouse capture");
+        Core::Logger::GetInstance().Info("  1/2/3 - Switch scenes");
+        Core::Logger::GetInstance().Info("  ESC  - Exit");
+        Core::Logger::GetInstance().Info("========================================");
+
+        // ========================================
+        // OpenGL 设置
+        // ========================================
+        Core::Logger::GetInstance().Info("Configuring OpenGL...");
         glEnable(GL_DEPTH_TEST);
 
-        // 设置背景色
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        // 面剔除设置（临时禁用以确保所有面都可见）
+        // 如果某些面不可见，可能是顶点缠绕顺序问题
+        // glEnable(GL_CULL_FACE);
+        // glCullFace(GL_BACK);
+        // glFrontFace(GL_CCW);
 
-        // 预设光照参数
-        glm::vec3 lightPos = glm::vec3(10.0f, 20.0f, 10.0f);
+        // 深色背景
+        glClearColor(0.05f, 0.08f, 0.12f, 1.0f);
 
-        float lastTime = static_cast<float>(glfwGetTime());
-        double fps_lastTime = glfwGetTime();
-        int fps_frameCount = 0;
-        int totalFrameCount = 0;
-
-        // Initial parameters
-        Core::Logger::GetInstance().Info("Controls: WASD=Move, Q/E=Up/Down, Mouse=Look Around");
-        Core::Logger::GetInstance().Info("TAB=Toggle Mouse Capture, ESC=Exit");
-        Core::Logger::GetInstance().Info("Scene: " + std::to_string(cubeRenderer.GetInstanceCount()) + " cubes, " +
-                                         (carRenderers.empty() ? "0" : std::to_string(carRenderers[0].GetInstanceCount())) + " cars (multi-material)");
-        Core::Logger::GetInstance().Info("Performance: Each material group uses only 1 draw call!");
+        // ========================================
+        // 渲染循环
+        // ========================================
         Core::Logger::GetInstance().Info("Starting render loop...");
+
+        double lastTime = glfwGetTime();
+        double fpsLastTime = glfwGetTime();
+        int fpsFrameCount = 0;
+        int totalFrameCount = 0;
+        float rotationAngle = 0.0f;
 
         while (!window.ShouldClose())
         {
-            double fps_currentTime = glfwGetTime();
-            fps_frameCount++;
+            // FPS 计算
+            double currentTime = glfwGetTime();
+            fpsFrameCount++;
             totalFrameCount++;
 
-            // ✅ 优化：降低日志输出频率，从 0.5 秒改为 5 秒
-            if (fps_currentTime - fps_lastTime >= 5.0)
+            if (currentTime - fpsLastTime >= 0.5)
             {
-                double fps = fps_frameCount / (fps_currentTime - fps_lastTime);
+                fps = fpsFrameCount / (currentTime - fpsLastTime);
                 Core::Logger::GetInstance().SetFPS(static_cast<int>(fps));
-                Core::Logger::GetInstance().LogStatisticsSummary();
 
-                fps_frameCount = 0;
-                fps_lastTime = fps_currentTime;
+                // 每秒输出一次统计
+                static int logCounter = 0;
+                if (++logCounter >= 2)  // 每1秒输出一次
+                {
+                    Core::Logger::GetInstance().Info(
+                        "Scene " + std::to_string(currentScene + 1) + " | " +
+                        "FPS: " + std::to_string(static_cast<int>(fps)) + " | " +
+                        "Instances: " + std::to_string(scenes[currentScene]->GetCount()) + " | " +
+                        "Total Frames: " + std::to_string(totalFrameCount)
+                    );
+                    logCounter = 0;
+                }
+
+                fpsFrameCount = 0;
+                fpsLastTime = currentTime;
             }
 
-            float currentTime = static_cast<float>(glfwGetTime());
-            float deltaTime = currentTime - lastTime;
+            float deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
 
+            // 更新动画
+            rotationAngle += deltaTime * 10.0f;
+
+            // ========================================
+            // 输入处理
+            // ========================================
             keyboardController.Update(deltaTime);
 
             float moveSpeed = cameraSpeed * deltaTime;
             glm::vec3 moveDirection(0.0f);
 
-            // 摄像机控制
+            // 摄像机移动
             if (keyboardController.IsKeyPressed(GLFW_KEY_W))
                 moveDirection += mouseController.GetCameraFront();
             if (keyboardController.IsKeyPressed(GLFW_KEY_S))
@@ -241,103 +486,75 @@ int main()
                 cameraPos += moveDirection * moveSpeed;
             }
 
-            // 动态计算窗口宽高比
+            // ========================================
+            // 渲染设置
+            // ========================================
             float aspectRatio = static_cast<float>(window.GetWidth()) / static_cast<float>(window.GetHeight());
-            glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()),
-                                                    aspectRatio, 0.1f, 200.0f);
-            glm::mat4 view = glm::lookAt(cameraPos,
-                                         cameraPos + mouseController.GetCameraFront(),
-                                         glm::vec3(0.0f, 1.0f, 0.0f));
+            glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()), aspectRatio, 0.1f, 300.0f);
+            glm::mat4 view = glm::lookAt(cameraPos, cameraPos + mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f));
 
-            // ✅ 优化：移除每帧的 LogContext 设置（避免字符串拷贝和日志系统调用）
-            // size_t totalDrawCalls = 1 + carRenderers.size();
-            // Core::LogContext renderContext;
-            // renderContext.renderPass = "Instanced";
-            // renderContext.batchIndex = 0;
-            // renderContext.drawCallCount = static_cast<int>(totalDrawCalls);
-            // renderContext.currentShader = "Instanced with Textures";
-            // Core::Logger::GetInstance().SetContext(renderContext);
+            // 设置日志上下文
+            Core::LogContext renderContext;
+            renderContext.renderPass = "CoolCubesDemo";
+            renderContext.batchIndex = currentScene;
+            renderContext.drawCallCount = 1;
+            renderContext.currentShader = "InstancedShader";
+            Core::Logger::GetInstance().SetContext(renderContext);
 
+            // 清空缓冲区
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // 设置通用着色器参数
+            // ========================================
+            // 设置着色器参数
+            // ========================================
             instancedShader.Use();
             instancedShader.SetMat4("projection", projection);
             instancedShader.SetMat4("view", view);
             instancedShader.SetVec3("lightPos", lightPos);
-            instancedShader.SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+            instancedShader.SetVec3("lightColor", lightColor);
             instancedShader.SetVec3("viewPos", cameraPos);
-            instancedShader.SetFloat("ambientStrength", 0.3f);
-            instancedShader.SetFloat("specularStrength", 0.5f);
-            instancedShader.SetFloat("shininess", 32.0f);
+            instancedShader.SetFloat("ambientStrength", 0.5f);  // 增强环境光（原来 0.3f）
+            instancedShader.SetFloat("specularStrength", 0.6f);
+            instancedShader.SetFloat("shininess", 64.0f);
+            instancedShader.SetBool("useInstanceColor", true);
+            instancedShader.SetBool("useTexture", false);
+            instancedShader.SetFloat("time", static_cast<float>(currentTime));  // 传递时间给着色器
 
-            // ==========================================
-            // 渲染立方体地面（无纹理）
-            // ==========================================
-            if (cubeRenderer.GetInstanceCount() > 0)
+            // ========================================
+            // 渲染当前场景
+            // ========================================
+
+            // ✅ 添加场景渲染的调试信息
+            static int lastScene = -1;
+            if (lastScene != currentScene)
             {
-                instancedShader.SetBool("useTexture", false);
-                instancedShader.SetBool("useInstanceColor", true); // 立方体使用实例颜色
-                cubeRenderer.Render();
+                Core::Logger::GetInstance().Info("Rendering scene " + std::to_string(currentScene + 1) +
+                                                 " with " + std::to_string(scenes[currentScene]->GetCount()) + " instances");
+                lastScene = currentScene;
             }
 
-            // ==========================================
-            // 渲染车模型（每个材质一个实例化渲染器，支持纹理）
-            // ==========================================
-            if (!carRenderers.empty())
-            {
-                // ✅ 优化：只在状态变化时设置 uniform（减少 GPU 状态切换）
-                // 使用 std::optional 表示"未初始化"状态，确保第一次总是设置
-                std::optional<bool> lastUseTexture;
-                std::optional<bool> lastUseInstanceColor;
-                std::optional<glm::vec3> lastObjectColor;
+            renderers[currentScene]->Render();
 
-                for (const auto& carRenderer : carRenderers)
-                {
-                    if (carRenderer.GetInstanceCount() > 0)
-                    {
-                        // ✅ 只在纹理状态变化时设置（第一次总是设置）
-                        bool useTexture = carRenderer.HasTexture();
-                        if (!lastUseTexture.has_value() || useTexture != lastUseTexture.value())
-                        {
-                            instancedShader.SetBool("useTexture", useTexture);
-                            lastUseTexture = useTexture;
-                        }
-
-                        // ✅ 只在颜色变化时设置（第一次总是设置）
-                        const glm::vec3& objectColor = carRenderer.GetMaterialColor();
-                        if (!lastObjectColor.has_value() || objectColor != lastObjectColor.value())
-                        {
-                            instancedShader.SetVec3("objectColor", objectColor);
-                            lastObjectColor = objectColor;
-                        }
-
-                        // ✅ 只在实例颜色状态变化时设置（第一次总是设置）
-                        // 车模型使用材质颜色，不使用实例颜色
-                        bool useInstanceColor = false;
-                        if (!lastUseInstanceColor.has_value() || useInstanceColor != lastUseInstanceColor.value())
-                        {
-                            instancedShader.SetBool("useInstanceColor", useInstanceColor);
-                            lastUseInstanceColor = useInstanceColor;
-                        }
-
-                        carRenderer.Render();
-                    }
-                }
-            }
-
+            // ========================================
+            // 交换缓冲区和事件处理
+            // ========================================
             window.SwapBuffers();
             window.PollEvents();
         }
 
-        Core::Logger::GetInstance().Info("Render loop ended, cleaning up resources...");
-        Core::Logger::GetInstance().Info("Final statistics - Total frames rendered: " + std::to_string(totalFrameCount));
-        Core::Logger::GetInstance().Info("Program terminated successfully");
+        // ========================================
+        // 清理和退出
+        // ========================================
+        Core::Logger::GetInstance().Info("========================================");
+        Core::Logger::GetInstance().Info("Render loop ended");
+        Core::Logger::GetInstance().Info("Total frames rendered: " + std::to_string(totalFrameCount));
+        Core::Logger::GetInstance().Info("Average FPS: " + std::to_string(fps));
+        Core::Logger::GetInstance().Info("Shutting down gracefully...");
+        Core::Logger::GetInstance().Info("========================================");
     }
-    catch (const std::exception &e)
+    catch (const std::exception& e)
     {
-        Core::Logger::GetInstance().Error("Fatal error occurred: " + std::string(e.what()));
-        Core::Logger::GetInstance().Error("Application will terminate with error code -1");
+        Core::Logger::GetInstance().Error("Fatal error: " + std::string(e.what()));
         Core::Logger::GetInstance().Shutdown();
         return -1;
     }

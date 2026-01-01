@@ -3,7 +3,8 @@
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
 #include "Renderer/Shader.hpp"
-#include "Renderer/SimpleMesh.hpp"
+#include "Renderer/MeshBuffer.hpp"
+#include "Renderer/MeshDataFactory.hpp"
 #include "Renderer/InstancedRenderer.hpp"
 #include "Renderer/InstanceData.hpp"
 #include <GLFW/glfw3.h>
@@ -11,7 +12,7 @@
 #include <vector>
 #include <cmath>
 #include <filesystem>
-#include <optional>  // ✅ 添加 std::optional 支持
+#include <optional> // ✅ 添加 std::optional 支持
 
 namespace fs = std::filesystem;
 
@@ -32,11 +33,11 @@ int main()
 
     try
     {
-        Core::Logger::GetInstance().Info("=== Instanced Rendering Application - New Architecture ===");
-        Core::Logger::GetInstance().Info("Architecture: Responsibility Separation Design");
-        Core::Logger::GetInstance().Info("  - IMesh: Mesh data (SimpleMesh)");
-        Core::Logger::GetInstance().Info("  - InstanceData: Instance data (matrices, colors)");
-        Core::Logger::GetInstance().Info("  - InstancedRenderer: Rendering logic");
+        Core::Logger::GetInstance().Info("=== Instanced Rendering Application - Unified Architecture ===");
+        Core::Logger::GetInstance().Info("Architecture: Three-Layer Responsibility Separation");
+        Core::Logger::GetInstance().Info("  - Layer 1 (Data): InstanceData, MeshData (pure CPU data)");
+        Core::Logger::GetInstance().Info("  - Layer 2 (Resources): MeshBuffer (GPU resources: VAO/VBO/EBO)");
+        Core::Logger::GetInstance().Info("  - Layer 3 (Rendering): InstancedRenderer (rendering logic)");
         Core::Logger::GetInstance().Info("Application version: Cube & OBJ Instanced Rendering with Textures");
         Core::Logger::GetInstance().Info("Window resolution: 1920x1080");
 
@@ -56,23 +57,22 @@ int main()
         keyboardController.RegisterKeyCallback(GLFW_KEY_ESCAPE, []()
                                                {
                                                    Core::Logger::GetInstance().Info("Application exit requested by user (ESC key)");
-                                                   exit(0);
-                                               });
+                                                   exit(0); });
         keyboardController.RegisterKeyCallback(GLFW_KEY_TAB, [&mouseController]()
-                                               {
-                                                   mouseController.ToggleMouseCapture();
-                                               });
+                                               { mouseController.ToggleMouseCapture(); });
 
         Core::Logger::GetInstance().Info("Loading instanced shader program...");
         Renderer::Shader instancedShader;
         instancedShader.Load("assets/shader/instanced.vert", "assets/shader/instanced.frag");
 
         // ==========================================
-        // 1. 创建立方体网格（SimpleMesh）
+        // 1. 创建立方体网格缓冲区（MeshBuffer）
         // ==========================================
-        Core::Logger::GetInstance().Info("Step 1: Creating SimpleMesh from Cube template...");
-        auto cubeMesh = std::make_shared<Renderer::SimpleMesh>(Renderer::SimpleMesh::CreateFromCube());
-        cubeMesh->Create();  // 创建 OpenGL 对象
+        Core::Logger::GetInstance().Info("Step 1: Creating MeshBuffer from Cube template...");
+
+        // 使用工厂创建 MeshBuffer（已自动上传到 GPU）
+        Renderer::MeshBuffer cubeBuffer = Renderer::MeshBufferFactory::CreateCubeBuffer();
+        auto cubeMeshBuffer = std::make_shared<Renderer::MeshBuffer>(std::move(cubeBuffer));
 
         // ==========================================
         // 2. 准备立方体实例数据（InstanceData）
@@ -111,8 +111,8 @@ int main()
         Core::Logger::GetInstance().Info("Step 3: Creating InstancedRenderer for cubes...");
 
         Renderer::InstancedRenderer cubeRenderer;
-        cubeRenderer.SetMesh(cubeMesh);  // 传递 shared_ptr
-        cubeRenderer.SetInstances(cubeInstances);  // 传递 shared_ptr（零拷贝）
+        cubeRenderer.SetMesh(cubeMeshBuffer);     // 传递 shared_ptr<MeshBuffer>
+        cubeRenderer.SetInstances(cubeInstances); // 传递 shared_ptr（零拷贝）
         cubeRenderer.Initialize();
 
         Core::Logger::GetInstance().Info("Cube renderer initialized with " +
@@ -123,8 +123,8 @@ int main()
         // ==========================================
         std::string carPath = "assets/models/cars/sportsCar.obj";
         std::vector<Renderer::InstancedRenderer> carRenderers;
-        std::vector<std::shared_ptr<Renderer::SimpleMesh>> carMeshes;  // 保持 mesh 存活
-        std::shared_ptr<Renderer::InstanceData> carInstancesData;  // 保持 instanceData 存活
+        std::vector<std::shared_ptr<Renderer::MeshBuffer>> carMeshBuffers; // 保持 meshBuffer 存活
+        std::shared_ptr<Renderer::InstanceData> carInstancesData;          // 保持 instanceData 存活
 
         if (fs::exists(carPath))
         {
@@ -152,11 +152,11 @@ int main()
                 carInstances->Add(position, rotation, scale, color);
             }
 
-            // 创建实例化渲染器（每个材质一个），同时获取 mesh 和 instanceData 的 shared_ptr
-            auto [renderers, meshes, instances] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
+            // 创建实例化渲染器（每个材质一个），同时获取 meshBuffer 和 instanceData 的 shared_ptr
+            auto [renderers, meshBuffers, instances] = Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
             carRenderers = std::move(renderers);
-            carMeshes = std::move(meshes);  // 保持 mesh 存活
-            carInstancesData = instances;   // 保持 instanceData 存活
+            carMeshBuffers = std::move(meshBuffers); // 保持 meshBuffer 存活
+            carInstancesData = instances;            // 保持 instanceData 存活
 
             if (!carRenderers.empty())
             {
@@ -289,7 +289,7 @@ int main()
                 std::optional<bool> lastUseInstanceColor;
                 std::optional<glm::vec3> lastObjectColor;
 
-                for (const auto& carRenderer : carRenderers)
+                for (const auto &carRenderer : carRenderers)
                 {
                     if (carRenderer.GetInstanceCount() > 0)
                     {
@@ -302,7 +302,7 @@ int main()
                         }
 
                         // ✅ 只在颜色变化时设置（第一次总是设置）
-                        const glm::vec3& objectColor = carRenderer.GetMaterialColor();
+                        const glm::vec3 &objectColor = carRenderer.GetMaterialColor();
                         if (!lastObjectColor.has_value() || objectColor != lastObjectColor.value())
                         {
                             instancedShader.SetVec3("objectColor", objectColor);
