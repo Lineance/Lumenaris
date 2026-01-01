@@ -29,6 +29,7 @@
  */
 
 #include "Core/Window.hpp"
+#include "Core/Camera.hpp"
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
@@ -51,10 +52,6 @@
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
 const char* WINDOW_TITLE = "Cool Cubes Demo - Press 1/2/3 to Switch Scenes";
-
-// 摄像机设置
-glm::vec3 cameraPos = glm::vec3(0.0f, 15.0f, 40.0f);
-float cameraSpeed = 15.0f;
 
 // 光照设置
 glm::vec3 lightPos = glm::vec3(20.0f, 30.0f, 20.0f);
@@ -288,13 +285,65 @@ int main()
         window.Init();
 
         // ========================================
-        // 初始化输入控制器
+        // 初始化输入控制器和摄像机
         // ========================================
-        Core::Logger::GetInstance().Info("Initializing input controllers...");
+        Core::Logger::GetInstance().Info("Initializing input controllers and camera...");
+
+        // 创建摄像机
+        Core::Camera camera(
+            glm::vec3(0.0f, 15.0f, 40.0f),  // 初始位置
+            glm::vec3(0.0f, 1.0f, 0.0f),    // 世界上向量
+            -90.0f,                          // 初始偏航角
+            0.0f                             // 初始俯仰角
+        );
 
         Core::MouseController mouseController;
         mouseController.Initialize(glfwGetCurrentContext());
         mouseController.SetMouseCapture(true);
+
+        // 设置鼠标移动回调来更新摄像机方向
+        glfwSetCursorPosCallback(glfwGetCurrentContext(), [](GLFWwindow* window, double xpos, double ypos) {
+            static bool firstMouse = true;
+            static float lastX = WINDOW_WIDTH / 2.0f;
+            static float lastY = WINDOW_HEIGHT / 2.0f;
+
+            // 检查鼠标是否被捕获
+            int mouseCaptured = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+            if (!mouseCaptured)
+                return;
+
+            if (firstMouse)
+            {
+                lastX = static_cast<float>(xpos);
+                lastY = static_cast<float>(ypos);
+                firstMouse = false;
+            }
+
+            float xoffset = static_cast<float>(xpos) - lastX;
+            float yoffset = lastY - static_cast<float>(ypos); // 反转Y轴
+
+            lastX = static_cast<float>(xpos);
+            lastY = static_cast<float>(ypos);
+
+            // 从窗口用户指针获取摄像机
+            Core::Camera* cam = static_cast<Core::Camera*>(glfwGetWindowUserPointer(window));
+            if (cam)
+            {
+                cam->ProcessMouseMovement(xoffset, yoffset);
+            }
+        });
+
+        // 设置滚轮回调来调整FOV
+        glfwSetScrollCallback(glfwGetCurrentContext(), [](GLFWwindow* window, double xoffset, double yoffset) {
+            Core::Camera* cam = static_cast<Core::Camera*>(glfwGetWindowUserPointer(window));
+            if (cam)
+            {
+                cam->ProcessMouseScroll(static_cast<float>(yoffset));
+            }
+        });
+
+        // 设置窗口用户指针，使回调可以访问摄像机
+        glfwSetWindowUserPointer(glfwGetCurrentContext(), &camera);
 
         Core::KeyboardController keyboardController;
         keyboardController.Initialize(glfwGetCurrentContext());
@@ -358,29 +407,29 @@ int main()
             renderers.push_back(std::move(renderer));
         }
 
-        // 场景切换回调（使用指针避免捕获全局变量）
-        keyboardController.RegisterKeyCallback(GLFW_KEY_1, [&currentScene]()
+        // 场景切换回调
+        keyboardController.RegisterKeyCallback(GLFW_KEY_1, [&currentScene, &camera]()
         {
             currentScene = 0;
-            cameraPos = glm::vec3(0.0f, 25.0f, 30.0f);  // ✅ 调整：更近的视角观察塔
+            camera.SetPosition(glm::vec3(0.0f, 25.0f, 30.0f));  // 更近的视角观察塔
             Core::Logger::GetInstance().Info("Switched to Scene 1: Spiral Tower");
         });
 
-        keyboardController.RegisterKeyCallback(GLFW_KEY_2, [&currentScene]()
+        keyboardController.RegisterKeyCallback(GLFW_KEY_2, [&currentScene, &camera]()
         {
             currentScene = 1;
-            cameraPos = glm::vec3(0.0f, 15.0f, 50.0f);  // ✅ 调整：俯视波浪
+            camera.SetPosition(glm::vec3(0.0f, 15.0f, 50.0f));  // 俯视波浪
             Core::Logger::GetInstance().Info("Switched to Scene 2: Wave Floor");
-            Core::Logger::GetInstance().Info("Camera position: " +
-                                            std::to_string(cameraPos.x) + ", " +
-                                            std::to_string(cameraPos.y) + ", " +
-                                            std::to_string(cameraPos.z));
+            Core::Logger::GetInstance().Info("Camera position: (" +
+                                            std::to_string(camera.GetPosition().x) + ", " +
+                                            std::to_string(camera.GetPosition().y) + ", " +
+                                            std::to_string(camera.GetPosition().z) + ")");
         });
 
-        keyboardController.RegisterKeyCallback(GLFW_KEY_3, [&currentScene]()
+        keyboardController.RegisterKeyCallback(GLFW_KEY_3, [&currentScene, &camera]()
         {
             currentScene = 2;
-            cameraPos = glm::vec3(0.0f, 20.0f, 55.0f);  // ✅ 调整：观察群岛
+            camera.SetPosition(glm::vec3(0.0f, 20.0f, 55.0f));  // 观察群岛
             Core::Logger::GetInstance().Info("Switched to Scene 3: Floating Islands");
         });
 
@@ -463,35 +512,26 @@ int main()
             // ========================================
             keyboardController.Update(deltaTime);
 
-            float moveSpeed = cameraSpeed * deltaTime;
-            glm::vec3 moveDirection(0.0f);
-
             // 摄像机移动
             if (keyboardController.IsKeyPressed(GLFW_KEY_W))
-                moveDirection += mouseController.GetCameraFront();
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::FORWARD, deltaTime);
             if (keyboardController.IsKeyPressed(GLFW_KEY_S))
-                moveDirection -= mouseController.GetCameraFront();
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::BACKWARD, deltaTime);
             if (keyboardController.IsKeyPressed(GLFW_KEY_A))
-                moveDirection -= glm::normalize(glm::cross(mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f)));
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::LEFT, deltaTime);
             if (keyboardController.IsKeyPressed(GLFW_KEY_D))
-                moveDirection += glm::normalize(glm::cross(mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f)));
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::RIGHT, deltaTime);
             if (keyboardController.IsKeyPressed(GLFW_KEY_Q))
-                moveDirection -= glm::vec3(0.0f, 1.0f, 0.0f);
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::DOWN, deltaTime);
             if (keyboardController.IsKeyPressed(GLFW_KEY_E))
-                moveDirection += glm::vec3(0.0f, 1.0f, 0.0f);
-
-            if (glm::length(moveDirection) > 0.0f)
-            {
-                moveDirection = glm::normalize(moveDirection);
-                cameraPos += moveDirection * moveSpeed;
-            }
+                camera.ProcessKeyboard(Core::Camera::MovementDirection::UP, deltaTime);
 
             // ========================================
             // 渲染设置
             // ========================================
             float aspectRatio = static_cast<float>(window.GetWidth()) / static_cast<float>(window.GetHeight());
-            glm::mat4 projection = glm::perspective(glm::radians(mouseController.GetFOV()), aspectRatio, 0.1f, 300.0f);
-            glm::mat4 view = glm::lookAt(cameraPos, cameraPos + mouseController.GetCameraFront(), glm::vec3(0.0f, 1.0f, 0.0f));
+            glm::mat4 projection = camera.GetProjectionMatrix(aspectRatio, 0.1f, 300.0f);
+            glm::mat4 view = camera.GetViewMatrix();
 
             // 设置日志上下文
             Core::LogContext renderContext;
@@ -512,7 +552,7 @@ int main()
             instancedShader.SetMat4("view", view);
             instancedShader.SetVec3("lightPos", lightPos);
             instancedShader.SetVec3("lightColor", lightColor);
-            instancedShader.SetVec3("viewPos", cameraPos);
+            instancedShader.SetVec3("viewPos", camera.GetPosition());
             instancedShader.SetFloat("ambientStrength", 0.5f);  // 增强环境光（原来 0.3f）
             instancedShader.SetFloat("specularStrength", 0.6f);
             instancedShader.SetFloat("shininess", 64.0f);

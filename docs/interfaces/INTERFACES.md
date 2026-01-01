@@ -4,6 +4,7 @@
 
 - [Core 模块接口](#core-模块接口)
   - [Window 类](#window-类)
+  - [Camera 类](#camera-类)
   - [MouseController 类](#mousecontroller-类)
   - [KeyboardController 类](#keyboardcontroller-类)
   - [Logger 类](#logger-类)
@@ -63,6 +64,185 @@ public:
 | `ShouldClose()` | 无 | bool | 检查用户是否请求关闭窗口 |
 | `GetWidth()` | 无 | int | 返回当前窗口宽度 |
 | `GetHeight()` | 无 | int | 返回当前窗口高度 |
+
+---
+
+### Camera 类
+
+3D摄像机类，封装摄像机位置、方向、移动和矩阵计算。
+
+```cpp
+namespace Core {
+class Camera {
+public:
+    // 移动方向枚举
+    enum class MovementDirection {
+        FORWARD,   // 前进
+        BACKWARD,  // 后退
+        LEFT,      // 左移
+        RIGHT,     // 右移
+        UP,        // 上升
+        DOWN       // 下降
+    };
+
+    // 投影类型枚举
+    enum class ProjectionType {
+        PERSPECTIVE,  // 透视投影（近大远小）
+        ORTHO         // 正交投影（无透视效果）
+    };
+
+    // 构造函数
+    Camera(const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f),
+           const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f),
+           float yaw = -90.0f,
+           float pitch = 0.0f);
+
+    // 矩阵获取
+    glm::mat4 GetViewMatrix() const;
+    glm::mat4 GetProjectionMatrix(float aspect, float nearPlane = 0.1f, float farPlane = 100.0f) const;
+
+    // 输入处理
+    void ProcessKeyboard(MovementDirection direction, float deltaTime);
+    void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
+    void ProcessMouseScroll(float yoffset);
+
+    // 位置和方向
+    const glm::vec3& GetPosition() const;
+    void SetPosition(const glm::vec3& position);
+    const glm::vec3& GetFront() const;
+    const glm::vec3& GetUp() const;
+    const glm::vec3& GetRight() const;
+    const glm::vec3& GetWorldUp() const;
+
+    // 欧拉角
+    float GetYaw() const;
+    float GetPitch() const;
+    void SetYaw(float yaw);
+    void SetPitch(float pitch);
+
+    // FOV和速度
+    float GetFOV() const;
+    void SetFOV(float fov);
+    float GetMovementSpeed() const;
+    void SetMovementSpeed(float speed);
+    float GetMouseSensitivity() const;
+    void SetMouseSensitivity(float sensitivity);
+
+    // 投影类型
+    ProjectionType GetProjectionType() const;
+    void SetProjectionType(ProjectionType type);
+
+    // 工具方法
+    void Reset(const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f),
+               const glm::vec3& up = glm::vec3(0.0f, 1.0f, 0.0f),
+               float yaw = -90.0f,
+               float pitch = 0.0f);
+    void LookAt(const glm::vec3& target);
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Camera()` | position, up, yaw, pitch | - | 构造摄像机，设置初始位置和朝向 |
+| `GetViewMatrix()` | 无 | glm::mat4 | 获取视图矩阵（世界坐标→摄像机坐标） |
+| `GetProjectionMatrix()` | aspect, nearPlane, farPlane | glm::mat4 | 获取投影矩阵（摄像机坐标→裁剪坐标） |
+| `ProcessKeyboard()` | direction, deltaTime | void | 处理键盘输入，移动摄像机 |
+| `ProcessMouseMovement()` | xoffset, yoffset, constrainPitch | void | 处理鼠标移动，更新摄像机方向 |
+| `ProcessMouseScroll()` | yoffset | void | 处理滚轮滚动，调整FOV实现缩放 |
+| `GetPosition()` | 无 | const glm::vec3& | 获取摄像机位置 |
+| `SetPosition()` | position | void | 设置摄像机位置 |
+| `GetFront()` | 无 | const glm::vec3& | 获取摄像机前向向量 |
+| `GetFOV()` | 无 | float | 获取视场角 |
+| `SetFOV()` | fov | void | 设置视场角（限制在1-120度） |
+| `GetMovementSpeed()` | 无 | float | 获取移动速度 |
+| `SetMovementSpeed()` | speed | void | 设置移动速度 |
+| `Reset()` | position, up, yaw, pitch | void | 重置摄像机到初始状态 |
+| `LookAt()` | target | void | 让摄像机观察指定目标点 |
+
+#### 功能特性
+
+**六自由度移动**：
+- WASD: 前后左右移动
+- Q/E: 垂直上下移动
+- 所有移动都基于摄像机坐标系
+
+**视角控制**：
+- 鼠标移动: 更新摄像机朝向
+- 自动限制俯仰角（防止万向节死锁）
+- 滚轮缩放: 调整FOV
+
+**矩阵计算**：
+- View Matrix: 使用glm::lookAt计算
+- Projection Matrix: 支持透视和正交投影
+
+#### 使用示例
+
+```cpp
+// 1. 创建摄像机
+Core::Camera camera(
+    glm::vec3(0.0f, 15.0f, 40.0f),  // 位置
+    glm::vec3(0.0f, 1.0f, 0.0f),    // 世界上向量
+    -90.0f,                          // 初始偏航角
+    0.0f                             // 初始俯仰角
+);
+
+// 2. 在渲染循环中处理输入
+float deltaTime = 0.016f; // 假设60FPS
+
+// WASD移动
+if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::FORWARD, deltaTime);
+if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::BACKWARD, deltaTime);
+if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::LEFT, deltaTime);
+if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::RIGHT, deltaTime);
+if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::DOWN, deltaTime);
+if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+    camera.ProcessKeyboard(Core::Camera::MovementDirection::UP, deltaTime);
+
+// 鼠标旋转（在鼠标回调函数中）
+void MouseCallback(GLFWwindow* window, double xpos, double ypos) {
+    // 计算偏移...
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+// 滚轮缩放（在滚轮回调函数中）
+void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    camera.ProcessMouseScroll(yoffset);
+}
+
+// 3. 获取矩阵并传给着色器
+float aspect = (float)windowWidth / (float)windowHeight;
+glm::mat4 view = camera.GetViewMatrix();
+glm::mat4 projection = camera.GetProjectionMatrix(aspect);
+
+shader.Use();
+shader.SetMat4("view", view);
+shader.SetMat4("projection", projection);
+```
+
+#### 设计说明
+
+**与MouseController的配合**：
+- `Camera`: 负责摄像机状态管理、矩阵计算、移动逻辑
+- `MouseController`: 负责捕获GLFW鼠标事件
+- 建议将MouseController的鼠标偏移传递给Camera.ProcessMouseMovement()
+
+**坐标系统**：
+- 使用右手坐标系
+- Y轴向上为正方向
+- 初始朝向为-Z方向（通过yaw=-90.0f实现）
+
+**性能优化**：
+- 矩阵计算使用惰性求值（调用GetViewMatrix时才计算）
+- 方向向量只在欧拉角改变时更新
+- 移动使用deltaTime归一化，保证不同帧率下速度一致
 
 ---
 

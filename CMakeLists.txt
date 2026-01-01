@@ -16,6 +16,7 @@ add_library(Core STATIC
     src/Core/MouseController.cpp
     src/Core/KeyboardController.cpp
     src/Core/Logger.cpp
+    src/Core/Camera.cpp
 )
 target_include_directories(Core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
