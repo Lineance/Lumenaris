@@ -83,6 +83,9 @@ namespace Renderer
         size_t GetInstanceCount() const { return m_instanceCount; }
         const std::shared_ptr<MeshBuffer>& GetMesh() const { return m_meshBuffer; }
 
+        // 更新实例数据到GPU（用于动画）
+        void UpdateInstanceData();
+
         // 静态辅助方法：为 Cube 创建实例化渲染器
         static InstancedRenderer CreateForCube(const std::shared_ptr<InstanceData>& instances);
 

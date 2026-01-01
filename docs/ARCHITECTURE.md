@@ -31,17 +31,19 @@ LearningOpenGL/
 │   │   ├── cars/            # 汽车模型 (sportsCar.obj + .mtl)
 │   │   ├── clouds/          # 云朵模型集合
 │   │   ├── CornellBox/      # 康奈尔盒场景
-│   │   └── bunny.obj        # 兔子模型
+│   │   ├── cube.obj         # 立方体模型
+│   │   └── simple_cube.obj  # 简单立方体模型
 │   ├── shader/              # 着色器文件
 │   │   ├── basic.vert       # 基础顶点着色器
 │   │   ├── basic.frag       # 基础片段着色器
 │   │   ├── debug.vert/frag  # 调试图形着色器
+│   │   ├── instanced.vert/frag # 实例化渲染着色器
+│   │   ├── multi_light.vert/frag # 多光源着色器
 │   │   ├── simple.frag      # 简单着色器
 │   │   └── storage/         # 风格化着色器库
 │   │       ├── glass.frag
 │   │       ├── ink.frag
 │   │       ├── neon.frag
-│   │       ├── phrone.frag
 │   │       ├── pixelnoise.frag
 │   │       ├── randomnoise.frag
 │   │       ├── sketch.frag
@@ -49,53 +51,98 @@ LearningOpenGL/
 │   └── picture/             # 纹理图片资源
 ├── include/                  # 头文件
 │   ├── Core/                # 核心系统头文件
+│   │   ├── Camera.hpp       # 3D摄像机系统
 │   │   ├── GLM.hpp          # GLM数学库统一封装
 │   │   ├── KeyboardController.hpp
+│   │   ├── Logger.hpp       # 日志系统
 │   │   ├── MouseController.hpp
 │   │   └── Window.hpp
-│   ├── Renderer/            # 渲染系统头文件
-│   │   ├── Mesh.hpp         # 网格抽象接口 + 工厂模式
-│   │   ├── Shader.hpp       # 着色器管理
-│   │   ├── Texture.hpp      # 纹理加载
-│   │   ├── Cube.hpp         # 立方体几何体
-│   │   ├── Sphere.hpp       # 球体几何体
-│   │   ├── OBJLoader.hpp    # OBJ文件解析器
-│   │   ├── OBJModel.hpp     # OBJ模型渲染器
-│   └── tinyobjloader\        # OBJ模型加载库
-│       └── tiny_obj_loader.h # TinyOBJLoader头文件
-│   └── glad/                # OpenGL加载器
+│   └── Renderer/            # 渲染系统头文件
+│       ├── Core/            # 核心接口
+│       │   └── IRenderer.hpp      # 渲染器抽象接口
+│       ├── Data/           # 数据容器
+│       │   ├── InstanceData.hpp   # 实例数据容器
+│       │   ├── MeshBuffer.hpp     # 网格缓冲区（GPU资源）
+│       │   └── MeshData.hpp       # 网格数据（CPU数据）
+│       ├── Factory/        # 工厂模式
+│       │   └── MeshDataFactory.hpp # 网格数据工厂
+│       ├── Geometry/       # 几何体实现
+│       │   ├── Mesh.hpp          # IMesh接口 + MeshFactory
+│       │   ├── Cube.hpp          # 立方体
+│       │   ├── OBJModel.hpp      # OBJ模型渲染器
+│       │   ├── Plane.hpp         # 平面
+│       │   ├── Sphere.hpp        # 球体
+│       │   └── Torus.hpp         # 圆环体
+│       ├── Lighting/       # 光照系统
+│       │   ├── Light.hpp         # 光照基类
+│       │   └── LightManager.hpp  # 光照管理器
+│       ├── Renderer/       # 渲染器实现
+│       │   └── InstancedRenderer.hpp # 实例化渲染器
+│       └── Resources/      # 资源管理
+│           ├── OBJLoader.hpp     # OBJ文件解析器
+│           ├── Shader.hpp        # 着色器管理
+│           └── Texture.hpp       # 纹理加载
 ├── src/                      # 源代码
 │   ├── Core/                # 核心系统实现
-│   │   ├── Window.cpp
+│   │   ├── Camera.cpp
+│   │   ├── KeyboardController.cpp
+│   │   ├── Logger.cpp
 │   │   ├── MouseController.cpp
-│   │   └── KeyboardController.cpp
+│   │   └── Window.cpp
 │   ├── Renderer/            # 渲染系统实现
-│   │   ├── Shader.cpp
-│   │   ├── Texture.cpp
-│   │   ├── Cube.cpp
-│   │   ├── Sphere.cpp
-│   │   ├── OBJLoader.cpp
-│   │   └── OBJModel.cpp
+│   │   ├── Data/           # 数据容器实现
+│   │   │   ├── InstanceData.cpp
+│   │   │   ├── MeshBuffer.cpp
+│   │   │   └── MeshData.cpp
+│   │   ├── Factory/        # 工厂实现
+│   │   │   └── MeshDataFactory.cpp
+│   │   ├── Geometry/       # 几何体实现
+│   │   │   ├── Cube.cpp
+│   │   │   ├── Mesh.cpp
+│   │   │   ├── OBJModel.cpp
+│   │   │   ├── Plane.cpp
+│   │   │   ├── Sphere.cpp
+│   │   │   └── Torus.cpp
+│   │   ├── Lighting/       # 光照系统实现
+│   │   │   ├── Light.cpp
+│   │   │   └── LightManager.cpp
+│   │   ├── Renderer/       # 渲染器实现
+│   │   │   └── InstancedRenderer.cpp
+│   │   └── Resources/      # 资源实现
+│   │       ├── OBJLoader.cpp
+│   │       ├── Shader.cpp
+│   │       └── Texture.cpp
 │   ├── main.cpp             # 应用程序入口
 │   └── glad.c               # OpenGL加载器实现
 ├── vendor/                  # 第三方库
-│   ├── glfw/               # 窗口库
 │   ├── glm/                # 数学库
-│   └── stb/                # 图像加载库
+│   ├── glfw/               # 窗口库
+│   ├── stb/                # 图像加载库
+│   └── tinyobjloader       # OBJ模型加载库
 ├── archive/                 # 归档文件
-│   └── shader_adjusting.cpp # 着色器调试代码
+│   └── *.cpp               # 历史代码备份
 ├── build/                   # 构建输出
 ├── test/                    # 测试代码
 ├── docs/                    # 文档
 │   ├── ARCHITECTURE.md     # 本文档
-│   ├── OPTIMIZATION_GUIDE.md
-│   ├── README.md
-│   └── interfaces/         # 接口文档
+│   ├── DISCO_STAGE_IMPLEMENTATION.md # Disco舞台实现文档
+│   ├── interfaces/         # 接口文档
+│   │   └── INTERFACES.md
+│   └── fixs/              # 修复和优化文档
 ├── CMakeLists.txt          # 构建配置
 └── .gitignore              # Git忽略文件
 ```
 
+
 #### 1.1 Core 模块 (静态库)
+
+**Camera 类** (`src/Core/Camera.cpp`)
+- 6自由度（6DOF）3D摄像机系统
+- 支持透视和正交投影
+- 欧拉角控制（偏航角、俯仰角）
+- View Matrix和Projection Matrix计算
+- 移动速度和鼠标灵敏度配置
+- LookAt功能（观察指定目标）
 
 **Window 类** (`src/Core/Window.cpp`)
 - 封装GLFW窗口管理，处理窗口生命周期
@@ -128,14 +175,26 @@ LearningOpenGL/
 
 #### 1.2 Renderer 模块 (静态库)
 
-**Mesh 抽象层** (`include/Renderer/Mesh.hpp`)
-- `IMesh` 接口定义统一的网格渲染标准
-- `MeshFactory` 工厂模式支持运行时几何体注册和创建
-
-**IRenderer 接口** (`include/Renderer/IRenderer.hpp`)
+**IRenderer 接口** (`include/Renderer/Core/IRenderer.hpp`)
 - 定义渲染器的统一抽象接口
 - 提供Initialize()、Render()、GetName()方法
 - 与IMesh接口分离，强调"渲染器"的概念而非"网格"
+
+**光照系统** (`include/Renderer/Lighting/`)
+- **Light 类**: 光照基类
+  - 支持三种光源类型：DirectionalLight（平行光）、PointLight（点光源）、SpotLight（聚光灯）
+  - Phong光照模型：环境光、漫反射、镜面反射
+  - 光照强度、颜色、开关状态控制
+  - ApplyToShader()方法将光照数据传递给着色器
+
+- **LightManager 类**: 光照管理器（单例模式）
+  - 统一管理所有光源
+  - 支持多光源渲染（最多16个点光源）
+  - 批量应用光源到着色器
+
+**Mesh 抽象层** (`include/Renderer/Geometry/Mesh.hpp`)
+- `IMesh` 接口定义统一的网格渲染标准
+- `MeshFactory` 工厂模式支持运行时几何体注册和创建
 
 **Shader 类** (`src/Renderer/Shader.cpp`)
 - 封装OpenGL着色器程序管理
@@ -153,60 +212,90 @@ LearningOpenGL/
 - 优化的立方体生成算法（循环编码实现）
 - 支持变换配置：位置、颜色、缩放、旋转
 - 生成6个面的顶点数据
+- 静态方法GetVertexData()用于工厂模式
 
 **Sphere 类** (`src/Renderer/Sphere.cpp`)
 - 参数化球体生成，支持经纬度分段配置
 - 可配置半径、堆栈数、切片数
 - 支持变换配置和顶点缓存
+- 静态方法GetVertexData()、GetIndexData()用于工厂模式
 
-**OBJLoader 类** (`src/Renderer/OBJLoader.cpp`)
+**Torus 类** (`src/Renderer/Torus.cpp`)
+- 圆环体（甜甜圈）几何体
+- 支持自定义主半径（管到中心的距离）和管半径
+- 可配置主分段数和次分段数
+- 正确的法线和UV坐标
+- 静态方法GetVertexData()、GetIndexData()用于工厂模式
+
+**Plane 类** (`src/Renderer/Plane.cpp`)
+- 平面几何体，支持自定义宽度和高度
+- 可配置分段数（用于细分）
+- 正确的法线和UV坐标
+- 静态方法GetVertexData()、GetIndexData()用于工厂模式
+
+**OBJLoader 类** (`src/Renderer/Resources/OBJLoader.cpp`)
 - 完整的OBJ文件格式解析器
 - 支持顶点、法线、UV坐标解析
 - 集成TinyOBJLoader第三方库
 - 自动加载关联的.mtl材质文件
 - 支持多材质模型的面索引管理
 
-**OBJModel 类** (`src/Renderer/OBJModel.cpp`)
+**OBJModel 类** (`src/Renderer/Geometry/OBJModel.cpp`)
 - 继承IMesh接口的OBJ模型渲染器
 - 支持按材质分组渲染
 - 集成纹理加载和管理
 - 提供完整的变换控制（位置、缩放、旋转）
 - 支持材质属性访问和查询
 
-**InstancedRenderer 类** (`src/Renderer/InstancedRenderer.cpp`)
+**数据容器** (Renderer/Data/)
+- **MeshData 类** (`src/Renderer/Data/MeshData.cpp`)
+  - CPU端网格数据容器
+  - 存储顶点数据、索引数据、顶点布局
+  - 支持材质颜色设置
+  - 移动语义优化，避免数据拷贝
+
+- **MeshBuffer 类** (`src/Renderer/Data/MeshBuffer.cpp`)
+  - GPU端网格缓冲区（VAO、VBO、EBO）
+  - UploadToGPU()方法上传数据到显卡
+  - 绑定纹理和材质颜色
+  - 提供顶点/索引数量查询
+
+- **InstanceData 类** (`src/Renderer/Data/InstanceData.cpp`)
+  - 实例数据容器，存储多个实例的变换和颜色信息
+  - 管理实例的模型矩阵（位置、旋转、缩放）
+  - 管理实例的颜色属性
+  - 提供批量添加和清除实例的接口
+  - 独立于渲染器，可以单独操作
+
+**工厂模式** (Renderer/Factory/)
+- **MeshDataFactory 类** (`src/Renderer/Factory/MeshDataFactory.cpp`)
+  - 创建CPU端MeshData（CreateCubeData、CreateSphereData等）
+  - 创建GPU端MeshBuffer（CreateCubeBuffer、CreateSphereBuffer等）
+  - 从OBJ文件创建多个MeshData/MeshBuffer
+  - 支持移动语义优化性能
+
+- **MeshBufferFactory 类** (MeshDataFactory的一部分)
+  - 从MeshData创建并上传到GPU
+  - 批量创建MeshBuffer列表
+
+**InstancedRenderer 类** (`src/Renderer/Renderer/InstancedRenderer.cpp`)
 - 实例化渲染器实现，大幅提升批量渲染性能
 - 继承IRenderer接口，实现统一的渲染器抽象
 - 采用职责分离设计：
-  - SimpleMesh: 网格数据容器（使用 shared_ptr 管理生命周期）
-  - InstanceData: 实例数据容器（使用 shared_ptr 避免拷贝）
-  - InstancedRenderer: 渲染逻辑（持有 shared_ptr）
-- 支持从 Cube 和 OBJ 模型创建实例化渲染器
+  - MeshBuffer: GPU资源（VAO、VBO、EBO）
+  - InstanceData: 实例数据（矩阵、颜色）
+  - InstancedRenderer: 渲染逻辑
 - 支持每个实例独立的模型矩阵变换（位置、旋转、缩放）
 - 支持每个实例独立的颜色属性（基于材质颜色）
 - 使用 glVertexAttribDivisor 实现实例化属性
 - 支持索引渲染（EBO）和纹理映射
 - 多材质支持：为每个材质创建独立的实例化渲染器
-- 内存安全：使用 shared_ptr 自动管理 mesh 和 instanceData 生命周期，避免悬空指针
-- CreateForOBJ()返回tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr>
+- 内存安全：使用 shared_ptr 自动管理资源生命周期，避免悬空指针
 - 一次绘制调用渲染数百个相同几何体
 - 适用于大量重复物体的场景（植被、建筑、车辆等）
-
-**SimpleMesh 类** (`src/Renderer/SimpleMesh.cpp`)
-- 纯粹的数据容器，存储网格几何数据（顶点、索引、VAO/VBO/EBO）
-- 继承IMesh接口，提供统一的网格接口
-- 支持深拷贝语义：拷贝时创建新的OpenGL缓冲对象
-- 支持移动语义：高效的资源转移
-- 与 InstancedRenderer 配合使用：SimpleMesh 提供数据，InstancedRenderer 提供逻辑
-- **纹理使用 shared_ptr 管理所有权**：SimpleMesh 持有 Texture 的 shared_ptr
-- 静态工厂方法：CreateFromCube() 和 CreateFromMaterialData()
-- **使用方式**：通过 shared_ptr 传递给 InstancedRenderer，自动管理生命周期
-
-**InstanceData 类** (`src/Renderer/InstanceData.cpp`)
-- 纯粹的数据容器，存储实例变换和颜色信息
-- 管理实例的模型矩阵（位置、旋转、缩放）
-- 管理实例的颜色属性
-- 提供批量添加和清除实例的接口
-- 独立于渲染器，可以单独操作
+- **动态更新**: UpdateInstanceData()方法支持运行时更新实例数据到GPU，实现动画效果
+  - 使用glBufferSubData高效更新GPU缓冲区（不重新分配内存）
+  - 每帧调用可实现实时动画（自转、公转、缩放等变换）
 
 #### 1.4 主程序 (`src/main.cpp`)
 
@@ -216,6 +305,14 @@ LearningOpenGL/
 - 输入事件处理和摄像机控制
 - 渲染管线实现（光照、材质、纹理）
 - FPS监控和性能统计
+- **Disco舞台动画系统**:
+  - 中央Disco球: 500个立方体 + 1个核心球体（半径2.5m立方层 + 1.8m核心球）
+  - 8个彩色球体: 每个包含100个立方体 + 1个核心球体（半径1.0/1.2/1.4m）
+  - 自转动画: 每个球体独立三轴旋转
+  - 公转动画: 8个彩色球围绕中心点（半径10m）公转
+  - 实时更新: 每帧调用InstancedRenderer::UpdateInstanceData()更新1300个立方体
+  - 混乱光照: 16个点光源4种运动模式（椭圆、8字、螺旋、抖动圆）
+  - Fibonacci球算法: 均匀分布立方体在球面上
 
 ### 2. 构建系统
 

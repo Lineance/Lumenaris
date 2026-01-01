@@ -130,6 +130,48 @@ namespace Renderer
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    void InstancedRenderer::UpdateInstanceData()
+    {
+        if (!m_instanceVBO)
+        {
+            Core::Logger::GetInstance().Error("InstancedRenderer::UpdateInstanceData() - Instance VBO not created!");
+            return;
+        }
+
+        if (!m_instances || m_instances->IsEmpty())
+        {
+            return;
+        }
+
+        const auto& matrices = m_instances->GetModelMatrices();
+        const auto& colors = m_instances->GetColors();
+
+        // 计算总数据大小：每个矩阵 16 个 float，每个颜色 3 个 float
+        size_t matrixFloatCount = matrices.size() * 16;
+        size_t colorFloatCount = colors.size() * 3;
+        size_t totalFloatCount = matrixFloatCount + colorFloatCount;
+
+        // 创建连续的缓冲区
+        std::vector<float> buffer;
+        buffer.reserve(totalFloatCount);
+
+        // 将矩阵数据插入缓冲区（每个 mat4 是 16 个 float）
+        const float* matrixData = reinterpret_cast<const float*>(matrices.data());
+        buffer.insert(buffer.end(), matrixData, matrixData + matrixFloatCount);
+
+        // 将颜色数据插入缓冲区（每个 vec3 是 3 个 float）
+        const float* colorData = reinterpret_cast<const float*>(colors.data());
+        buffer.insert(buffer.end(), colorData, colorData + colorFloatCount);
+
+        // 更新 GPU 缓冲区数据（使用 glBufferSubData 而不是 glBufferData）
+        glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+        glBufferSubData(GL_ARRAY_BUFFER,
+                       0,
+                       buffer.size() * sizeof(float),
+                       buffer.data());
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
     void InstancedRenderer::Render() const
     {
         if (!m_meshBuffer || m_meshBuffer->GetVAO() == 0)

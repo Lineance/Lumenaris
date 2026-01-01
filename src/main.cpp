@@ -1,16 +1,40 @@
 /**
  * ========================================
- * 多光源系统演示 - Multi-Light Demo
+ * Disco 舞台演示 - Disco Stage Demo
  * ========================================
  *
- * 展示完整的多光源系统和光源可视化
+ * 简洁的Disco舞台：水平平面 + 统一立方体密集拟合 + 全部核心球体 + 混乱多彩光源
  *
  * 特性：
- * - 多种光源类型（平行光、点光源、聚光灯）
- * - 光源位置可视化（发光立方体标识）
- * - 彩色点光源阵列
- * - 动态光源旋转
+ * - 水平平面舞台（50x50纯白色地板）
+ * - 中央Disco球：500个立方体外层（边长0.35，分布半径2.5）+ 核心球体（半径2.5，与立方体层一致）
+ * - 8个彩色球形灯：每个100个立方体外层（边长0.2，分布半径1.0）+ 核心球体（半径1.0，与立方体层一致）
+ * - 16个混乱旋转彩色点光源（不同运动模式）
+ * - 中央聚光灯（窄光束向下照射地板）
+ * - 动态光源旋转效果
  * - 实时光照计算
+ *
+ * 光源系统（混乱Disco风格）：
+ * - 16种不同颜色：红绿蓝黄、洋红青、橙紫、粉红天蓝、酸橙金色、薰衣草绿松石、珊瑚薄荷
+ * - 点光源范围：13米（缩小光圈，更集中）
+ * - 4种混乱运动模式：
+ *   * 模式0：椭圆运动（12x8米，高度波动）
+ *   * 模式1：8字形运动（利萨如曲线，复杂轨迹）
+ *   * 模式2：螺旋进出（半径8-14米动态变化）
+ *   * 模式3：随机抖动圆形（额外2米抖动）
+ * - 不同旋转速度：0.5, 0.8, 1.1, 1.4, 1.7
+ * - 偶数索引额外扰动：±1.5米随机偏移
+ * - 高度动态变化：3.0-5.0米之间复杂波动
+ * - 聚光灯角度：15-25度（窄光束）
+ *
+ * 技术特点：
+ * - 斐波那契球面算法确保立方体均匀分布
+ * - 统一立方体大小：中央0.35，周边0.2（增大）
+ * - 核心球体半径等于立方体层半径，完全填充内部空间
+ * - 立方体附着在核心球体表面，形成镜面反射层
+ * - 总计1300个立方体 + 9个核心球体
+ * - 3个渲染器（平面、立方体、球体）
+ * - 16个混乱旋转彩色点光源，营造真实Disco氛围
  *
  * 控制说明：
  * - WASD: 前后左右移动
@@ -18,8 +42,6 @@
  * - 鼠标: 旋转视角
  * - TAB: 切换鼠标捕获
  * - ESC: 退出
- * - 1/2/3: 切换渲染场景
- * - L: 切换光源显示/隐藏
  * - SPACE: 暂停/恢复光源动画
  *
  * ========================================
@@ -51,7 +73,7 @@
 // 窗口设置
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
-const char* WINDOW_TITLE = "Sphere Demo - 9 Spheres | SPACE: Pause Animation";
+const char* WINDOW_TITLE = "Disco Stage - Press SPACE to Pause Lights";
 
 // 性能统计
 float fps = 0.0f;
@@ -75,31 +97,48 @@ void SetupLighting(
     Core::Logger::GetInstance().Info("Setting up multi-light system...");
     Core::Logger::GetInstance().Info("========================================");
 
-    // 1. 太阳光（平行光）- 暖白色，从斜上方照射
+    // 1. 太阳光（平行光）- 弱化，仅提供基础照明
     auto sun = std::make_shared<Renderer::Lighting::DirectionalLight>(
-        glm::vec3(-0.3f, -1.0f, -0.2f),  // 方向：从右上方往下
-        glm::vec3(1.0f, 0.95f, 0.8f),     // 暖白色
-        0.2f,                             // ✅ 进一步降低强度
-        0.1f, 0.3f, 0.2f                  // ✅ 降低环境光，让彩色光更突出
+        glm::vec3(0.0f, -1.0f, 0.0f),    // 方向：从正上方往下
+        glm::vec3(1.0f, 1.0f, 1.0f),     // 纯白色
+        0.3f,                            // 大幅降低强度
+        0.05f, 0.2f, 0.1f                // 非常低的环境光、漫反射和镜面
     );
     lightManager.AddDirectionalLight(sun);
-    Core::Logger::GetInstance().Info("✓ Added sun (directional light)");
+    Core::Logger::GetInstance().Info("✓ Added weak sun (directional light) from above");
 
-    // 2. 彩色点光源阵列（4个）- 平面演示专用配置
+    // 2. 彩色点光源阵列（16个）- Disco舞台专用配置，丰富多彩
+    // 使用更多样化的颜色混合
     glm::vec3 pointLightColors[] = {
-        glm::vec3(1.0f, 0.0f, 0.0f),  // 🔴 纯红色
-        glm::vec3(0.0f, 1.0f, 0.0f),  // 🟢 纯绿色
-        glm::vec3(0.0f, 0.0f, 1.0f),  // 🔵 纯蓝色
-        glm::vec3(1.0f, 1.0f, 0.0f)   // 🟡 纯黄色
+        glm::vec3(1.0f, 0.0f, 0.0f),      // 纯红
+        glm::vec3(0.0f, 1.0f, 0.0f),      // 纯绿
+        glm::vec3(0.0f, 0.0f, 1.0f),      // 纯蓝
+        glm::vec3(1.0f, 1.0f, 0.0f),      // 黄色
+        glm::vec3(1.0f, 0.0f, 1.0f),      // 洋红
+        glm::vec3(0.0f, 1.0f, 1.0f),      // 青色
+        glm::vec3(1.0f, 0.5f, 0.0f),      // 橙色
+        glm::vec3(0.5f, 0.0f, 1.0f),      // 紫色
+        glm::vec3(1.0f, 0.0f, 0.5f),      // 粉红
+        glm::vec3(0.0f, 0.5f, 1.0f),      // 天蓝
+        glm::vec3(0.5f, 1.0f, 0.0f),      // 酸橙
+        glm::vec3(1.0f, 0.8f, 0.0f),      // 金色
+        glm::vec3(0.8f, 0.0f, 1.0f),      // 薰衣草
+        glm::vec3(0.0f, 1.0f, 0.5f),      // 绿松石
+        glm::vec3(1.0f, 0.5f, 0.5f),      // 珊瑚色
+        glm::vec3(0.5f, 1.0f, 0.8f)       // 薄荷绿
     };
 
-    float radius = 8.0f;  // ✅ 适中的旋转半径
-    float height = 6.0f;  // ✅ 降低高度，更靠近平面
+    float baseRadius = 12.0f;  // 基础旋转半径
+    float baseHeight = 3.5f;   // 基础高度
     outRotatingLights.clear();
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 16; ++i)
     {
-        float angle = i * glm::two_pi<float>() / 4.0f;
+        // 每个光源有不同的初始角度、半径和高度
+        float angle = i * glm::two_pi<float>() / 16.0f;
+        float radius = baseRadius + (i % 3 - 1) * 2.0f;  // 半径变化：10, 12, 14米
+        float height = baseHeight + (i % 2) * 1.0f;       // 高度变化：3.5, 4.5米
+
         glm::vec3 pos(
             std::cos(angle) * radius,
             height,
@@ -109,15 +148,29 @@ void SetupLighting(
         auto pointLight = std::make_shared<Renderer::Lighting::PointLight>(
             pos,
             pointLightColors[i],
-            8.0f,                              // ✅ 非常强的强度，效果明显
-            0.0f, 0.0f, 1.0f,                  // ✅ 无环境光，只有漫反射和镜面
-            Renderer::Lighting::PointLight::Attenuation::Range20()  // ✅ 20米范围
+            8.0f,                              // 降低强度，避免过曝
+            0.0f, 0.0f, 1.0f,                  // 无环境光，只有漫反射和镜面
+            Renderer::Lighting::PointLight::Attenuation::Range13()  // 13米范围，缩小光圈
         );
         lightManager.AddPointLight(pointLight);
         outRotatingLights.push_back(pointLight);
-        Core::Logger::GetInstance().Info("✓ Added rotating point light " + std::to_string(i) +
+        Core::Logger::GetInstance().Info("✓ Added chaotic rotating point light " + std::to_string(i) +
                                          " at (" + std::to_string(pos.x) + ", " + std::to_string(pos.y) + ", " + std::to_string(pos.z) + ")");
     }
+
+    // 3. 中央聚光灯 - 从Disco球位置向下照射到地板，缩小光圈
+    auto centerSpotlight = std::make_shared<Renderer::Lighting::SpotLight>(
+        glm::vec3(0.0f, 8.0f, 0.0f),      // 位置：与中央Disco球一致
+        glm::vec3(0.0f, -1.0f, 0.0f),     // 方向：向下
+        glm::vec3(1.0f, 1.0f, 1.0f),      // 颜色：白色
+        15.0f,                            // 强度
+        0.0f, 0.0f, 1.0f,                 // ambient, diffuse, specular
+        Renderer::Lighting::PointLight::Attenuation::Range32(),  // 32米范围
+        glm::radians(15.0f),              // 内角：15度，缩小光圈
+        glm::radians(25.0f)               // 外角：25度，更小的边缘
+    );
+    lightManager.AddSpotLight(centerSpotlight);
+    Core::Logger::GetInstance().Info("✓ Added center spotlight (tight beam from disco ball to floor)");
 
     // 3. 手电筒（聚光灯）- 跟随相机
     outFlashlight = std::make_shared<Renderer::Lighting::SpotLight>(
@@ -134,14 +187,14 @@ void SetupLighting(
     Core::Logger::GetInstance().Info("✓ Added flashlight (spot light)");
 
     // 中心点位置（用于旋转动画）
-    outCenterPosition = glm::vec3(0.0f, height, 0.0f);
+    outCenterPosition = glm::vec3(0.0f, baseHeight, 0.0f);
 
     Core::Logger::GetInstance().Info("========================================");
     Core::Logger::GetInstance().Info("Multi-light configuration:");
-    Core::Logger::GetInstance().Info("  - Point light radius: " + std::to_string(radius) + "m");
-    Core::Logger::GetInstance().Info("  - Point light height: " + std::to_string(height) + "m");
+    Core::Logger::GetInstance().Info("  - Point light base radius: " + std::to_string(baseRadius) + "m");
+    Core::Logger::GetInstance().Info("  - Point light base height: " + std::to_string(baseHeight) + "m");
     Core::Logger::GetInstance().Info("  - Point light intensity: 8.0x");
-    Core::Logger::GetInstance().Info("  - Pure RGB colors for maximum visibility");
+    Core::Logger::GetInstance().Info("  - Chaotic rotation: different speeds, directions, radii");
     Core::Logger::GetInstance().Info("========================================");
     lightManager.PrintAllLights();
     Core::Logger::GetInstance().Info("========================================");
@@ -430,181 +483,197 @@ std::shared_ptr<Renderer::InstanceData> CreateGeometryShowcase()
 }
 
 /**
- * 场景: 混合几何体对比 (Mixed Geometry Comparison)
- * 展示球体、平面、圆环体
+ * 场景: Disco 舞台 (Disco Stage)
+ * 使用所有几何体创建炫酷的Disco效果
  */
-struct MixedGeometryScene
+struct DiscoStage
 {
     std::vector<std::unique_ptr<Renderer::InstancedRenderer>> renderers;
     std::vector<std::shared_ptr<Renderer::MeshBuffer>> meshBuffers;
     std::vector<std::shared_ptr<Renderer::InstanceData>> instanceDataList;
 };
 
-MixedGeometryScene CreateMixedGeometryScene()
+DiscoStage CreateDiscoStage()
 {
-    Core::Logger::GetInstance().Info("Creating Mixed Geometry Scene (Spheres, Planes, Tori)...");
+    Core::Logger::GetInstance().Info("Creating Disco Stage...");
 
-    MixedGeometryScene scene;
+    DiscoStage stage;
 
     // ========================================
-    // 创建球体实例（3行3列）
+    // 舞台地板 - 使用平面
     // ========================================
+    auto floorInstances = std::make_shared<Renderer::InstanceData>();
+
+    // 中央舞池 - 纯白色地板（绕X轴旋转-90度使其水平）
+    floorInstances->Add(
+        glm::vec3(0.0f, -0.01f, 0.0f),
+        glm::vec3(-90.0f, 0.0f, 0.0f),  // 绕X轴旋转-90度，使平面水平
+        glm::vec3(50.0f, 50.0f, 1.0f),  // 原始平面在X-Y平面，旋转后X和Y变成地面的长宽
+        glm::vec3(1.0f, 1.0f, 1.0f)  // 纯白色
+    );
+
+    // ========================================
+    // 立方体组合成的球形灯
+    // ========================================
+    auto cubeInstances = std::make_shared<Renderer::InstanceData>();
     auto sphereInstances = std::make_shared<Renderer::InstanceData>();
 
-    for (int row = 0; row < 3; ++row)
+    // 中央Disco球 - 使用大量统一立方体密集拟合
+    glm::vec3 centerPos(0.0f, 8.0f, 0.0f);
+    float discoBallRadius = 2.5f;
+
+    // 使用斐波那契球面分布算法均匀分布立方体
+    const int numCubes = 500;  // 500个立方体密集拟合球体
+    const float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
+    const float uniformCubeSize = 0.35f;  // 增大统一的立方体大小
+
+    for (int i = 0; i < numCubes; ++i)
     {
-        for (int col = 0; col < 3; ++col)
+        // 斐波那契球面算法
+        float theta = 2.0f * glm::pi<float>() * i / goldenRatio;
+        float phi = std::acos(1.0f - 2.0f * (i + 0.5f) / numCubes);
+
+        // 转换为笛卡尔坐标
+        float x = discoBallRadius * std::sin(phi) * std::cos(theta);
+        float y = discoBallRadius * std::sin(phi) * std::sin(theta);
+        float z = discoBallRadius * std::cos(phi);
+
+        glm::vec3 offset(x, y, z);
+
+        // 根据位置设置颜色变化
+        float colorVariation = 0.7f + 0.3f * std::sin(theta * 3.0f);
+        glm::vec3 cubeColor(colorVariation, colorVariation, colorVariation + 0.1f);
+
+        cubeInstances->Add(centerPos + offset, glm::vec3(0.0f), glm::vec3(uniformCubeSize), cubeColor);
+    }
+
+    // 中央核心球体 - 缩小，作为内部核心
+    sphereInstances->Add(
+        glm::vec3(0.0f, 8.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),  // 旋转在渲染循环中应用
+        glm::vec3(1.8f),  // 核心球体半径1.8，小于立方体层半径2.5
+        glm::vec3(1.0f, 1.0f, 0.95f)  // 亮银白色
+    );
+
+    // 创建一圈立方体组合成的球形灯（8个位置，更加密集）
+    for (int i = 0; i < 8; ++i)
+    {
+        float angle = i * (360.0f / 8.0f);
+        float radius = 10.0f;
+        float x = radius * cosf(glm::radians(angle));
+        float z = radius * sinf(glm::radians(angle));
+
+        glm::vec3 color;
+        if (i % 4 == 0)
+            color = glm::vec3(1.0f, 0.1f, 0.1f);  // 红
+        else if (i % 4 == 1)
+            color = glm::vec3(0.1f, 1.0f, 0.1f);  // 绿
+        else if (i % 4 == 2)
+            color = glm::vec3(0.1f, 0.1f, 1.0f);  // 蓝
+        else
+            color = glm::vec3(1.0f, 1.0f, 0.1f);  // 黄
+
+        glm::vec3 lightCenter(x, 5.0f, z);
+
+        // 每个球形灯使用100个统一立方体密集拟合
+        const int cubesPerLight = 100;
+        float lightRadius = 1.0f + (i % 3) * 0.2f;  // 不同大小：1.0, 1.2, 1.4米
+        const float lightCubeSize = 0.2f;  // 立方体边长
+
+        for (int j = 0; j < cubesPerLight; ++j)
         {
-            glm::vec3 position(-6.0f + col * 6.0f, 1.0f, -8.0f + row * 8.0f);
-            glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-            glm::vec3 scale(1.2f);
+            float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
+            float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / cubesPerLight);
 
-            // 不同颜色
-            glm::vec3 color;
-            if (row == 0)
-                color = glm::vec3(0.2f, 0.6f, 1.0f);  // 蓝色
-            else if (row == 1)
-                color = glm::vec3(0.2f, 1.0f, 0.4f);  // 绿色
-            else
-                color = glm::vec3(1.0f, 0.6f, 0.2f);  // 橙色
+            float lx = lightRadius * std::sin(phi) * std::cos(theta);
+            float ly = lightRadius * std::sin(phi) * std::sin(theta);
+            float lz = lightRadius * std::cos(phi);
 
-            sphereInstances->Add(position, rotation, scale, color);
+            glm::vec3 localOffset(lx, ly, lz);
+
+            cubeInstances->Add(lightCenter + localOffset, glm::vec3(0.0f), glm::vec3(lightCubeSize), color);
         }
+
+        // 每个球形灯的核心球体 - 与立方体层半径一致，但不同球体大小不同
+        sphereInstances->Add(
+            lightCenter,
+            glm::vec3(0.0f, 0.0f, 0.0f),  // 旋转在渲染循环中应用
+            glm::vec3(lightRadius),  // 核心球体半径等于立方体层半径
+            color * 1.2f  // 核心球体颜色更亮
+        );
     }
 
     // ========================================
-    // 创建平面实例（3个平面，沿X轴排列）
+    // 创建渲染器
     // ========================================
-    auto planeInstances = std::make_shared<Renderer::InstanceData>();
 
-    // 平面1：左侧，红色
-    planeInstances->Add(
-        glm::vec3(-15.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),  // 旋转使其竖立
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(1.0f, 0.3f, 0.3f)
-    );
-
-    // 平面2：中间，黄色
-    planeInstances->Add(
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(1.0f, 1.0f, 0.3f)
-    );
-
-    // 平面3：右侧，紫色
-    planeInstances->Add(
-        glm::vec3(15.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(0.8f, 0.3f, 1.0f)
-    );
-
-    // ========================================
-    // 创建圆环体实例（2行2列）
-    // ========================================
-    auto torusInstances = std::make_shared<Renderer::InstanceData>();
-
-    for (int row = 0; row < 2; ++row)
+    // 地板渲染器
+    Core::Logger::GetInstance().Info("Creating floor renderer...");
+    try
     {
-        for (int col = 0; col < 2; ++col)
-        {
-            glm::vec3 position(-4.5f + col * 9.0f, 2.5f, 12.0f + row * 6.0f);
-            glm::vec3 rotation(90.0f, 0.0f, 0.0f);  // 平躺
-            glm::vec3 scale(1.5f);
+        Renderer::MeshBuffer floorMesh = Renderer::MeshBufferFactory::CreatePlaneBuffer(1.0f, 1.0f, 1, 1);
+        auto floorMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(floorMesh));
+        stage.meshBuffers.push_back(floorMeshPtr);
 
-            // 青色和品红色交替
-            glm::vec3 color = (row + col) % 2 == 0 ?
-                glm::vec3(0.3f, 1.0f, 1.0f) :  // 青色
-                glm::vec3(1.0f, 0.3f, 1.0f);  // 品红
-
-            torusInstances->Add(position, rotation, scale, color);
-        }
+        auto floorRenderer = std::make_unique<Renderer::InstancedRenderer>();
+        floorRenderer->SetMesh(floorMeshPtr);
+        floorRenderer->SetInstances(floorInstances);
+        floorRenderer->Initialize();
+        stage.renderers.push_back(std::move(floorRenderer));
+        stage.instanceDataList.push_back(floorInstances);
+    }
+    catch (const std::exception& e)
+    {
+        Core::Logger::GetInstance().Error("Failed to create floor renderer: " + std::string(e.what()));
     }
 
-    // ========================================
-    // 创建球体渲染器
-    // ========================================
-    Core::Logger::GetInstance().Info("Creating sphere renderer...");
+    // 立方体球形灯渲染器
+    Core::Logger::GetInstance().Info("Creating cube-based sphere lights renderer...");
+    try
+    {
+        Renderer::MeshBuffer cubeMesh = Renderer::MeshBufferFactory::CreateCubeBuffer();
+        auto cubeMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(cubeMesh));
+        stage.meshBuffers.push_back(cubeMeshPtr);
 
+        auto cubeRenderer = std::make_unique<Renderer::InstancedRenderer>();
+        cubeRenderer->SetMesh(cubeMeshPtr);
+        cubeRenderer->SetInstances(cubeInstances);
+        cubeRenderer->Initialize();
+        stage.renderers.push_back(std::move(cubeRenderer));
+        stage.instanceDataList.push_back(cubeInstances);
+    }
+    catch (const std::exception& e)
+    {
+        Core::Logger::GetInstance().Error("Failed to create cube renderer: " + std::string(e.what()));
+    }
+
+    // 中央核心球体渲染器
+    Core::Logger::GetInstance().Info("Creating center core sphere renderer...");
     try
     {
         Renderer::MeshBuffer sphereMesh = Renderer::MeshBufferFactory::CreateSphereBuffer(32, 32, 1.0f);
         auto sphereMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(sphereMesh));
-        scene.meshBuffers.push_back(sphereMeshPtr);
+        stage.meshBuffers.push_back(sphereMeshPtr);
 
         auto sphereRenderer = std::make_unique<Renderer::InstancedRenderer>();
         sphereRenderer->SetMesh(sphereMeshPtr);
         sphereRenderer->SetInstances(sphereInstances);
         sphereRenderer->Initialize();
-        scene.renderers.push_back(std::move(sphereRenderer));
-        scene.instanceDataList.push_back(sphereInstances);
-
-        Core::Logger::GetInstance().Info("Sphere renderer created successfully");
+        stage.renderers.push_back(std::move(sphereRenderer));
+        stage.instanceDataList.push_back(sphereInstances);
     }
     catch (const std::exception& e)
     {
         Core::Logger::GetInstance().Error("Failed to create sphere renderer: " + std::string(e.what()));
     }
 
-    // ========================================
-    // 创建平面渲染器
-    // ========================================
-    Core::Logger::GetInstance().Info("Creating plane renderer...");
+    Core::Logger::GetInstance().Info("Disco Stage created: " +
+                                     std::to_string(stage.renderers.size()) + " renderer types - " +
+                                     "1 floor, " +
+                                     std::to_string(cubeInstances->GetCount()) + " cubes, " +
+                                     std::to_string(sphereInstances->GetCount()) + " core spheres (1 center + 8 colored)");
 
-    try
-    {
-        Renderer::MeshBuffer planeMesh = Renderer::MeshBufferFactory::CreatePlaneBuffer(1.0f, 1.0f, 1, 1);
-        auto planeMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(planeMesh));
-        scene.meshBuffers.push_back(planeMeshPtr);
-
-        auto planeRenderer = std::make_unique<Renderer::InstancedRenderer>();
-        planeRenderer->SetMesh(planeMeshPtr);
-        planeRenderer->SetInstances(planeInstances);
-        planeRenderer->Initialize();
-        scene.renderers.push_back(std::move(planeRenderer));
-        scene.instanceDataList.push_back(planeInstances);
-
-        Core::Logger::GetInstance().Info("Plane renderer created successfully");
-    }
-    catch (const std::exception& e)
-    {
-        Core::Logger::GetInstance().Error("Failed to create plane renderer: " + std::string(e.what()));
-    }
-
-    // ========================================
-    // 创建圆环体渲染器
-    // ========================================
-    Core::Logger::GetInstance().Info("Creating torus renderer...");
-
-    try
-    {
-        Renderer::MeshBuffer torusMesh = Renderer::MeshBufferFactory::CreateTorusBuffer(1.0f, 0.3f, 32, 24);
-        auto torusMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(torusMesh));
-        scene.meshBuffers.push_back(torusMeshPtr);
-
-        auto torusRenderer = std::make_unique<Renderer::InstancedRenderer>();
-        torusRenderer->SetMesh(torusMeshPtr);
-        torusRenderer->SetInstances(torusInstances);
-        torusRenderer->Initialize();
-        scene.renderers.push_back(std::move(torusRenderer));
-        scene.instanceDataList.push_back(torusInstances);
-
-        Core::Logger::GetInstance().Info("Torus renderer created successfully");
-    }
-    catch (const std::exception& e)
-    {
-        Core::Logger::GetInstance().Error("Failed to create torus renderer: " + std::string(e.what()));
-    }
-
-    Core::Logger::GetInstance().Info("Mixed Geometry Scene created: " +
-                                     std::to_string(scene.renderers.size()) + " renderer types, " +
-                                     std::to_string(sphereInstances->GetCount()) + " spheres, " +
-                                     std::to_string(planeInstances->GetCount()) + " planes, " +
-                                     std::to_string(torusInstances->GetCount()) + " tori");
-
-    return scene;
+    return stage;
 }
 
 // ========================================
@@ -734,9 +803,9 @@ int main()
         multiLightShader.Load("assets/shader/multi_light.vert", "assets/shader/multi_light.frag");
 
         // ========================================
-        // 创建混合几何体场景
+        // 创建Disco舞台
         // ========================================
-        MixedGeometryScene mixedGeometryScene = CreateMixedGeometryScene();
+        DiscoStage discoStage = CreateDiscoStage();
 
         // 光源控制回调
         bool animateLights = true;
@@ -748,8 +817,8 @@ int main()
         });
 
         Core::Logger::GetInstance().Info("========================================");
-        Core::Logger::GetInstance().Info("Mixed Geometry Scene loaded successfully!");
-        Core::Logger::GetInstance().Info("Total renderers: " + std::to_string(mixedGeometryScene.renderers.size()));
+        Core::Logger::GetInstance().Info("Disco Stage loaded successfully!");
+        Core::Logger::GetInstance().Info("Total renderers: " + std::to_string(discoStage.renderers.size()));
         Core::Logger::GetInstance().Info("========================================");
         Core::Logger::GetInstance().Info("Controls:");
         Core::Logger::GetInstance().Info("  WASD - Move camera");
@@ -803,7 +872,7 @@ int main()
                 static int logCounter = 0;
                 if (++logCounter >= 2)  // 每1秒输出一次
                 {
-                    std::string logMessage = "Mixed Geometry | FPS: " +
+                    std::string logMessage = "Disco Stage | FPS: " +
                                              std::to_string(static_cast<int>(fps)) +
                                              " | Total Frames: " +
                                              std::to_string(totalFrameCount);
@@ -826,21 +895,188 @@ int main()
             // ========================================
             if (!animationPaused)
             {
-                // 更新旋转的点光源位置
+                // 更新旋转的点光源位置 - 真正混乱的Disco风格
                 float time = static_cast<float>(glfwGetTime());
                 for (size_t i = 0; i < rotatingPointLights.size(); ++i)
                 {
-                    float angleOffset = static_cast<float>(i) * glm::two_pi<float>() / 4.0f;
-                    float radius = 8.0f;  // ✅ 与SetupLighting中的半径一致
-                    float speed = 1.0f;   // ✅ 适中的旋转速度
+                    // 每个光源有独特的运动参数
+                    float angleOffset = static_cast<float>(i) * glm::two_pi<float>() / 16.0f;
+                    float speed = 0.5f + static_cast<float>(i % 5) * 0.3f;
 
-                    // 水平圆形旋转，高度固定
-                    glm::vec3 offset(
-                        std::sin(time * speed + angleOffset) * radius,
-                        0.0f,  // ✅ 不再上下移动，保持在固定高度
-                        std::cos(time * speed + angleOffset) * radius
-                    );
+                    // 不同的运动模式
+                    int motionPattern = i % 4;
+                    glm::vec3 offset(0.0f);
+
+                    if (motionPattern == 0)
+                    {
+                        // 模式0：椭圆运动（水平拉伸）
+                        float radiusX = 12.0f;
+                        float radiusZ = 8.0f;
+                        float height = 4.0f + std::sin(time * speed * 3.0f) * 0.8f;
+                        offset = glm::vec3(
+                            std::sin(time * speed + angleOffset) * radiusX,
+                            height,
+                            std::cos(time * speed + angleOffset) * radiusZ
+                        );
+                    }
+                    else if (motionPattern == 1)
+                    {
+                        // 模式1：8字形运动（利萨如曲线）
+                        float radius = 10.0f;
+                        offset = glm::vec3(
+                            std::sin(time * speed + angleOffset) * radius,
+                            4.0f + std::sin(time * speed * 2.0f) * 0.6f,
+                            std::sin(time * speed * 2.0f + angleOffset) * radius * 0.7f
+                        );
+                    }
+                    else if (motionPattern == 2)
+                    {
+                        // 模式2：螺旋进出运动
+                        float baseRadius = 11.0f;
+                        float radiusVariation = std::sin(time * speed * 0.5f) * 3.0f;
+                        float currentRadius = baseRadius + radiusVariation;
+                        float height = 3.5f + std::cos(time * speed) * 1.0f;
+                        offset = glm::vec3(
+                            std::sin(time * speed * 1.5f + angleOffset) * currentRadius,
+                            height,
+                            std::cos(time * speed * 1.5f + angleOffset) * currentRadius
+                        );
+                    }
+                    else
+                    {
+                        // 模式3：随机抖动圆形运动
+                        float radius = 13.0f;
+                        float jitterX = std::sin(time * speed * 7.0f + i) * 2.0f;
+                        float jitterZ = std::cos(time * speed * 5.0f + i) * 2.0f;
+                        float height = 3.8f + std::sin(time * speed * 4.0f) * 0.7f;
+                        offset = glm::vec3(
+                            std::sin(time * speed * 0.8f + angleOffset) * radius + jitterX,
+                            height,
+                            std::cos(time * speed * 0.8f + angleOffset) * radius + jitterZ
+                        );
+                    }
+
+                    // 偶数索引添加额外的随机扰动
+                    if (i % 2 == 0)
+                    {
+                        offset.x += std::sin(time * 2.0f + i) * 1.5f;
+                        offset.z += std::cos(time * 1.5f + i) * 1.5f;
+                    }
+
                     rotatingPointLights[i]->SetPosition(centerPosition + offset);
+                }
+
+                // 更新球体和立方体旋转（自转 + 公转）
+                auto& sphereMatrices = discoStage.instanceDataList[2]->GetModelMatrices();
+                auto& cubeMatrices = discoStage.instanceDataList[1]->GetModelMatrices();
+
+                const float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
+
+                // 中央球体自转（索引0）- 慢速三轴自转
+                float centerRotX = std::sin(time * 0.3f) * 360.0f;
+                float centerRotY = time * 20.0f;
+                float centerRotZ = std::cos(time * 0.2f) * 360.0f;
+                glm::mat4 centerModel = glm::mat4(1.0f);
+                centerModel = glm::translate(centerModel, glm::vec3(0.0f, 8.0f, 0.0f));
+                centerModel = glm::rotate(centerModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+                centerModel = glm::rotate(centerModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+                centerModel = glm::rotate(centerModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+                centerModel = glm::scale(centerModel, glm::vec3(1.8f));
+                sphereMatrices[0] = centerModel;
+
+                // 中央disco球周围的500个立方体自转（索引0-499）
+                const int centerCubesCount = 500;
+                const float discoBallRadius = 2.5f;
+                const float centerCubeSize = 0.35f;
+
+                for (int j = 0; j < centerCubesCount; ++j)
+                {
+                    // 使用Fibonacci球算法重新计算每个立方体的相对位置
+                    float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
+                    float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / centerCubesCount);
+
+                    float lx = discoBallRadius * std::sin(phi) * std::cos(theta);
+                    float ly = discoBallRadius * std::sin(phi) * std::sin(theta);
+                    float lz = discoBallRadius * std::cos(phi);
+
+                    glm::vec3 localOffset(lx, ly, lz);
+                    glm::vec3 cubePos = glm::vec3(0.0f, 8.0f, 0.0f) + localOffset;
+
+                    // 应用与中央球体相同的自转
+                    glm::mat4 cubeModel = glm::mat4(1.0f);
+                    cubeModel = glm::translate(cubeModel, cubePos);
+                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+                    cubeModel = glm::scale(cubeModel, glm::vec3(centerCubeSize));
+
+                    cubeMatrices[j] = cubeModel;
+                }
+
+                // 8个彩色球体（索引1-8）- 自转 + 围绕中心公转
+                float orbitRadius = 10.0f;  // 公转半径
+                float orbitSpeed = 0.5f;    // 公转速度
+                const int cubesPerLight = 100;
+
+                for (int i = 0; i < 8; ++i)
+                {
+                    // 初始角度位置
+                    float initialAngle = i * (360.0f / 8.0f);
+
+                    // 公转：围绕中心点(0, 8, 0)旋转
+                    float currentOrbitAngle = glm::radians(initialAngle + time * orbitSpeed * 50.0f);
+                    float x = orbitRadius * std::cos(currentOrbitAngle);
+                    float z = orbitRadius * std::sin(currentOrbitAngle);
+
+                    // 球体中心位置（包含公转）
+                    glm::vec3 lightCenter(x, 5.0f, z);
+
+                    // 自转：每个球体独特的自转速度
+                    float selfRotSpeed = 0.5f + static_cast<float>(i) * 0.2f;
+                    float selfRotX = std::sin(time * selfRotSpeed + i) * 180.0f;
+                    float selfRotY = time * (50.0f + i * 15.0f);  // 快速自转
+                    float selfRotZ = std::cos(time * selfRotSpeed * 0.7f + i * 2.0f) * 180.0f;
+
+                    // 构建模型矩阵：先平移到公转位置，再应用自转
+                    glm::mat4 lightModel = glm::mat4(1.0f);
+                    lightModel = glm::translate(lightModel, lightCenter);
+                    lightModel = glm::rotate(lightModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+                    lightModel = glm::rotate(lightModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+                    lightModel = glm::rotate(lightModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+
+                    // 不同大小的球体
+                    float lightRadius = 1.0f + (i % 3) * 0.2f;
+                    lightModel = glm::scale(lightModel, glm::vec3(lightRadius));
+
+                    sphereMatrices[i + 1] = lightModel;  // 索引1-8对应8个彩色球体
+
+                    // 更新每个彩色球体周围的100个立方体（索引500-1299）
+                    const float lightCubeSize = 0.2f;
+                    int cubeStartIndex = centerCubesCount + i * cubesPerLight;
+
+                    for (int j = 0; j < cubesPerLight; ++j)
+                    {
+                        // 使用Fibonacci球算法计算立方体的相对位置
+                        float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
+                        float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / cubesPerLight);
+
+                        float lx = lightRadius * std::sin(phi) * std::cos(theta);
+                        float ly = lightRadius * std::sin(phi) * std::sin(theta);
+                        float lz = lightRadius * std::cos(phi);
+
+                        glm::vec3 localOffset(lx, ly, lz);
+                        glm::vec3 cubePos = lightCenter + localOffset;
+
+                        // 应用与球体相同的自转
+                        glm::mat4 cubeModel = glm::mat4(1.0f);
+                        cubeModel = glm::translate(cubeModel, cubePos);
+                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+                        cubeModel = glm::scale(cubeModel, glm::vec3(lightCubeSize));
+
+                        cubeMatrices[cubeStartIndex + j] = cubeModel;
+                    }
                 }
 
                 // 更新手电筒位置和方向
@@ -850,6 +1086,10 @@ int main()
                     flashlight->SetDirection(camera.GetFront());
                 }
             }
+
+            // 更新实例数据到GPU
+            discoStage.renderers[1]->UpdateInstanceData();  // 更新立方体
+            discoStage.renderers[2]->UpdateInstanceData();  // 更新球体
 
             // ========================================
             // 输入处理
@@ -879,7 +1119,7 @@ int main()
 
             // 设置日志上下文
             Core::LogContext renderContext;
-            renderContext.renderPass = "MixedGeometry";
+            renderContext.renderPass = "DiscoStage";
             renderContext.batchIndex = 0;
             renderContext.drawCallCount = 1;
             renderContext.currentShader = "MultiLightShader";
@@ -904,19 +1144,19 @@ int main()
             Renderer::Lighting::LightManager::GetInstance().ApplyToShader(multiLightShader);
 
             // ========================================
-            // 渲染混合几何体场景
+            // 渲染Disco舞台
             // ========================================
 
             static bool firstRender = true;
             if (firstRender)
             {
-                Core::Logger::GetInstance().Info("Rendering Mixed Geometry Scene with " +
-                                                 std::to_string(mixedGeometryScene.renderers.size()) + " renderers");
+                Core::Logger::GetInstance().Info("Rendering Disco Stage with " +
+                                                 std::to_string(discoStage.renderers.size()) + " renderers");
                 firstRender = false;
             }
 
             // 渲染所有渲染器
-            for (const auto& renderer : mixedGeometryScene.renderers)
+            for (const auto& renderer : discoStage.renderers)
             {
                 renderer->Render();
             }
