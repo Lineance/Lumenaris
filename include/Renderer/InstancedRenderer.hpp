@@ -76,8 +76,8 @@ namespace Renderer
         void SetMaterialColor(const glm::vec3& color) { m_materialColor = color; }
         const glm::vec3& GetMaterialColor() const { return m_materialColor; }
 
-        // 设置纹理
-        void SetTexture(Texture* texture);
+        // 设置纹理（使用 shared_ptr 管理所有权）
+        void SetTexture(std::shared_ptr<Texture> texture) { m_texture = texture; }
         bool HasTexture() const { return m_texture != nullptr; }
 
         // 获取信息
@@ -110,7 +110,7 @@ namespace Renderer
         GLuint m_instanceVBO = 0;                   // 实例化 VBO（存储矩阵和颜色）
 
         // 材质和纹理
-        Texture* m_texture = nullptr;               // 纹理（不拥有所有权）
+        std::shared_ptr<Texture> m_texture;         // 纹理（使用 shared_ptr 管理所有权）
         glm::vec3 m_materialColor = glm::vec3(1.0f);
 
         // 内部方法

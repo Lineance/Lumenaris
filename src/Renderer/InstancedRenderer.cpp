@@ -19,7 +19,7 @@ namespace Renderer
             m_instanceVBO = 0;
         }
 
-        // 注意：不删除纹理和网格，因为不拥有它们的所有权
+        // 注意：纹理和网格由 shared_ptr 自动管理，无需手动删除
     }
 
     void InstancedRenderer::SetMesh(std::shared_ptr<SimpleMesh> mesh)
@@ -28,7 +28,7 @@ namespace Renderer
         m_materialColor = mesh->GetMaterialColor();
         if (mesh->HasTexture())
         {
-            m_texture = mesh->GetTexture();
+            m_texture = mesh->GetTexture();  // 共享纹理的 shared_ptr
         }
     }
 
@@ -53,9 +53,6 @@ namespace Renderer
             return;
         }
 
-        Core::Logger::GetInstance().Info("Initializing InstancedRenderer for " +
-                                         std::to_string(m_instanceCount) + " instances...");
-
         // 创建实例化 VBO
         glGenBuffers(1, &m_instanceVBO);
 
@@ -70,9 +67,6 @@ namespace Renderer
         SetupInstanceAttributes();
 
         glBindVertexArray(0);
-
-        Core::Logger::GetInstance().Info("InstancedRenderer initialized - Instance VBO: " +
-                                         std::to_string(m_instanceVBO));
     }
 
     void InstancedRenderer::UploadInstanceData()
@@ -86,19 +80,30 @@ namespace Renderer
         const auto& matrices = m_instances->GetModelMatrices();
         const auto& colors = m_instances->GetColors();
 
-        size_t matrixDataSize = matrices.size() * sizeof(glm::mat4);
-        size_t colorDataSize = colors.size() * sizeof(glm::vec3);
-        size_t totalSize = matrixDataSize + colorDataSize;
+        // 计算总数据大小：每个矩阵 16 个 float，每个颜色 3 个 float
+        size_t matrixFloatCount = matrices.size() * 16;
+        size_t colorFloatCount = colors.size() * 3;
+        size_t totalFloatCount = matrixFloatCount + colorFloatCount;
 
+        // 创建连续的缓冲区（使用 vector 避免手动内存管理）
+        std::vector<float> buffer;
+        buffer.reserve(totalFloatCount);
+
+        // 将矩阵数据插入缓冲区（每个 mat4 是 16 个 float）
+        const float* matrixData = reinterpret_cast<const float*>(matrices.data());
+        buffer.insert(buffer.end(), matrixData, matrixData + matrixFloatCount);
+
+        // 将颜色数据插入缓冲区（每个 vec3 是 3 个 float）
+        const float* colorData = reinterpret_cast<const float*>(colors.data());
+        buffer.insert(buffer.end(), colorData, colorData + colorFloatCount);
+
+        // 单次传输到 GPU
         glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, totalSize, nullptr, GL_DYNAMIC_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, matrixDataSize, matrices.data());
-        glBufferSubData(GL_ARRAY_BUFFER, matrixDataSize, colorDataSize, colors.data());
+        glBufferData(GL_ARRAY_BUFFER,
+                     buffer.size() * sizeof(float),
+                     buffer.data(),
+                     GL_DYNAMIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        Core::Logger::GetInstance().Info("Uploaded instance data: " +
-                                         std::to_string(matrices.size()) + " matrices, " +
-                                         std::to_string(colors.size()) + " colors");
     }
 
     void InstancedRenderer::SetupInstanceAttributes()
@@ -126,18 +131,16 @@ namespace Renderer
     {
         if (!m_mesh || m_mesh->GetVAO() == 0)
         {
-            Core::Logger::GetInstance().Warning("InstancedRenderer::Render() - Mesh not created!");
-            return;
+            return;  // 静默失败，避免每帧日志
         }
 
         if (!m_instances || m_instances->IsEmpty())
         {
-            Core::Logger::GetInstance().Warning("InstancedRenderer::Render() - No instances to render!");
-            return;
+            return;  // 静默失败，避免每帧日志
         }
 
         // 绑定纹理（如果有）
-        if (m_texture != nullptr)
+        if (m_texture)
         {
             m_texture->Bind(GL_TEXTURE0);
         }
@@ -166,7 +169,7 @@ namespace Renderer
         glBindVertexArray(0);
 
         // 解绑纹理
-        if (m_texture != nullptr)
+        if (m_texture)
         {
             Texture::UnbindStatic();
         }
@@ -183,8 +186,6 @@ namespace Renderer
     {
         InstancedRenderer renderer;
         renderer.SetInstances(instances);
-
-        Core::Logger::GetInstance().Info("Created InstancedRenderer for Cube template");
 
         return renderer;
     }
@@ -206,9 +207,6 @@ namespace Renderer
             return std::make_tuple(std::move(renderers), std::move(meshPointers), nullptr);
         }
 
-        Core::Logger::GetInstance().Info("Creating InstancedRenderers from OBJ: " + objPath +
-                                         " with " + std::to_string(materialDataList.size()) + " materials");
-
         meshPointers.reserve(materialDataList.size());
 
         // 为每个材质创建一个 SimpleMesh 和 InstancedRenderer
@@ -228,10 +226,6 @@ namespace Renderer
             renderer.Initialize();
 
             renderers.push_back(std::move(renderer));
-
-            Core::Logger::GetInstance().Info("Created InstancedRenderer for material " +
-                                             materialData.material.name +
-                                             " with " + std::to_string(materialData.indices.size()) + " indices");
         }
 
         return std::make_tuple(std::move(renderers), std::move(meshPointers), instances);

@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <filesystem>
+#include <optional>  // ✅ 添加 std::optional 支持
 
 namespace fs = std::filesystem;
 
@@ -197,7 +198,8 @@ int main()
             fps_frameCount++;
             totalFrameCount++;
 
-            if (fps_currentTime - fps_lastTime >= 0.5)
+            // ✅ 优化：降低日志输出频率，从 0.5 秒改为 5 秒
+            if (fps_currentTime - fps_lastTime >= 5.0)
             {
                 double fps = fps_frameCount / (fps_currentTime - fps_lastTime);
                 Core::Logger::GetInstance().SetFPS(static_cast<int>(fps));
@@ -244,14 +246,14 @@ int main()
                                          cameraPos + mouseController.GetCameraFront(),
                                          glm::vec3(0.0f, 1.0f, 0.0f));
 
-            // 设置渲染上下文
-            size_t totalDrawCalls = 1 + carRenderers.size();
-            Core::LogContext renderContext;
-            renderContext.renderPass = "Instanced";
-            renderContext.batchIndex = 0;
-            renderContext.drawCallCount = static_cast<int>(totalDrawCalls);
-            renderContext.currentShader = "Instanced with Textures";
-            Core::Logger::GetInstance().SetContext(renderContext);
+            // ✅ 优化：移除每帧的 LogContext 设置（避免字符串拷贝和日志系统调用）
+            // size_t totalDrawCalls = 1 + carRenderers.size();
+            // Core::LogContext renderContext;
+            // renderContext.renderPass = "Instanced";
+            // renderContext.batchIndex = 0;
+            // renderContext.drawCallCount = static_cast<int>(totalDrawCalls);
+            // renderContext.currentShader = "Instanced with Textures";
+            // Core::Logger::GetInstance().SetContext(renderContext);
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -281,18 +283,40 @@ int main()
             // ==========================================
             if (!carRenderers.empty())
             {
+                // ✅ 优化：只在状态变化时设置 uniform（减少 GPU 状态切换）
+                // 使用 std::optional 表示"未初始化"状态，确保第一次总是设置
+                std::optional<bool> lastUseTexture;
+                std::optional<bool> lastUseInstanceColor;
+                std::optional<glm::vec3> lastObjectColor;
+
                 for (const auto& carRenderer : carRenderers)
                 {
                     if (carRenderer.GetInstanceCount() > 0)
                     {
-                        // 如果此渲染器有纹理，启用纹理
-                        instancedShader.SetBool("useTexture", carRenderer.HasTexture());
+                        // ✅ 只在纹理状态变化时设置（第一次总是设置）
+                        bool useTexture = carRenderer.HasTexture();
+                        if (!lastUseTexture.has_value() || useTexture != lastUseTexture.value())
+                        {
+                            instancedShader.SetBool("useTexture", useTexture);
+                            lastUseTexture = useTexture;
+                        }
 
-                        // 设置材质颜色
-                        instancedShader.SetVec3("objectColor", carRenderer.GetMaterialColor());
+                        // ✅ 只在颜色变化时设置（第一次总是设置）
+                        const glm::vec3& objectColor = carRenderer.GetMaterialColor();
+                        if (!lastObjectColor.has_value() || objectColor != lastObjectColor.value())
+                        {
+                            instancedShader.SetVec3("objectColor", objectColor);
+                            lastObjectColor = objectColor;
+                        }
 
-                        // 设置材质光泽度
-                        instancedShader.SetBool("useInstanceColor", false); // 使用材质颜色而不是实例颜色
+                        // ✅ 只在实例颜色状态变化时设置（第一次总是设置）
+                        // 车模型使用材质颜色，不使用实例颜色
+                        bool useInstanceColor = false;
+                        if (!lastUseInstanceColor.has_value() || useInstanceColor != lastUseInstanceColor.value())
+                        {
+                            instancedShader.SetBool("useInstanceColor", useInstanceColor);
+                            lastUseInstanceColor = useInstanceColor;
+                        }
 
                         carRenderer.Render();
                     }

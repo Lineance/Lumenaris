@@ -4,6 +4,7 @@
 #include "Renderer/OBJModel.hpp"
 #include "Core/GLM.hpp"
 #include <vector>
+#include <memory>
 #include <glad/glad.h>
 
 namespace Renderer
@@ -35,11 +36,11 @@ namespace Renderer
         // 拷贝赋值运算符（深拷贝）
         SimpleMesh& operator=(const SimpleMesh& other);
 
-        // 移动构造函数（默认）
-        SimpleMesh(SimpleMesh&&) noexcept = default;
+        // 移动构造函数（显式实现以提高效率）
+        SimpleMesh(SimpleMesh&& other) noexcept;
 
-        // 移动赋值运算符（默认）
-        SimpleMesh& operator=(SimpleMesh&&) noexcept = default;
+        // 移动赋值运算符（显式实现以提高效率）
+        SimpleMesh& operator=(SimpleMesh&& other) noexcept;
 
         // IMesh 接口实现
         void Create() override;
@@ -59,9 +60,9 @@ namespace Renderer
         // 设置索引数据
         void SetIndexData(const std::vector<unsigned int>& indices);
 
-        // 设置纹理
-        void SetTexture(Texture* texture);
-        Texture* GetTexture() const { return m_texture; }
+        // 设置纹理（使用 shared_ptr 管理所有权）
+        void SetTexture(std::shared_ptr<Texture> texture);
+        std::shared_ptr<Texture> GetTexture() const { return m_texture; }
 
         // 设置材质颜色
         void SetMaterialColor(const glm::vec3& color) { m_materialColor = color; }
@@ -88,7 +89,7 @@ namespace Renderer
         bool m_hasIndices = false;
 
         // 材质和纹理
-        Texture* m_texture = nullptr;
+        std::shared_ptr<Texture> m_texture;
         glm::vec3 m_materialColor = glm::vec3(1.0f);
 
         // 顶点属性布局

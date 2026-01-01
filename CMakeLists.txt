@@ -87,6 +87,18 @@ target_include_directories(HelloWindow PRIVATE
 )
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
 
+# 性能优化测试程序
+add_executable(TestPerformanceOptimization
+    test/test_performance_optimization.cpp
+    src/glad.c
+    $<TARGET_OBJECTS:Geometry>
+)
+target_include_directories(TestPerformanceOptimization PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
+)
+target_link_libraries(TestPerformanceOptimization PRIVATE Core Renderer OpenGL::GL)
+
 # # 7. 测试程序
 # add_executable(TestLogger test_logger.cpp)
 # target_include_directories(TestLogger PRIVATE

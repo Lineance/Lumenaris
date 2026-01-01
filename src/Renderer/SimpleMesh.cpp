@@ -26,7 +26,7 @@ namespace Renderer
             m_ebo = 0;
         }
 
-        // 注意：不删除纹理，因为 SimpleMesh 不拥有纹理的所有权
+        // 注意：纹理由 shared_ptr 自动管理
     }
 
     // 拷贝构造函数（深拷贝）
@@ -93,6 +93,74 @@ namespace Renderer
         return *this;
     }
 
+    // 移动构造函数（高效转移资源）
+    SimpleMesh::SimpleMesh(SimpleMesh&& other) noexcept
+        : m_vao(other.m_vao),
+          m_vbo(other.m_vbo),
+          m_ebo(other.m_ebo),
+          m_vertices(std::move(other.m_vertices)),
+          m_indices(std::move(other.m_indices)),
+          m_vertexStride(other.m_vertexStride),
+          m_vertexCount(other.m_vertexCount),
+          m_indexCount(other.m_indexCount),
+          m_hasIndices(other.m_hasIndices),
+          m_texture(std::move(other.m_texture)),
+          m_materialColor(other.m_materialColor),
+          m_vertexAttributes(std::move(other.m_vertexAttributes))
+    {
+        // 将源对象的 OpenGL 句柄置零，避免析构时删除
+        other.m_vao = 0;
+        other.m_vbo = 0;
+        other.m_ebo = 0;
+        other.m_vertexCount = 0;
+        other.m_indexCount = 0;
+        other.m_hasIndices = false;
+    }
+
+    // 移动赋值运算符（高效转移资源）
+    SimpleMesh& SimpleMesh::operator=(SimpleMesh&& other) noexcept
+    {
+        if (this != &other)
+        {
+            // 清理当前对象的旧资源
+            if (m_vao)
+            {
+                glDeleteVertexArrays(1, &m_vao);
+            }
+            if (m_vbo)
+            {
+                glDeleteBuffers(1, &m_vbo);
+            }
+            if (m_ebo)
+            {
+                glDeleteBuffers(1, &m_ebo);
+            }
+
+            // 转移资源（移动而非拷贝）
+            m_vao = other.m_vao;
+            m_vbo = other.m_vbo;
+            m_ebo = other.m_ebo;
+            m_vertices = std::move(other.m_vertices);
+            m_indices = std::move(other.m_indices);
+            m_vertexStride = other.m_vertexStride;
+            m_vertexCount = other.m_vertexCount;
+            m_indexCount = other.m_indexCount;
+            m_hasIndices = other.m_hasIndices;
+            m_texture = std::move(other.m_texture);
+            m_materialColor = other.m_materialColor;
+            m_vertexAttributes = std::move(other.m_vertexAttributes);
+
+            // 将源对象的 OpenGL 句柄置零，避免析构时删除
+            other.m_vao = 0;
+            other.m_vbo = 0;
+            other.m_ebo = 0;
+            other.m_vertexCount = 0;
+            other.m_indexCount = 0;
+            other.m_hasIndices = false;
+        }
+        return *this;
+    }
+
     void SimpleMesh::SetVertexData(const std::vector<float>& vertices, size_t stride)
     {
         m_vertices = vertices;
@@ -116,7 +184,7 @@ namespace Renderer
         m_hasIndices = true;
     }
 
-    void SimpleMesh::SetTexture(Texture* texture)
+    void SimpleMesh::SetTexture(std::shared_ptr<Texture> texture)
     {
         m_texture = texture;
     }
@@ -178,12 +246,11 @@ namespace Renderer
     {
         if (m_vao == 0)
         {
-            Core::Logger::GetInstance().Error("SimpleMesh::Draw() called before Create()!");
-            return;
+            return;  // 静默失败
         }
 
         // 绑定纹理（如果有）
-        if (m_texture != nullptr)
+        if (m_texture)
         {
             m_texture->Bind(GL_TEXTURE0);
         }
@@ -202,7 +269,7 @@ namespace Renderer
         glBindVertexArray(0);
 
         // 解绑纹理
-        if (m_texture != nullptr)
+        if (m_texture)
         {
             Texture::UnbindStatic();
         }
@@ -250,10 +317,10 @@ namespace Renderer
         // 设置材质颜色
         mesh.SetMaterialColor(materialData.material.diffuse);
 
-        // 加载并设置纹理
+        // 加载并设置纹理（使用 shared_ptr 管理所有权）
         if (!materialData.texturePath.empty())
         {
-            Texture* texture = new Texture();
+            auto texture = std::make_shared<Texture>();
             if (texture->LoadFromFile(materialData.texturePath))
             {
                 mesh.SetTexture(texture);
@@ -261,8 +328,6 @@ namespace Renderer
             }
             else
             {
-                delete texture;
-                texture = nullptr;
                 Core::Logger::GetInstance().Warning("Failed to load texture: " + materialData.texturePath);
             }
         }
