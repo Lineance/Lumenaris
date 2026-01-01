@@ -77,7 +77,8 @@ uniform float shininess;
 uniform bool useInstanceColor;
 uniform bool useTexture;
 
-uniform sampler2D textureSampler;
+uniform sampler2D textureSampler;  // 纹理单元 1（TextureUnit::MATERIAL_DIFFUSE）
+
 
 // ========================================
 // 视点位置

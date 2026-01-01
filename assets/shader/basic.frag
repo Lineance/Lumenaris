@@ -12,7 +12,7 @@ uniform vec3 viewPos;
 uniform float shininess; // 光泽度
 
 // 纹理支持
-uniform sampler2D diffuseTexture;
+uniform sampler2D diffuseTexture;  // 纹理单元 1（TextureUnit::MATERIAL_DIFFUSE）
 uniform bool useTexture;
 
 void main() {

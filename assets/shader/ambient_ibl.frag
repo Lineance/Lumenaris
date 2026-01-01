@@ -74,7 +74,7 @@ uniform float ambientIntensity;  // 环境光强度
 uniform int ambientMode;          // 0=固定颜色, 1=天空盒采样, 2=半球光照
 
 // 天空盒环境光
-uniform samplerCube ambientSkybox;
+uniform samplerCube ambientSkybox;  // 纹理单元 10（TextureUnit::AMBIENT_SKYBOX）
 
 // 半球光照
 uniform vec3 skyColor;      // 天空颜色
@@ -89,7 +89,7 @@ uniform float shininess;
 uniform bool useInstanceColor;
 uniform bool useTexture;
 
-uniform sampler2D textureSampler;
+uniform sampler2D textureSampler;  // 纹理单元 1（TextureUnit::MATERIAL_DIFFUSE）
 
 // ========================================
 // 视点位置

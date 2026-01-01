@@ -218,11 +218,11 @@ namespace Renderer
         m_shader.SetMat4("projection", projection);
         m_shader.SetMat4("view", skyboxView);
 
-        // 绑定天空盒VAO
+        // ⭐ 绑定天空盒纹理到单元15（TextureUnit::SKYBOX_CUBEMAP）
         glBindVertexArray(m_VAO);
-        glActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE15);
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
-        m_shader.SetInt("skybox", 0);
+        m_shader.SetInt("skybox", 15);
 
         // 绘制天空盒
         glDrawArrays(GL_TRIANGLES, 0, 36);

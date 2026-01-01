@@ -23,7 +23,7 @@ uniform float specularStrength;
 uniform float shininess;
 
 // 纹理采样器
-uniform sampler2D textureSampler;
+uniform sampler2D textureSampler;  // 纹理单元 1（TextureUnit::MATERIAL_DIFFUSE）
 
 void main()
 {

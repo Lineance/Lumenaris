@@ -14,7 +14,8 @@ namespace Renderer
         bool LoadFromFile(const std::string& filepath);
 
         // 绑定纹理到指定的纹理单元
-        void Bind(GLenum textureUnit = GL_TEXTURE0) const;
+        // ⭐ 默认使用纹理单元1（TextureUnit::MATERIAL_DIFFUSE），为ImGui预留单元0
+        void Bind(GLenum textureUnit = GL_TEXTURE1) const;
 
         // 解绑纹理
         void Unbind() const;

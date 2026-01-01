@@ -69,8 +69,8 @@ uniform bool useReflection;  // 是否使用天空盒反射
 uniform float reflectivity;  // 反射强度 (0.0 - 1.0)
 
 // 纹理
-uniform sampler2D textureSampler;
-uniform samplerCube skybox;  // 天空盒纹理
+uniform sampler2D textureSampler;  // 纹理单元 1（TextureUnit::MATERIAL_DIFFUSE）
+uniform samplerCube skybox;  // 纹理单元 15（TextureUnit::SKYBOX_CUBEMAP）
 
 // 视点位置
 uniform vec3 viewPos;

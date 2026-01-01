@@ -66,8 +66,9 @@ namespace Renderer
 
         /**
          * 绑定天空盒纹理到指定的纹理单元
+         * ⭐ 默认使用纹理单元15（TextureUnit::SKYBOX_CUBEMAP）
          */
-        void BindTexture(unsigned int textureUnit = 0) const;
+        void BindTexture(unsigned int textureUnit = 15) const;
 
         /**
          * 获取天空盒纹理ID

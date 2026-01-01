@@ -259,9 +259,10 @@ namespace Renderer
         }
 
         // 绑定纹理（如果有）
+        // ⭐ 使用纹理单元1（TextureUnit::MATERIAL_DIFFUSE），为ImGui预留单元0
         if (m_texture)
         {
-            m_texture->Bind(GL_TEXTURE0);
+            m_texture->Bind(GL_TEXTURE1);
         }
 
         // 绑定独立VAO（所有属性已预先配置）

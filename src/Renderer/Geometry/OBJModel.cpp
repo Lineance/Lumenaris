@@ -119,9 +119,10 @@ namespace Renderer
         if (faceMaterials.empty() || materialIndex < 0)
         {
             // 绑定纹理（如果有的话）
+            // ⭐ 使用纹理单元1（TextureUnit::MATERIAL_DIFFUSE），为ImGui预留单元0
             if (HasTexture() && materialIndex >= 0 && materialIndex < static_cast<int>(m_textures.size()))
             {
-                m_textures[materialIndex].Bind(GL_TEXTURE0);
+                m_textures[materialIndex].Bind(GL_TEXTURE1);
             }
 
             // 绑定VAO并绘制整个模型
@@ -156,9 +157,10 @@ namespace Renderer
             const auto& indices = m_loader.GetIndices();
 
             // 绑定纹理
+            // ⭐ 使用纹理单元1（TextureUnit::MATERIAL_DIFFUSE），为ImGui预留单元0
             if (HasTexture() && materialIndex >= 0 && materialIndex < static_cast<int>(m_textures.size()))
             {
-                m_textures[materialIndex].Bind(GL_TEXTURE0);
+                m_textures[materialIndex].Bind(GL_TEXTURE1);
             }
 
             // 遍历每个三角形（3个索引为一组）
