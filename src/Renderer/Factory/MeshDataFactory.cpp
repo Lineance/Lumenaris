@@ -192,6 +192,9 @@ namespace Renderer
             // 使用材质的漫反射颜色
             data.SetMaterialColor(materialData.material.diffuse);
 
+            // 存储纹理路径
+            data.SetTexturePath(materialData.texturePath);
+
             dataList.push_back(std::move(data));
         }
 

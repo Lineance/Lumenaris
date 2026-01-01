@@ -260,10 +260,6 @@ namespace Renderer
         Core::Logger::GetInstance().Info("InstancedRenderer::CreateForOBJ() - Creating " +
                                          std::to_string(buffers.size()) + " renderers from " + objPath);
 
-        // 获取材质数据（用于加载纹理）
-        std::vector<OBJModel::MaterialVertexData> materialDataList =
-            OBJModel::GetMaterialVertexData(objPath);
-
         renderers.reserve(buffers.size());
         meshBuffers.reserve(buffers.size());
 
@@ -272,11 +268,14 @@ namespace Renderer
         {
             auto meshBufferPtr = std::make_shared<MeshBuffer>(std::move(buffers[i]));
 
+            // 从MeshData中获取纹理路径（无需重新加载OBJ！）
+            const std::string& texturePath = meshBufferPtr->GetData().GetTexturePath();
+
             // 如果有纹理，加载纹理
-            if (i < materialDataList.size() && !materialDataList[i].texturePath.empty())
+            if (!texturePath.empty())
             {
                 auto texture = std::make_shared<Texture>();
-                if (texture->LoadFromFile(materialDataList[i].texturePath))
+                if (texture->LoadFromFile(texturePath))
                 {
                     meshBufferPtr->SetTexture(texture);
                 }

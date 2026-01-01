@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/GLM.hpp"
 #include <vector>
+#include <string>
 #include <cstddef>
 
 namespace Renderer
@@ -75,6 +76,11 @@ namespace Renderer
          */
         void SetMaterialColor(const glm::vec3& color) { m_materialColor = color; }
 
+        /**
+         * @brief 设置纹理路径
+         */
+        void SetTexturePath(const std::string& path) { m_texturePath = path; }
+
         // ============================================================
         // 数据访问接口
         // ============================================================
@@ -86,6 +92,7 @@ namespace Renderer
         size_t GetIndexCount() const { return m_indexCount; }
         bool HasIndices() const { return !m_indices.empty(); }
         const glm::vec3& GetMaterialColor() const { return m_materialColor; }
+        const std::string& GetTexturePath() const { return m_texturePath; }
 
         const std::vector<size_t>& GetAttributeOffsets() const { return m_attributeOffsets; }
         const std::vector<int>& GetAttributeSizes() const { return m_attributeSizes; }
@@ -128,6 +135,7 @@ namespace Renderer
 
         // 材质数据
         glm::vec3 m_materialColor = glm::vec3(1.0f);
+        std::string m_texturePath;  // 纹理路径
 
         // 顶点属性布局
         std::vector<size_t> m_attributeOffsets;  // 每个属性的偏移（float 索引）
