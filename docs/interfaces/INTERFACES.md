@@ -3,18 +3,21 @@
 ## 📋 目录
 
 - [Core 模块接口](#core-模块接口)
-- [Window 类](#window-类)
-- [MouseController 类](#mousecontroller-类)
-- [KeyboardController 类](#keyboardcontroller-类)
-- [Logger 类](#logger-类)
+  - [Window 类](#window-类)
+  - [MouseController 类](#mousecontroller-类)
+  - [KeyboardController 类](#keyboardcontroller-类)
+  - [Logger 类](#logger-类)
 - [Renderer 模块接口](#renderer-模块接口)
   - [IMesh 抽象接口](#imesh-抽象接口)
+  - [IRenderer 抽象接口](#irenderer-抽象接口)
   - [MeshFactory 工厂类](#meshfactory-工厂类)
   - [Shader 类](#shader-类)
   - [Texture 类](#texture-类)
   - [Cube 类](#cube-类)
   - [Sphere 类](#sphere-类)
   - [OBJModel 类](#objmodel-类)
+  - [InstanceData 类](#instancedata-类)
+  - [SimpleMesh 类](#simplemesh-类)
   - [InstancedRenderer 类](#instancedrenderer-类)
 - [几何体接口](#几何体接口)
 - [使用示例](#使用示例)
@@ -279,6 +282,13 @@ public:
     virtual void Create() = 0;                      // 创建网格资源
     virtual void Draw() const = 0;                  // 绘制网格
     virtual ~IMesh() = default;                     // 虚析构函数
+
+    // 扩展接口（可选实现）
+    virtual unsigned int GetVAO() const { return 0; }
+    virtual size_t GetVertexCount() const { return 0; }
+    virtual size_t GetIndexCount() const { return 0; }
+    virtual bool HasIndices() const { return false; }
+    virtual bool HasTexture() const { return false; }
 };
 }
 ```
@@ -289,6 +299,50 @@ public:
 |------|------|--------|------|
 | `Create()` | 无 | void | 初始化网格的顶点缓冲对象和数组对象 |
 | `Draw()` | 无 | void | 执行网格的渲染操作 |
+| `GetVAO()` | 无 | unsigned int | 返回VAO ID（可选实现） |
+| `GetVertexCount()` | 无 | size_t | 返回顶点数量（可选实现） |
+| `GetIndexCount()` | 无 | size_t | 返回索引数量（可选实现） |
+| `HasIndices()` | 无 | bool | 是否有索引数据（可选实现） |
+| `HasTexture()` | 无 | bool | 是否有纹理（可选实现） |
+
+---
+
+### IRenderer 抽象接口
+
+渲染器的抽象基类，定义了渲染器的统一接口。
+
+```cpp
+namespace Renderer {
+class IRenderer {
+public:
+    virtual ~IRenderer() = default;
+
+    // 初始化渲染器（创建 OpenGL 缓冲区等）
+    virtual void Initialize() = 0;
+
+    // 执行渲染
+    virtual void Render() const = 0;
+
+    // 获取渲染器名称（用于调试）
+    virtual std::string GetName() const = 0;
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Initialize()` | 无 | void | 初始化渲染器，创建OpenGL缓冲区 |
+| `Render()` | 无 | void | 执行渲染操作 |
+| `GetName()` | 无 | string | 获取渲染器名称（用于调试） |
+
+#### 设计说明
+
+IRenderer接口与IMesh接口分离：
+- **IMesh**: 表示可渲染的几何体数据
+- **IRenderer**: 表示渲染逻辑的执行者
+- 例如：InstancedRenderer继承IRenderer，SimpleMesh继承IMesh
 
 ---
 
@@ -324,6 +378,81 @@ public:
 OpenGL着色器程序的管理类。
 
 ```cpp
+namespace Renderer {
+class Shader {
+public:
+    Shader() = default;
+    ~Shader();
+
+    // 着色器加载
+    void Load(const std::string& vertexPath, const std::string& fragmentPath);
+    void Use() const;
+
+    // Uniform 设置 - 基础类型
+    void SetMat4(const std::string& name, const glm::mat4& mat) const;
+    void SetVec3(const std::string& name, const glm::vec3& vec) const;
+    void SetFloat(const std::string& name, float value) const;
+    void SetInt(const std::string& name, int value) const;
+    void SetBool(const std::string& name, bool value) const;
+
+    // 资源管理
+    unsigned int GetID() const;
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Load()` | string vertexPath, string fragmentPath | void | 编译并链接顶点和片段着色器 |
+| `Use()` | 无 | void | 激活当前着色器程序 |
+| `SetMat4()` | string name, glm::mat4 | void | 设置4x4矩阵uniform变量 |
+| `SetVec3()` | string name, glm::vec3 | void | 设置3D向量uniform变量 |
+| `GetID()` | 无 | unsigned int | 返回OpenGL着色器程序ID |
+
+---
+
+### Texture 类
+
+纹理加载和管理的封装类。
+
+```cpp
+namespace Renderer {
+class Texture {
+public:
+    Texture();
+    ~Texture();
+
+    // 纹理加载
+    bool LoadFromFile(const std::string& filepath);
+
+    // 纹理操作
+    void Bind(GLenum textureUnit = GL_TEXTURE0) const;
+    void Unbind() const;
+    static void UnbindStatic();
+
+    // 属性查询
+    GLuint GetID() const;
+    bool IsLoaded() const;
+    const std::string& GetFilePath() const;
+};
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `LoadFromFile()` | string filepath | bool | 从文件加载纹理，支持PNG、JPG、BMP格式 |
+| `Bind()` | GLenum textureUnit | void | 将纹理绑定到指定的纹理单元 |
+| `Unbind()` | 无 | void | 解绑当前纹理 |
+| `GetID()` | 无 | GLuint | 返回OpenGL纹理对象ID |
+| `IsLoaded()` | 无 | bool | 检查纹理是否成功加载 |
+
+---
+
+### Cube 类
 namespace Renderer {
 class Shader {
 public:
@@ -453,6 +582,146 @@ public:
 
 ---
 
+### InstanceData 类
+
+实例数据容器，存储多个实例的变换和颜色信息。
+
+```cpp
+namespace Renderer {
+
+class InstanceData {
+public:
+    InstanceData() = default;
+
+    // 添加单个实例
+    void Add(const glm::vec3& position, const glm::vec3& rotation,
+             const glm::vec3& scale, const glm::vec3& color);
+
+    // 批量添加实例
+    void AddBatch(const std::vector<glm::mat4>& matrices, const std::vector<glm::vec3>& colors);
+
+    // 清除所有实例
+    void Clear();
+
+    // 获取实例数量
+    size_t GetCount() const;
+
+    // 数据访问
+    const std::vector<glm::mat4>& GetModelMatrices() const;
+    const std::vector<glm::vec3>& GetColors() const;
+    std::vector<glm::mat4>& GetModelMatrices();
+    std::vector<glm::vec3>& GetColors();
+
+    // 判断是否为空
+    bool IsEmpty() const;
+};
+
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Add()` | position, rotation, scale, color | void | 添加单个实例 |
+| `AddBatch()` | matrices, colors | void | 批量添加实例 |
+| `Clear()` | 无 | void | 清除所有实例 |
+| `GetCount()` | 无 | size_t | 返回实例数量 |
+| `GetModelMatrices()` | 无 | const vector<glm::mat4>& | 获取模型矩阵数组（const版本） |
+| `GetModelMatrices()` | 无 | vector<glm::mat4>& | 获取模型矩阵数组（非const版本） |
+| `GetColors()` | 无 | const vector<glm::vec3>& | 获取颜色数组（const版本） |
+| `GetColors()` | 无 | vector<glm::vec3>& | 获取颜色数组（非const版本） |
+| `IsEmpty()` | 无 | bool | 判断是否为空 |
+
+---
+
+### SimpleMesh 类
+
+简单网格类 - 纯粹的数据容器，用于实例化渲染。SimpleMesh 存储网格几何数据（顶点、索引、纹理），支持深拷贝语义，使用shared_ptr管理纹理。
+
+```cpp
+namespace Renderer {
+
+class SimpleMesh : public IMesh {
+public:
+    SimpleMesh() = default;
+    ~SimpleMesh();
+
+    // 拷贝语义（深拷贝）
+    SimpleMesh(const SimpleMesh& other);
+    SimpleMesh& operator=(const SimpleMesh& other);
+
+    // 移动语义（显式实现）
+    SimpleMesh(SimpleMesh&& other) noexcept;
+    SimpleMesh& operator=(SimpleMesh&& other) noexcept;
+
+    // IMesh接口实现
+    void Create() override;
+    void Draw() const override;
+
+    // IMesh接口扩展
+    unsigned int GetVAO() const override;
+    size_t GetVertexCount() const override;
+    size_t GetIndexCount() const override;
+    bool HasIndices() const override;
+    bool HasTexture() const override;
+
+    // 设置顶点数据
+    void SetVertexData(const std::vector<float>& vertices, size_t stride);
+    void SetVertexLayout(const std::vector<size_t>& offsets, const std::vector<int>& sizes);
+
+    // 设置索引数据
+    void SetIndexData(const std::vector<unsigned int>& indices);
+
+    // 设置纹理（使用 shared_ptr 管理所有权）
+    void SetTexture(std::shared_ptr<Texture> texture);
+    std::shared_ptr<Texture> GetTexture() const;
+
+    // 设置材质颜色
+    void SetMaterialColor(const glm::vec3& color);
+    const glm::vec3& GetMaterialColor() const;
+
+    // 静态工厂方法
+    static SimpleMesh CreateFromCube();
+    static SimpleMesh CreateFromMaterialData(const OBJModel::MaterialVertexData& materialData);
+};
+
+}
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Create()` | 无 | void | 创建OpenGL缓冲对象（VAO、VBO、EBO） |
+| `Draw()` | 无 | void | 绑定纹理并执行标准渲染 |
+| `SetVertexData()` | vertices, stride | void | 设置顶点数据 |
+| `SetVertexLayout()` | offsets, sizes | void | 设置顶点属性布局 |
+| `SetIndexData()` | indices | void | 设置索引数据（用于EBO） |
+| `SetTexture()` | shared_ptr<Texture> | void | 设置纹理（使用shared_ptr管理所有权） |
+| `GetTexture()` | 无 | shared_ptr<Texture> | 获取纹理的shared_ptr |
+| `SetMaterialColor()` | glm::vec3 color | void | 设置材质颜色 |
+| `CreateFromCube()` | 无 | SimpleMesh | 静态方法：从立方体模板创建 |
+| `CreateFromMaterialData()` | MaterialVertexData | SimpleMesh | 静态方法：从OBJ材质数据创建 |
+
+#### 设计特点
+
+**值语义（深拷贝）**：
+- 拷贝构造函数和拷贝赋值运算符执行深拷贝
+- 拷贝时会创建新的OpenGL缓冲对象（VAO、VBO、EBO）
+- 移动构造和移动赋值显式实现以提高效率
+
+**纹理管理**：
+- 使用 `shared_ptr<Texture>` 管理纹理所有权
+- 多个SimpleMesh可以共享同一个Texture
+- 自动管理纹理生命周期
+
+**职责清晰**：
+- 纯粹的数据容器，不包含实例化逻辑
+- 与 InstancedRenderer 配合使用：SimpleMesh 提供网格数据，InstancedRenderer 提供渲染逻辑
+
+---
+
 ### OBJModel 类
 
 OBJ模型加载和渲染类。
@@ -486,121 +755,12 @@ public:
 
 ---
 
-### SimpleMesh 类
-
-简单网格类 - 纯粹的数据容器，用于实例化渲染。SimpleMesh 存储网格几何数据（顶点、索引、纹理），支持深拷贝语义。
-
-```cpp
-namespace Renderer {
-
-class SimpleMesh : public IMesh {
-public:
-    SimpleMesh() = default;
-    ~SimpleMesh();
-
-    // 拷贝语义（深拷贝）
-    SimpleMesh(const SimpleMesh& other);
-    SimpleMesh& operator=(const SimpleMesh& other);
-
-    // 移动语义（默认）
-    SimpleMesh(SimpleMesh&&) noexcept = default;
-    SimpleMesh& operator=(SimpleMesh&&) noexcept = default;
-
-    // IMesh接口实现
-    void Create() override;
-    void Draw() const override;
-
-    // IMesh接口扩展
-    unsigned int GetVAO() const override;
-    size_t GetVertexCount() const override;
-    size_t GetIndexCount() const override;
-    bool HasIndices() const override;
-    bool HasTexture() const override;
-
-    // 设置顶点数据
-    void SetVertexData(const std::vector<float>& vertices, size_t stride);
-    void SetVertexLayout(const std::vector<size_t>& offsets, const std::vector<int>& sizes);
-
-    // 设置索引数据
-    void SetIndexData(const std::vector<unsigned int>& indices);
-
-    // 设置纹理和材质
-    void SetTexture(Texture* texture);
-    Texture* GetTexture() const;
-    void SetMaterialColor(const glm::vec3& color);
-    const glm::vec3& GetMaterialColor() const;
-
-    // 静态工厂方法
-    static SimpleMesh CreateFromCube();
-    static SimpleMesh CreateFromMaterialData(const OBJModel::MaterialVertexData& materialData);
-};
-}
-```
-
-#### 接口说明
-
-| 方法 | 参数 | 返回值 | 说明 |
-|------|------|--------|------|
-| `Create()` | 无 | void | 创建OpenGL缓冲对象（VAO、VBO、EBO） |
-| `Draw()` | 无 | void | 绑定纹理并执行标准渲染（glDrawElements 或 glDrawArrays） |
-| `SetVertexData()` | vertices, stride | void | 设置顶点数据 |
-| `SetVertexLayout()` | offsets, sizes | void | 设置顶点属性布局 |
-| `SetIndexData()` | indices | void | 设置索引数据（用于EBO） |
-| `SetTexture()` | Texture* texture | void | 设置纹理指针（SimpleMesh不拥有纹理所有权） |
-| `SetMaterialColor()` | glm::vec3 color | void | 设置材质颜色 |
-| `CreateFromCube()` | 无 | SimpleMesh | 静态方法：从立方体模板创建 |
-| `CreateFromMaterialData()` | MaterialVertexData | SimpleMesh | 静态方法：从OBJ材质数据创建 |
-
-#### 设计特点
-
-**值语义（深拷贝）**：
-- 拷贝构造函数和拷贝赋值运算符执行深拷贝
-- 拷贝时会创建新的OpenGL缓冲对象（VAO、VBO、EBO）
-- 移动构造和移动赋值使用默认实现（高效转移资源）
-
-**职责清晰**：
-- 纯粹的数据容器，不包含实例化逻辑
-- 与 InstancedRenderer 配合使用：SimpleMesh 提供网格数据，InstancedRenderer 提供渲染逻辑
-- 纹理指针由外部管理，SimpleMesh不负责释放
-
-**使用场景**：
-- 作为 InstancedRenderer 的网格模板
-- 从 OBJ 模型的材质数据创建（每个材质一个 SimpleMesh）
-- 从基础几何体（Cube、Sphere）创建
-
-**重要使用规则**：
-```cpp
-// ❌ 错误用法：手动调用 Create() 会导致双重创建
-SimpleMesh mesh = SimpleMesh::CreateFromCube();
-mesh.Create();  // 第一次创建 VAO
-renderer.SetMesh(mesh);  // 拷贝时第二次创建 VAO！
-
-// ✅ 正确用法：让拷贝自动创建
-SimpleMesh mesh = SimpleMesh::CreateFromCube();
-renderer.SetMesh(mesh);  // 拷贝时自动创建 OpenGL 对象
-```
-
----
-
 ### InstancedRenderer 类
 
-实例化渲染器 - 负责批量渲染多个相同几何体，大幅提升渲染性能。采用职责分离设计：SimpleMesh 存储网格数据，InstanceData 存储实例数据，InstancedRenderer 执行渲染逻辑。
+实例化渲染器 - 负责批量渲染多个相同几何体，大幅提升渲染性能。继承IRenderer接口，采用职责分离设计：SimpleMesh 存储网格数据，InstanceData 存储实例数据，InstancedRenderer 执行渲染逻辑。使用shared_ptr管理资源生命周期。
 
 ```cpp
 namespace Renderer {
-
-// 实例数据容器
-class InstanceData {
-public:
-    void Add(const glm::vec3& position, const glm::vec3& rotation,
-             const glm::vec3& scale, const glm::vec3& color);
-    void Clear();
-    bool IsEmpty() const;
-    size_t GetCount() const;
-
-    const std::vector<glm::mat4>& GetModelMatrices() const;
-    const std::vector<glm::vec3>& GetColors() const;
-};
 
 class InstancedRenderer : public IRenderer {
 public:
@@ -615,31 +775,36 @@ public:
     // 设置网格模板（使用 shared_ptr 管理所有权）
     void SetMesh(std::shared_ptr<SimpleMesh> mesh);
 
-    // 设置实例数据
-    void SetInstances(const InstanceData& data);
+    // 设置实例数据（使用 shared_ptr 避免拷贝）
+    void SetInstances(const std::shared_ptr<InstanceData>& data);
 
-    // 更新实例数据（动态更新）
-    void UpdateInstances(const InstanceData& data);
-
-    // 材质和纹理
+    // 设置材质颜色
     void SetMaterialColor(const glm::vec3& color);
     const glm::vec3& GetMaterialColor() const;
-    void SetTexture(Texture* texture);
+
+    // 设置纹理（使用 shared_ptr 管理所有权）
+    void SetTexture(std::shared_ptr<Texture> texture);
     bool HasTexture() const;
 
     // 信息查询
     size_t GetInstanceCount() const;
-    const std::shared_ptr<SimpleMesh> GetMesh() const;
+    const std::shared_ptr<SimpleMesh>& GetMesh() const;
 
-    // 静态工厂方法
-    static InstancedRenderer CreateForCube(const InstanceData& instances);
-    // 返回 pair<渲染器vector, mesh的shared_ptrvector>
-    static std::pair<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<SimpleMesh>>>
-    CreateForOBJ(const std::string& objPath, const InstanceData& instances);
+    // 静态工厂方法：为 Cube 创建实例化渲染器
+    static InstancedRenderer CreateForCube(const std::shared_ptr<InstanceData>& instances);
 
-    // 移动语义支持（用于放入vector）
+    // 静态工厂方法：为 OBJ 模型创建实例化渲染器（返回多个渲染器，每个材质一个）
+    // 同时返回 mesh 和 instanceData 的 shared_ptr 以保持生命周期
+    static std::tuple<std::vector<InstancedRenderer>,
+                      std::vector<std::shared_ptr<SimpleMesh>>,
+                      std::shared_ptr<InstanceData>>
+    CreateForOBJ(const std::string& objPath, const std::shared_ptr<InstanceData>& instances);
+
+    // 禁用拷贝（但允许移动，用于放入vector）
     InstancedRenderer(const InstancedRenderer&) = delete;
     InstancedRenderer& operator=(const InstancedRenderer&) = delete;
+
+    // 允许移动构造和移动赋值
     InstancedRenderer(InstancedRenderer&&) noexcept = default;
     InstancedRenderer& operator=(InstancedRenderer&&) noexcept = default;
 };
@@ -653,24 +818,25 @@ public:
 | `Initialize()` | 无 | void | 初始化实例化渲染器，上传实例数据并设置实例化属性 |
 | `Render()` | 无 | void | 执行实例化渲染（glDrawElementsInstanced 或 glDrawArraysInstanced） |
 | `SetMesh()` | shared_ptr<SimpleMesh> mesh | void | 设置网格模板（使用 shared_ptr 管理所有权） |
-| `SetInstances()` | const InstanceData& data | void | 设置实例数据 |
-| `UpdateInstances()` | const InstanceData& data | void | 动态更新实例数据 |
-| `SetTexture()` | Texture* texture | void | 设置纹理（不拥有所有权） |
+| `SetInstances()` | shared_ptr<InstanceData> data | void | 设置实例数据（使用 shared_ptr 避免拷贝） |
+| `SetTexture()` | shared_ptr<Texture> texture | void | 设置纹理（使用 shared_ptr 管理所有权） |
 | `SetMaterialColor()` | glm::vec3 color | void | 设置材质颜色 |
-| `CreateForCube()` | InstanceData& instances | InstancedRenderer | 静态方法：创建立方体实例化渲染器 |
-| `CreateForOBJ()` | string objPath, InstanceData& instances | pair<渲染器vector, mesh的shared_ptrvector> | 静态方法：从OBJ模型创建多个材质渲染器 |
+| `CreateForCube()` | shared_ptr<InstanceData> instances | InstancedRenderer | 静态方法：创建立方体实例化渲染器 |
+| `CreateForOBJ()` | string objPath, shared_ptr<InstanceData> instances | tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr> | 静态方法：从OBJ模型创建多个材质渲染器 |
 
 #### 职责分离设计
 
 **架构（方案C：职责完全分离）**：
-- ✅ **SimpleMesh**: 纯粹的数据容器，负责存储网格数据（顶点、索引、VAO）
+- ✅ **SimpleMesh**: 纯粹的数据容器，负责存储网格数据（顶点、索引、VAO），继承IMesh接口
 - ✅ **InstanceData**: 实例数据容器，负责存储实例变换和颜色
-- ✅ **InstancedRenderer**: 渲染逻辑，负责批量渲染多个实例
+- ✅ **InstancedRenderer**: 渲染逻辑，负责批量渲染多个实例，继承IRenderer接口
 
 **所有权管理**：
 - `InstancedRenderer` 使用 `shared_ptr<SimpleMesh>` 管理网格生命周期
-- `InstancedRenderer` 不拥有 `Texture` 的所有权（仅持有指针）
-- `CreateForOBJ()` 返回 mesh 的 shared_ptr，主程序需保持其存活
+- `InstancedRenderer` 使用 `shared_ptr<InstanceData>` 避免拷贝
+- `InstancedRenderer` 使用 `shared_ptr<Texture>` 管理纹理所有权
+- `CreateForOBJ()` 返回 tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr>
+- 主程序需保持 mesh 和 instanceData 的 shared_ptr 存活
 - 自动内存管理，消除悬空指针风险
 
 #### 功能特性
@@ -702,22 +868,22 @@ auto cubeMesh = std::make_shared<Renderer::SimpleMesh>(
 );
 cubeMesh->Create();  // 创建 OpenGL 对象
 
-// 2. 准备实例数据
-Renderer::InstanceData cubeInstances;
+// 2. 准备实例数据（使用 shared_ptr 避免拷贝）
+auto cubeInstances = std::make_shared<Renderer::InstanceData>();
 for (int x = 0; x < 10; ++x) {
     for (int z = 0; z < 10; ++z) {
         glm::vec3 position(x * 2.0f, 0.0f, z * 2.0f);
         glm::vec3 rotation(0.0f, 0.0f, 0.0f);
         glm::vec3 scale(1.0f, 1.0f, 1.0f);
         glm::vec3 color(1.0f, 0.5f, 0.3f); // 橙色
-        cubeInstances.Add(position, rotation, scale, color);
+        cubeInstances->Add(position, rotation, scale, color);
     }
 }
 
 // 3. 创建渲染器并初始化
 Renderer::InstancedRenderer cubeRenderer;
 cubeRenderer.SetMesh(cubeMesh);  // 传递 shared_ptr
-cubeRenderer.SetInstances(cubeInstances);
+cubeRenderer.SetInstances(cubeInstances);  // 传递 shared_ptr
 cubeRenderer.Initialize();
 
 // 4. 渲染
@@ -727,20 +893,20 @@ shader.SetBool("useInstanceColor", true);
 cubeRenderer.Render();
 
 // 示例2：从OBJ模型创建（多材质）
-// 1. 准备实例数据
-Renderer::InstanceData carInstances;
+// 1. 准备实例数据（使用 shared_ptr）
+auto carInstances = std::make_shared<Renderer::InstanceData>();
 for (int i = 0; i < 12; ++i) {
     float angle = (float)i / 12.0f * 3.14159f * 2.0f;
     glm::vec3 position(std::cos(angle) * 15.0f, 0.0f, std::sin(angle) * 15.0f);
     glm::vec3 rotation(0.0f, -angle * 57.2958f + 90.0f, 0.0f);
     glm::vec3 scale(0.5f, 0.5f, 0.5f);
     glm::vec3 color(1.0f, 1.0f, 1.0f); // 白色（使用材质颜色）
-    carInstances.Add(position, rotation, scale, color);
+    carInstances->Add(position, rotation, scale, color);
 }
 
 // 2. 创建渲染器（静态方法自动处理多材质）
 std::string carPath = "assets/models/cars/sportsCar.obj";
-auto [carRenderers, carMeshes] =  // 接收渲染器和mesh的shared_ptr
+auto [carRenderers, carMeshes, carInstanceData] =  // 接收渲染器、mesh和instanceData的shared_ptr
     Renderer::InstancedRenderer::CreateForOBJ(carPath, carInstances);
 
 // 3. 渲染（每个材质一个draw call）
@@ -750,7 +916,7 @@ for (const auto& carRenderer : carRenderers) {
     shader.SetBool("useInstanceColor", false); // 使用材质颜色
     carRenderer.Render();
 }
-// 注意：carMeshes 必须保持存活，直到渲染结束
+// 注意：carMeshes 和 carInstanceData 必须保持存活，直到渲染结束
 ```
 
 #### 着色器要求

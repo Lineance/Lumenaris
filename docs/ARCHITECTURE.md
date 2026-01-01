@@ -113,6 +113,15 @@ LearningOpenGL/
 - 提供事件驱动的回调注册机制
 - 实现按键重复和防抖功能
 
+**Logger 类** (`src/Core/Logger.cpp`)
+- 线程安全的日志系统，支持异步写入
+- 分级日志：DEBUG、INFO、WARNING、ERROR
+- 日志轮转支持：按大小、按天、按小时
+- 上下文感知日志：支持渲染阶段、批次索引、三角形数量等上下文信息
+- 统计功能：着色器激活次数、纹理绑定次数、DrawCall次数、FPS监控等
+- 编译时优化：DEBUG级别日志在Release版本中完全移除
+- 性能关键路径的日志可独立控制
+
 **GLM.hpp** (`include/Core/GLM.hpp`)
 - GLM数学库统一封装，简化头文件管理
 - 提供完整的3D数学运算支持
@@ -122,6 +131,11 @@ LearningOpenGL/
 **Mesh 抽象层** (`include/Renderer/Mesh.hpp`)
 - `IMesh` 接口定义统一的网格渲染标准
 - `MeshFactory` 工厂模式支持运行时几何体注册和创建
+
+**IRenderer 接口** (`include/Renderer/IRenderer.hpp`)
+- 定义渲染器的统一抽象接口
+- 提供Initialize()、Render()、GetName()方法
+- 与IMesh接口分离，强调"渲染器"的概念而非"网格"
 
 **Shader 类** (`src/Renderer/Shader.cpp`)
 - 封装OpenGL着色器程序管理
@@ -161,9 +175,10 @@ LearningOpenGL/
 
 **InstancedRenderer 类** (`src/Renderer/InstancedRenderer.cpp`)
 - 实例化渲染器实现，大幅提升批量渲染性能
+- 继承IRenderer接口，实现统一的渲染器抽象
 - 采用职责分离设计：
   - SimpleMesh: 网格数据容器（使用 shared_ptr 管理生命周期）
-  - InstanceData: 实例数据容器（矩阵和颜色）
+  - InstanceData: 实例数据容器（使用 shared_ptr 避免拷贝）
   - InstancedRenderer: 渲染逻辑（持有 shared_ptr）
 - 支持从 Cube 和 OBJ 模型创建实例化渲染器
 - 支持每个实例独立的模型矩阵变换（位置、旋转、缩放）
@@ -171,18 +186,27 @@ LearningOpenGL/
 - 使用 glVertexAttribDivisor 实现实例化属性
 - 支持索引渲染（EBO）和纹理映射
 - 多材质支持：为每个材质创建独立的实例化渲染器
-- 内存安全：使用 shared_ptr 自动管理 mesh 生命周期，避免悬空指针
+- 内存安全：使用 shared_ptr 自动管理 mesh 和 instanceData 生命周期，避免悬空指针
+- CreateForOBJ()返回tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr>
 - 一次绘制调用渲染数百个相同几何体
 - 适用于大量重复物体的场景（植被、建筑、车辆等）
 
 **SimpleMesh 类** (`src/Renderer/SimpleMesh.cpp`)
 - 纯粹的数据容器，存储网格几何数据（顶点、索引、VAO/VBO/EBO）
+- 继承IMesh接口，提供统一的网格接口
 - 支持深拷贝语义：拷贝时创建新的OpenGL缓冲对象
 - 支持移动语义：高效的资源转移
 - 与 InstancedRenderer 配合使用：SimpleMesh 提供数据，InstancedRenderer 提供逻辑
-- 纹理指针由外部管理，SimpleMesh 不拥有所有权
+- **纹理使用 shared_ptr 管理所有权**：SimpleMesh 持有 Texture 的 shared_ptr
 - 静态工厂方法：CreateFromCube() 和 CreateFromMaterialData()
 - **使用方式**：通过 shared_ptr 传递给 InstancedRenderer，自动管理生命周期
+
+**InstanceData 类** (`src/Renderer/InstanceData.cpp`)
+- 纯粹的数据容器，存储实例变换和颜色信息
+- 管理实例的模型矩阵（位置、旋转、缩放）
+- 管理实例的颜色属性
+- 提供批量添加和清除实例的接口
+- 独立于渲染器，可以单独操作
 
 #### 1.4 主程序 (`src/main.cpp`)
 
@@ -287,7 +311,7 @@ class OBJModel : public IMesh {
 
 ### 2. 当前实现的关键特性
 
-#### 2.1 OBJ模型系统
+#### 2.2 OBJ模型系统
 
 **完整解析能力**:
 - ✅ 顶点、法线、UV坐标解析
@@ -301,7 +325,7 @@ class OBJModel : public IMesh {
 - ✅ 纹理混合渲染（纹理+颜色）
 - ✅ 变换矩阵支持（位置、缩放、旋转）
 
-#### 2.2 实例化渲染系统
+#### 2.3 实例化渲染系统
 
 **性能优化特性**:
 - ✅ 单次绘制调用渲染数百个实例
@@ -312,6 +336,7 @@ class OBJModel : public IMesh {
 - ✅ 支持索引渲染（EBO）和纹理映射
 - ✅ 多材质模型支持（每个材质一个实例化网格）
 - ✅ 材质颜色自动应用
+- ✅ 使用shared_ptr管理SimpleMesh、InstanceData、Texture生命周期
 
 **适用场景**:
 - 大量重复物体的场景渲染（植被、建筑、车辆）
@@ -320,14 +345,27 @@ class OBJModel : public IMesh {
   - 12辆车×38个材质 = 456次传统调用 vs 38次实例化调用
 - 性能提升：相比逐个绘制，实例化渲染可提升10-100倍性能
 
+#### 2.4 日志系统
+
+**核心功能**:
+- ✅ 线程安全：支持多线程并发写入
+- ✅ 异步写入：默认启用后台线程写入日志，避免阻塞主线程
+- ✅ 分级日志：DEBUG、INFO、WARNING、ERROR
+- ✅ 日志轮转：按大小、按天、按小时轮转
+- ✅ 上下文感知：支持渲染阶段、批次索引、三角形数量等上下文信息
+- ✅ 统计功能：着色器激活次数、纹理绑定次数、DrawCall次数、FPS监控
+- ✅ 编译时优化：DEBUG级别日志在Release版本中完全移除（零开销）
+
 **技术实现**:
 - 职责分离架构（方案C）：
-  - SimpleMesh: 纯数据容器（顶点、索引、VAO/VBO/EBO）
+  - SimpleMesh: 纯数据容器（顶点、索引、VAO/VBO/EBO），继承IMesh接口
   - InstanceData: 实例数据容器（变换矩阵、颜色）
-  - InstancedRenderer: 渲染逻辑（持有 shared_ptr）
+  - InstancedRenderer: 渲染逻辑（继承IRenderer接口，持有 shared_ptr）
 - 智能指针管理：
   - InstancedRenderer 使用 `shared_ptr<SimpleMesh>` 管理网格生命周期
-  - CreateForOBJ() 返回 pair<渲染器vector, mesh的shared_ptrvector>
+  - InstancedRenderer 使用 `shared_ptr<InstanceData>` 避免拷贝
+  - SimpleMesh 使用 `shared_ptr<Texture>` 管理纹理所有权
+  - CreateForOBJ() 返回 tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr>
   - 自动内存管理，消除悬空指针风险
   - 多个 InstancedRenderer 可以安全共享同一个 SimpleMesh
 - 顶点着色器（`assets/shader/instanced.vert`）：
@@ -340,14 +378,13 @@ class OBJModel : public IMesh {
 - 绘制调用：`glDrawElementsInstanced` 一次渲染所有实例
 - 工厂方法：
   - `CreateForCube()`: 创建立方体实例化渲染器
-  - `CreateForOBJ()`: 从OBJ模型创建多个材质渲染器（返回pair）
+  - `CreateForOBJ()`: 从OBJ模型创建多个材质渲染器（返回tuple）
 
 **内存管理**:
-- 使用 shared_ptr 自动管理 SimpleMesh 生命周期
-- 主程序需要保持 mesh 的 shared_ptr 存活
-- 纹理由外部管理，InstancedRenderer 仅持有指针
+- 使用 shared_ptr 自动管理 SimpleMesh、InstanceData、Texture 生命周期
+- 主程序需要保持 mesh 和 instanceData 的 shared_ptr 存活
 - 实例数据包含模型矩阵和颜色
-- 支持动态更新实例缓冲（`UpdateInstances()`）
+- 支持动态更新实例缓冲（通过 shared_ptr<InstanceData>）
 
 #### 2.3 资源管理
 
@@ -384,6 +421,9 @@ class OBJModel : public IMesh {
 
 **渲染性能优化**:
 - ✅ **实例化渲染**: InstancedRenderer类实现，一次绘制数百个实例
+- ✅ **智能指针管理**: 使用shared_ptr自动管理资源生命周期
+- ✅ **异步日志系统**: 避免主线程阻塞，提升性能
+- ✅ **编译时优化**: DEBUG日志在Release版本中零开销
 - **LOD系统**: 根据距离动态调整几何体细节层次
 - **视锥剔除**: 只渲染可见几何体，减少无效绘制
 - **遮挡剔除**: 避免渲染被其他物体遮挡的几何体
@@ -536,13 +576,19 @@ class OBJModel : public IMesh {
 - ✅ **SimpleMesh类**: 纯粹的数据容器，支持深拷贝和移动语义
   - 从Cube模板创建网格
   - 从OBJ材质数据创建网格
-  - 值语义设计，避免生命周期问题
+  - 继承IMesh接口，提供统一的网格接口
+  - 使用shared_ptr管理Texture所有权
 - ✅ **InstancedRenderer类**: 实例化渲染器，支持批量渲染
+  - 继承IRenderer接口，实现统一的渲染器抽象
   - 采用职责分离设计（SimpleMesh + InstanceData + InstancedRenderer）
   - 从Cube模板创建实例化渲染器
   - 从OBJ模型创建多材质实例化渲染器
   - 支持纹理和材质颜色混合渲染
-  - 内存安全：拥有SimpleMesh副本，避免悬空指针
+  - 使用shared_ptr管理SimpleMesh、InstanceData、Texture生命周期
+  - CreateForOBJ()返回tuple<渲染器vector, mesh的shared_ptrvector, instanceData的shared_ptr>
+- ✅ **InstanceData类**: 实例数据容器
+  - 存储实例变换和颜色信息
+  - 使用shared_ptr传递给InstancedRenderer，避免拷贝
 - ✅ **网格工厂**: 支持运行时几何体类型注册
 
 #### 3.2 OBJ模型系统
@@ -582,20 +628,26 @@ class OBJModel : public IMesh {
 #### 5.1 性能优化
 - ✅ 循环编码：cube.cpp使用循环生成顶点
 - ✅ 资源复用：着色器预加载避免重复编译
-- ✅ 智能指针：unique_ptr管理资源生命周期
+- ✅ 智能指针：shared_ptr管理资源生命周期，避免内存泄漏和悬空指针
 - ✅ 顶点缓存：OBJ模型顶点数据缓存
 - ✅ 实例化渲染：InstancedRenderer实现批量渲染
   - 职责分离架构（SimpleMesh + InstanceData + InstancedRenderer）
+  - 继承IRenderer接口，实现统一渲染器抽象
   - 单次绘制调用渲染数百个实例
   - 支持材质颜色和纹理映射
   - 多材质模型优化（每个材质一次绘制调用）
-  - 值语义设计：SimpleMesh 深拷贝，避免生命周期问题
+  - 使用shared_ptr管理SimpleMesh、InstanceData、Texture生命周期
+- ✅ 异步日志：Logger使用后台线程写入，避免阻塞主线程
+- ✅ 编译时优化：DEBUG日志在Release版本中零开销
 
 #### 5.2 代码质量
 - ✅ 现代C++：使用C++17特性
 - ✅ 异常安全：try-catch错误处理
 - ✅ 模块化：清晰的代码组织结构
-- ✅ 接口统一：IMesh抽象接口
+- ✅ 接口统一：IMesh和IRenderer抽象接口
+- ✅ 智能指针：shared_ptr自动管理资源生命周期
+- ✅ 线程安全：Logger支持多线程并发写入
+- ✅ 编译时优化：条件编译实现零开销抽象
 
 ## 📁 代码结构详解
 
