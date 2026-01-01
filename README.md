@@ -22,7 +22,9 @@
 🎉 Enjoy the chaos! 🎆
 </div>
 
-![超级宇宙迪斯科](./assets/picture/EXAMPLE.gif)
+<div align="center">
+  <img src="./assets/picture/EXAMPLE.gif" alt="超级宇宙迪斯科">
+</div>
 
 ---
 
