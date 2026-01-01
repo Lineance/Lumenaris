@@ -10,10 +10,23 @@ namespace Renderer
         m_vertexCount = stride > 0 ? vertices.size() / stride : 0;
     }
 
+    void MeshData::SetVertices(std::vector<float>&& vertices, size_t stride)
+    {
+        m_vertices = std::move(vertices);
+        m_vertexStride = stride;
+        m_vertexCount = stride > 0 ? m_vertices.size() / stride : 0;
+    }
+
     void MeshData::SetIndices(const std::vector<unsigned int>& indices)
     {
         m_indices = indices;
         m_indexCount = indices.size();
+    }
+
+    void MeshData::SetIndices(std::vector<unsigned int>&& indices)
+    {
+        m_indices = std::move(indices);
+        m_indexCount = m_indices.size();
     }
 
     void MeshData::SetVertexLayout(const std::vector<size_t>& offsets, const std::vector<int>& sizes)

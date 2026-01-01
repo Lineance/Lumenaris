@@ -11,34 +11,9 @@ namespace Renderer
     }
 
     // ============================================================
-    // 拷贝语义（深拷贝）
+    // 拷贝语义（已删除，防止误用）
     // ============================================================
-
-    MeshBuffer::MeshBuffer(const MeshBuffer& other)
-        : m_data(other.m_data),
-          m_vao(0),  // 新对象需要重新创建 GPU 资源
-          m_vbo(0),
-          m_ebo(0),
-          m_texture(other.m_texture)  // 共享纹理
-    {
-        // 注意：不拷贝 GPU 资源，新对象需要调用 UploadToGPU()
-    }
-
-    MeshBuffer& MeshBuffer::operator=(const MeshBuffer& other)
-    {
-        if (this != &other)
-        {
-            // 释放旧资源
-            ReleaseGPU();
-
-            // 拷贝数据
-            m_data = other.m_data;
-            m_texture = other.m_texture;
-
-            // 不拷贝 GPU 资源，需要调用 UploadToGPU()
-        }
-        return *this;
-    }
+    // 拷贝构造函数和拷贝赋值运算符已声明为 delete，无实现
 
     // ============================================================
     // 移动语义
@@ -85,7 +60,7 @@ namespace Renderer
 
     void MeshBuffer::UploadToGPU(const MeshData& data)
     {
-        // 保存数据副本
+        // 保存数据副本（拷贝）
         m_data = data;
 
         // 如果已有 GPU 资源，先释放
@@ -111,6 +86,38 @@ namespace Renderer
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         Core::Logger::GetInstance().Info("MeshBuffer::UploadToGPU() - Uploaded mesh to GPU: " +
+                                         std::to_string(m_data.GetVertexCount()) + " vertices, " +
+                                         std::to_string(m_data.GetIndexCount()) + " indices");
+    }
+
+    void MeshBuffer::UploadToGPU(MeshData&& data)
+    {
+        // ✅ 性能优化：使用移动语义避免数据拷贝
+        m_data = std::move(data);
+
+        // 如果已有 GPU 资源，先释放
+        if (m_vao != 0)
+        {
+            ReleaseGPU();
+        }
+
+        // 创建新的 GPU 资源
+        CreateVAO();
+        UploadVertexData();
+
+        if (m_data.HasIndices())
+        {
+            UploadIndexData();
+        }
+
+        SetupVertexAttributes();
+
+        // 解绑
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        Core::Logger::GetInstance().Info("MeshBuffer::UploadToGPU() - Uploaded mesh to GPU (moved): " +
                                          std::to_string(m_data.GetVertexCount()) + " vertices, " +
                                          std::to_string(m_data.GetIndexCount()) + " indices");
     }

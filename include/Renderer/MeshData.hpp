@@ -32,17 +32,32 @@ namespace Renderer
         // ============================================================
 
         /**
-         * @brief 设置顶点数据
+         * @brief 设置顶点数据（左值引用版本）
          * @param vertices 顶点数据数组
          * @param stride 每个顶点的步长（字节数 / sizeof(float)）
          */
         void SetVertices(const std::vector<float>& vertices, size_t stride);
 
         /**
-         * @brief 设置索引数据
+         * @brief 设置顶点数据（右值引用版本，移动语义）
+         * @param vertices 顶点数据数组
+         * @param stride 每个顶点的步长（字节数 / sizeof(float)）
+         * @note 避免数据拷贝，提升性能
+         */
+        void SetVertices(std::vector<float>&& vertices, size_t stride);
+
+        /**
+         * @brief 设置索引数据（左值引用版本）
          * @param indices 索引数据数组
          */
         void SetIndices(const std::vector<unsigned int>& indices);
+
+        /**
+         * @brief 设置索引数据（右值引用版本，移动语义）
+         * @param indices 索引数据数组
+         * @note 避免数据拷贝，提升性能
+         */
+        void SetIndices(std::vector<unsigned int>&& indices);
 
         /**
          * @brief 设置顶点属性布局

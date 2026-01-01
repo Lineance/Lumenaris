@@ -125,11 +125,19 @@ namespace Renderer
         // ============================================================
 
         /**
-         * @brief 从 MeshData 创建 MeshBuffer 并上传到 GPU
+         * @brief 从 MeshData 创建 MeshBuffer 并上传到 GPU（左值引用版本）
          * @param data 网格数据
          * @return MeshBuffer 已上传到 GPU
          */
         static MeshBuffer CreateFromMeshData(const MeshData& data);
+
+        /**
+         * @brief 从 MeshData 创建 MeshBuffer 并上传到 GPU（右值引用版本，移动语义）
+         * @param data 网格数据
+         * @return MeshBuffer 已上传到 GPU
+         * @note 使用移动语义避免数据拷贝，性能更优
+         */
+        static MeshBuffer CreateFromMeshData(MeshData&& data);
 
         /**
          * @brief 批量创建 MeshBuffer 并上传到 GPU

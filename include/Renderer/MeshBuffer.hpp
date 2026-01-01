@@ -34,20 +34,22 @@ namespace Renderer
         ~MeshBuffer();
 
         // ============================================================
-        // 拷贝语义（深拷贝）
+        // 拷贝语义（已删除，防止误用）
         // ============================================================
 
         /**
-         * @brief 拷贝构造函数（深拷贝）
-         * @note 拷贝 CPU 数据，但不拷贝 GPU 资源
-         *       新对象需要调用 UploadToGPU() 创建新的 GPU 资源
+         * @brief 拷贝构造函数（已删除）
+         * @note 删除拷贝构造以防止意外深拷贝（昂贵操作）
+         *       请使用移动语义或引用/指针传递
          */
-        MeshBuffer(const MeshBuffer& other);
+        MeshBuffer(const MeshBuffer& other) = delete;
 
         /**
-         * @brief 拷贝赋值运算符（深拷贝）
+         * @brief 拷贝赋值运算符（已删除）
+         * @note 删除拷贝赋值以防止意外深拷贝（昂贵操作）
+         *       请使用移动语义或引用/指针传递
          */
-        MeshBuffer& operator=(const MeshBuffer& other);
+        MeshBuffer& operator=(const MeshBuffer& other) = delete;
 
         // ============================================================
         // 移动语义（高效转移资源）
@@ -69,11 +71,18 @@ namespace Renderer
         // ============================================================
 
         /**
-         * @brief 上传数据到 GPU
+         * @brief 上传数据到 GPU（左值引用版本）
          * @param data 网格数据
-         * @note 创建或更新 VAO/VBO/EBO
+         * @note 创建或更新 VAO/VBO/EBO，会拷贝数据
          */
         void UploadToGPU(const MeshData& data);
+
+        /**
+         * @brief 上传数据到 GPU（右值引用版本，移动语义）
+         * @param data 网格数据
+         * @note 创建或更新 VAO/VBO/EBO，使用移动语义避免拷贝，性能更优
+         */
+        void UploadToGPU(MeshData&& data);
 
         /**
          * @brief 释放 GPU 资源

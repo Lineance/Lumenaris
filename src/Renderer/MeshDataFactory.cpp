@@ -22,7 +22,8 @@ namespace Renderer
         Cube::GetVertexLayout(offsets, sizes);
 
         MeshData data;
-        data.SetVertices(vertices, 8);  // stride = 8 (pos:3 + normal:3 + uv:2)
+        // ✅ 性能优化：使用移动语义避免数据拷贝
+        data.SetVertices(std::move(vertices), 8);  // stride = 8 (pos:3 + normal:3 + uv:2)
         data.SetVertexLayout(offsets, sizes);
         data.SetMaterialColor(glm::vec3(1.0f));
 
@@ -34,8 +35,16 @@ namespace Renderer
 
     MeshData MeshDataFactory::CreateSphereData(int stacks, int slices, float radius)
     {
+        // ✅ 性能优化：预分配内存，避免多次重新分配
+        size_t totalVertices = (stacks + 1) * (slices + 1);
+        size_t vertexDataSize = totalVertices * 8;  // 8 floats per vertex (pos:3 + normal:3 + uv:2)
+        size_t totalIndices = stacks * slices * 6;  // 每个网格单元 2 个三角形 = 6 个索引
+
         std::vector<float> vertices;
+        vertices.reserve(vertexDataSize);
+
         std::vector<unsigned int> indices;
+        indices.reserve(totalIndices);
 
         // 参数化球体生成
         float stackStep = glm::pi<float>() / stacks;
@@ -100,8 +109,9 @@ namespace Renderer
         }
 
         MeshData data;
-        data.SetVertices(vertices, 8);  // stride = 8
-        data.SetIndices(indices);
+        // ✅ 性能优化：使用移动语义避免数据拷贝
+        data.SetVertices(std::move(vertices), 8);  // stride = 8
+        data.SetIndices(std::move(indices));
         data.SetVertexLayout({0, 3, 6}, {3, 3, 2});  // pos, normal, uv
         data.SetMaterialColor(glm::vec3(1.0f));
 
@@ -121,16 +131,17 @@ namespace Renderer
         std::vector<MeshData> dataList;
         dataList.reserve(materialDataList.size());
 
-        for (const auto& materialData : materialDataList)
+        for (auto& materialData : materialDataList)  // ✅ 改为非 const 引用以支持移动
         {
             MeshData data;
 
             // OBJ 的顶点格式：pos(3) + normal(3) + uv(2) = 8 floats
-            data.SetVertices(materialData.vertices, 8);
+            // ✅ 性能优化：使用移动语义避免数据拷贝
+            data.SetVertices(std::move(materialData.vertices), 8);
 
             if (!materialData.indices.empty())
             {
-                data.SetIndices(materialData.indices);
+                data.SetIndices(std::move(materialData.indices));
             }
 
             // OBJ 的标准布局：位置、法线、UV
@@ -187,6 +198,14 @@ namespace Renderer
     {
         MeshBuffer buffer;
         buffer.UploadToGPU(data);
+        return buffer;
+    }
+
+    MeshBuffer MeshBufferFactory::CreateFromMeshData(MeshData&& data)
+    {
+        MeshBuffer buffer;
+        // ✅ 性能优化：使用移动语义避免数据拷贝
+        buffer.UploadToGPU(std::move(data));
         return buffer;
     }
 
