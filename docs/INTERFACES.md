@@ -471,6 +471,61 @@ public:
 
 ## Lighting 模块接口
 
+### LightWithAttenuation 类 ⭐ NEW
+
+**文件**: `include/Renderer/Lighting/Light.hpp`
+
+**描述**: 带衰减的光源基类，消除 PointLight 和 SpotLight 之间的代码重复。
+
+**设计要点**:
+- 遵循 DRY 原则（Don't Repeat Yourself）
+- 提供位置和衰减参数的公共实现
+- 支持虚函数多态调用 GetEffectiveRange()
+
+```cpp
+class LightWithAttenuation : public Light {
+public:
+    struct Attenuation {
+        float constant, linear, quadratic;
+        static Attenuation Range7();
+        static Attenuation Range13();
+        static Attenuation Range20();
+        static Attenuation Range32();
+        static Attenuation Range50();
+        static Attenuation Range65();
+        static Attenuation Range100();
+    };
+
+    // 位置和衰减（公共属性）
+    const glm::vec3 &GetPosition() const;
+    void SetPosition(const glm::vec3 &position);
+    const Attenuation &GetAttenuation() const;
+    void SetAttenuation(const Attenuation &attenuation);
+
+    // ⭐ 虚函数：支持多态
+    virtual float GetEffectiveRange() const;
+
+protected:
+    glm::vec3 m_position;
+    Attenuation m_attenuation;
+};
+```
+
+**使用示例**:
+```cpp
+// 多态调用
+LightWithAttenuation* lights[] = {
+    new PointLight(/* attenuation = Range32 */),
+    new SpotLight(/* attenuation = Range32, cutOff = 12.5° */)
+};
+
+for (auto* light : lights) {
+    float range = light->GetEffectiveRange();  // ⭐ 虚函数调用
+}
+```
+
+---
+
 ### LightHandle 类 ⭐ NEW
 
 **文件**: `include/Renderer/Lighting/Light.hpp`
@@ -643,29 +698,19 @@ public:
 
 ---
 
-### PointLight 类
+### PointLight 类 ⭐ UPDATED
 
 点光源，从一个点向所有方向发光（如灯泡）。
+
+**架构更新**: 继承 `LightWithAttenuation` 基类，消除代码重复。
 
 ```cpp
 namespace Renderer {
 namespace Lighting {
 
-class PointLight : public Light {
+class PointLight : public LightWithAttenuation {
 public:
-    struct Attenuation {
-        float constant;
-        float linear;
-        float quadratic;
-
-        static Attenuation Range7();
-        static Attenuation Range13();
-        static Attenuation Range20();
-        static Attenuation Range32();
-        static Attenuation Range50();
-        static Attenuation Range100();
-        static Attenuation Range200();
-    };
+    using Attenuation = LightWithAttenuation::Attenuation;  // 类型别名
 
     PointLight(
         const glm::vec3 &position,
@@ -676,14 +721,14 @@ public:
         float specular = 1.0f,
         const Attenuation &attenuation = Attenuation());
 
-    // 位置和衰减
-    const glm::vec3 &GetPosition() const;
-    void SetPosition(const glm::vec3 &position);
+    // 位置和衰减（继承自 LightWithAttenuation）
+    // GetPosition() / SetPosition()
+    // GetAttenuation() / SetAttenuation()
 
-    const Attenuation &GetAttenuation() const;
-    void SetAttenuation(const Attenuation &attenuation);
+    // ⭐ 重写虚函数（支持多态）
+    float GetEffectiveRange() const override;
 
-    // 接口实现
+    // Light接口实现
     LightType GetType() const override;
     void ApplyToShader(Shader &shader, int index = 0) const override;
     std::string GetDescription() const override;
@@ -698,11 +743,12 @@ public:
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
 | `PointLight()` | position, color, intensity, ... | - | 构造点光源，设置位置和衰减参数 |
-| `GetPosition()` | 无 | const glm::vec3& | 获取光源位置 |
-| `SetPosition()` | position | void | 设置光源位置 |
-| `GetAttenuation()` | 无 | const Attenuation& | 获取衰减参数 |
-| `SetAttenuation()` | attenuation | void | 设置衰减参数 |
-| `Range7()` ~ `Range200()` | 无 | Attenuation | 预设衰减范围（7米/13米/20米/32米/50米/100米/200米） |
+| `GetPosition()` | 无 | const glm::vec3& | 获取光源位置（继承自 LightWithAttenuation） |
+| `SetPosition()` | position | void | 设置光源位置（继承自 LightWithAttenuation） |
+| `GetAttenuation()` | 无 | const Attenuation& | 获取衰减参数（继承自 LightWithAttenuation） |
+| `SetAttenuation()` | attenuation | void | 设置衰减参数（继承自 LightWithAttenuation） |
+| `GetEffectiveRange()` | 无 | float | ⭐ 虚函数：计算有效距离（重写） |
+| `Range7()` ~ `Range100()` | 无 | Attenuation | 预设衰减范围（静态方法） |
 
 ---
 
@@ -710,16 +756,15 @@ public:
 
 聚光灯，从一个点向特定方向锥形发光。
 
-**架构更新**: 不再继承 `PointLight`，改为直接继承 `Light`，使用组合模式（修复Liskov原则违反）。
+**架构更新**: 继承 `LightWithAttenuation` 基类（消除代码重复），支持多态。
 
 ```cpp
 namespace Renderer {
 namespace Lighting {
 
-class SpotLight : public Light {
+class SpotLight : public LightWithAttenuation {
 public:
-    // 使用PointLight的Attenuation类型（兼容性）
-    using Attenuation = PointLight::Attenuation;
+    using Attenuation = LightWithAttenuation::Attenuation;  // 类型别名
 
     SpotLight(
         const glm::vec3 &position,
@@ -729,24 +774,26 @@ public:
         float ambient = 0.0f,
         float diffuse = 0.8f,
         float specular = 1.0f,
-        const Attenuation &attenuation = PointLight::Attenuation(),
+        const Attenuation &attenuation = LightWithAttenuation::Attenuation(),
         float cutOff = glm::radians(12.5f),      // ⚠️ 注意：现在使用弧度
         float outerCutOff = glm::radians(17.5f));
 
-    // 位置、方向和衰减（组合而非继承）
-    const glm::vec3 &GetPosition() const;
-    void SetPosition(const glm::vec3 &position);
+    // ========================================
+    // 位置和衰减（继承自 LightWithAttenuation）
+    // ========================================
+    // ⭐ 不再需要重复实现，直接使用基类的：
+    // - GetPosition() / SetPosition()
+    // - GetAttenuation() / SetAttenuation()
 
+    // ========================================
+    // 方向属性（SpotLight 特有）
+    // ========================================
     const glm::vec3 &GetDirection() const;
     void SetDirection(const glm::vec3 &direction);
 
-    const Attenuation &GetAttenuation() const;
-    void SetAttenuation(const Attenuation &attenuation);
-
-    // 有效距离计算
-    float GetEffectiveRange() const;
-
-    // 锥形角度（度数和弧度）
+    // ========================================
+    // 截止角度（SpotLight 特有）
+    // ========================================
     float GetCutOff() const;
     void SetCutOff(float cutOff);
 
@@ -758,6 +805,11 @@ public:
 
     float GetOuterCutOffDegrees() const;
     void SetOuterCutOffDegrees(float degrees);
+
+    // ========================================
+    // ⭐ 重写虚函数（支持多态）
+    // ========================================
+    float GetEffectiveRange() const override;
 
     // 接口实现
     LightType GetType() const override;
@@ -774,11 +826,11 @@ public:
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
 | `SpotLight()` | position, direction, color, ... | - | 构造聚光灯，设置位置、方向和锥角（弧度） |
-| `GetPosition()` | 无 | const glm::vec3& | 获取光源位置 |
-| `SetPosition()` | position | void | 设置光源位置 |
+| `GetPosition()` | 无 | const glm::vec3& | 获取光源位置（继承自 LightWithAttenuation） |
+| `SetPosition()` | position | void | 设置光源位置（继承自 LightWithAttenuation） |
 | `GetDirection()` | 无 | const glm::vec3& | 获取光照方向 |
 | `SetDirection()` | direction | void | 设置光照方向 |
-| `GetEffectiveRange()` | 无 | float | 计算有效光照距离（近似值） |
+| `GetEffectiveRange()` | 无 | float | ⭐ 虚函数：计算有效距离（距离+角度衰减） |
 | `GetCutOff()` | 无 | float | 获取内锥角（弧度） |
 | `SetCutOff()` | cutOff | void | 设置内锥角（弧度） |
 | `GetCutOffDegrees()` | 无 | float | 获取内锥角（度数） |

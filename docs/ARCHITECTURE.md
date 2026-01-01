@@ -197,6 +197,15 @@ LearningOpenGL/
   - ApplyToShader()方法将光照数据传递给着色器
   - ⚠️ **修复**: 禁用光源时设置零值uniform而非跳过（避免未初始化数据）
 
+- **LightWithAttenuation 类**: ⭐ NEW - 带衰减的光源基类
+  - **设计目标**: 消除 PointLight 和 SpotLight 之间的代码重复
+  - **架构优势**:
+    - ✅ 遵循 DRY 原则（Don't Repeat Yourself）
+    - ✅ 统一衰减参数管理
+    - ✅ 支持虚函数多态调用 GetEffectiveRange()
+  - 提供位置和衰减参数的公共实现
+  - PointLight 和 SpotLight 继承此基类
+
 - **LightHandle 类**: ⭐ NEW - 光源句柄系统
   - 使用稳定的 `id + generation` 机制（避免索引失效）
   - 禁用拷贝，仅可移动（避免意外复制）
@@ -213,10 +222,16 @@ LearningOpenGL/
   - 批量应用光源到着色器（线程安全）
   - 完全隔离，无全局状态污染
 
-- **SpotLight 类**: 聚光灯（⭐ **架构重构**）
-  - ⭐ **修复**: 不再继承 PointLight，改为直接继承 Light（组合模式）
+- **PointLight 类**: ⭐ **架构优化** - 点光源（继承 LightWithAttenuation）
+  - 继承 `LightWithAttenuation` 基类，消除代码重复
+  - ⭐ **重写虚函数**: `GetEffectiveRange()` 支持多态调用
+  - 不再重复定义位置和衰减属性
+
+- **SpotLight 类**: ⭐ **架构重构** - 聚光灯（继承 LightWithAttenuation）
+  - ⭐ **修复**: 继承 `LightWithAttenuation` 而非直接继承 Light
+  - ⭐ **消除重复**: 位置和衰减属性继承自基类
+  - ⭐ **重写虚函数**: `GetEffectiveRange()` 考虑距离+角度衰减
   - 避免违反 Liskov 原则
-  - 独立实现位置、方向、衰减属性
   - 支持内锥角和外锥角控制
 
 **RenderContext 类**: ⭐ NEW - 多Context架构核心 (`include/Renderer/Core/RenderContext.hpp`)

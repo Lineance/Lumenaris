@@ -79,7 +79,7 @@ namespace Renderer
         }
     }
 
-    void AmbientLighting::ApplyToShader(Shader& shader) const
+    void AmbientLighting::ApplyToShader(Shader& shader, unsigned int textureUnit) const
     {
         if (!m_enabled)
         {
@@ -101,12 +101,9 @@ namespace Renderer
                 break;
 
             case Mode::SKYBOX_SAMPLE:
-                // 绑定天空盒纹理
-                if (m_skyboxTextureID != 0)
-                {
-                    BindTexture(10);
-                    shader.SetInt("ambientSkybox", 10);
-                }
+                // ⭐ 修复：使用参数化的纹理单元
+                BindTexture(textureUnit);
+                shader.SetInt("ambientSkybox", static_cast<int>(textureUnit));
                 break;
 
             case Mode::HEMISPHERE:

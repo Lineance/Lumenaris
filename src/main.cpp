@@ -1529,8 +1529,9 @@ int main()
             ambientShader.SetFloat("shininess", 64.0f);
             ambientShader.SetFloat("time", static_cast<float>(currentTime));
 
-            // 应用环境光照
-            ambientLighting.ApplyToShader(ambientShader);
+            // 应用环境光照（使用纹理单元10，避免与常用纹理冲突）
+            ambientLighting.ApplyToShader(ambientShader);  // 默认 textureUnit = 10
+
 
             // ⭐ 应用所有直接光源（使用RenderContext）
             mainContext.GetLightManager().ApplyToShader(ambientShader);

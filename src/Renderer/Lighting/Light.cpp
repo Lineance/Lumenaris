@@ -82,6 +82,33 @@ namespace Renderer
         }
 
         // ========================================
+        // LightWithAttenuation 实现 ⭐ NEW
+        // ========================================
+
+        float LightWithAttenuation::GetEffectiveRange() const
+        {
+            // 计算光照衰减到5%以下的距离（近似值）
+            float min = 0.0f;
+            float max = 100.0f;
+            float threshold = 0.05f;
+
+            for (int i = 0; i < 10; ++i)
+            {
+                float mid = (min + max) / 2.0f;
+                float attenuation = 1.0f / (m_attenuation.constant +
+                                            m_attenuation.linear * mid +
+                                            m_attenuation.quadratic * mid * mid);
+
+                if (attenuation > threshold)
+                    min = mid;
+                else
+                    max = mid;
+            }
+
+            return (min + max) / 2.0f;
+        }
+
+        // ========================================
         // PointLight 实现
         // ========================================
 
@@ -93,9 +120,7 @@ namespace Renderer
             float diffuse,
             float specular,
             const Attenuation &attenuation)
-            : Light(color, intensity, ambient, diffuse, specular),
-              m_position(position),
-              m_attenuation(attenuation)
+            : LightWithAttenuation(color, intensity, ambient, diffuse, specular, position, attenuation)
         {
         }
 
@@ -142,32 +167,19 @@ namespace Renderer
             return oss.str();
         }
 
+        /**
+         * PointLight::GetEffectiveRange - ⭐ 重写虚函数
+         *
+         * 纯距离衰减计算
+         */
         float PointLight::GetEffectiveRange() const
         {
-            // 计算光照衰减到5%以下的距离（近似值）
-            // 使用二分法求解: 1 / (constant + linear*d + quadratic*d^2) = 0.05
-            float min = 0.0f;
-            float max = 100.0f;
-            float threshold = 0.05f;
-
-            for (int i = 0; i < 10; ++i)
-            {
-                float mid = (min + max) / 2.0f;
-                float attenuation = 1.0f / (m_attenuation.constant +
-                                            m_attenuation.linear * mid +
-                                            m_attenuation.quadratic * mid * mid);
-
-                if (attenuation > threshold)
-                    min = mid;
-                else
-                    max = mid;
-            }
-
-            return (min + max) / 2.0f;
+            // 调用基类方法（纯距离衰减）
+            return LightWithAttenuation::GetEffectiveRange();
         }
 
         // ========================================
-        // SpotLight 实现（修复：直接继承Light）
+        // SpotLight 实现（⭐ 重构：继承 LightWithAttenuation）
         // ========================================
 
         SpotLight::SpotLight(
@@ -178,13 +190,11 @@ namespace Renderer
             float ambient,
             float diffuse,
             float specular,
-            const PointLight::Attenuation &attenuation,
+            const LightWithAttenuation::Attenuation &attenuation,
             float cutOff,
             float outerCutOff)
-            : Light(color, intensity, ambient, diffuse, specular),
-              m_position(position),
+            : LightWithAttenuation(color, intensity, ambient, diffuse, specular, position, attenuation),
               m_direction(direction),
-              m_attenuation(attenuation),
               m_cutOff(cutOff),
               m_outerCutOff(outerCutOff)
         {
@@ -197,13 +207,13 @@ namespace Renderer
             // 修复：禁用时设置零值而非跳过，避免未初始化的uniform数据
             if (m_enabled)
             {
-                shader.SetVec3(prefix + "position", m_position);
+                shader.SetVec3(prefix + "position", m_position);  // 继承自 LightWithAttenuation
                 shader.SetVec3(prefix + "direction", m_direction);
                 shader.SetVec3(prefix + "color", m_color * m_intensity);
                 shader.SetFloat(prefix + "ambient", m_ambient);
                 shader.SetFloat(prefix + "diffuse", m_diffuse);
                 shader.SetFloat(prefix + "specular", m_specular);
-                shader.SetFloat(prefix + "constant", m_attenuation.constant);
+                shader.SetFloat(prefix + "constant", m_attenuation.constant);  // 继承自 LightWithAttenuation
                 shader.SetFloat(prefix + "linear", m_attenuation.linear);
                 shader.SetFloat(prefix + "quadratic", m_attenuation.quadratic);
                 shader.SetFloat(prefix + "cutOff", m_cutOff);
@@ -230,39 +240,34 @@ namespace Renderer
         {
             std::ostringstream oss;
             oss << "SpotLight [Position: ("
-                << m_position.x << ", " << m_position.y << ", " << m_position.z
+                << m_position.x << ", " << m_position.y << ", " << m_position.z  // 继承自 LightWithAttenuation
                 << "), Direction: ("
                 << m_direction.x << ", " << m_direction.y << ", " << m_direction.z
                 << "), Color: ("
                 << m_color.r << ", " << m_color.g << ", " << m_color.b
                 << "), Intensity: " << m_intensity
                 << ", CutOff: " << GetCutOffDegrees() << "°"
-                << ", Range: ~" << GetEffectiveRange() << "m"
+                << ", Range: ~" << GetEffectiveRange() << "m"  // ⭐ 虚函数调用
                 << ", Enabled: " << (m_enabled ? "Yes" : "No") << "]";
             return oss.str();
         }
 
+        /**
+         * SpotLight::GetEffectiveRange - ⭐ 重写虚函数
+         *
+         * 考虑聚光灯的角度衰减
+         */
         float SpotLight::GetEffectiveRange() const
         {
-            // 计算光照衰减到5%以下的距离（与PointLight相同）
-            float min = 0.0f;
-            float max = 100.0f;
-            float threshold = 0.05f;
+            // 首先计算基于距离衰减的有效范围（调用基类方法）
+            float distanceRange = LightWithAttenuation::GetEffectiveRange();
 
-            for (int i = 0; i < 10; ++i)
-            {
-                float mid = (min + max) / 2.0f;
-                float attenuation = 1.0f / (m_attenuation.constant +
-                                            m_attenuation.linear * mid +
-                                            m_attenuation.quadratic * mid * mid);
+            // 然后考虑角度衰减：聚光灯的有效范围受锥角限制
+            // 内锥角越小，有效距离越短
+            float angleFactor = glm::cos(m_cutOff);  // 0~1之间，越小越窄
 
-                if (attenuation > threshold)
-                    min = mid;
-                else
-                    max = mid;
-            }
-
-            return (min + max) / 2.0f;
+            // 综合距离和角度因素（简化模型）
+            return distanceRange * angleFactor;
         }
 
     } // namespace Lighting

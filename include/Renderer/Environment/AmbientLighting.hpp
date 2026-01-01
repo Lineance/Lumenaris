@@ -48,8 +48,9 @@ namespace Renderer
         /**
          * 应用环境光设置到着色器
          * @param shader 目标着色器
+         * @param textureUnit 纹理单元（默认为10，避免与常用纹理冲突）
          */
-        void ApplyToShader(Shader& shader) const;
+        void ApplyToShader(Shader& shader, unsigned int textureUnit = 10) const;
 
         /**
          * 设置环境光强度
