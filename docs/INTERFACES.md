@@ -27,6 +27,10 @@
   - [MeshData 类](#meshdata-类)
   - [MeshBuffer 类](#meshbuffer-类)
   - [InstancedRenderer 类](#instancedrenderer-类)
+- [Environment 模块接口](#environment-模块接口)
+  - [Skybox 类](#skybox-类)
+  - [SkyboxLoader 类](#skyboxloader-类)
+  - [AmbientLighting 类](#ambientlighting-类)
 - [几何体接口](#几何体接口)
 - [使用示例](#使用示例)
 
@@ -2200,6 +2204,391 @@ void main() {
 - **传统渲染**：12辆车 × 38个材质 = 456次绘制调用
 - **实例化渲染**：38个材质 = 38次绘制调用
 - **性能提升**：约12倍（取决于场景复杂度）
+
+---
+
+## Environment 模块接口
+
+### Skybox 类
+
+天空盒渲染器，负责渲染立方体环境贴图。
+
+```cpp
+namespace Renderer {
+
+class Skybox {
+public:
+    Skybox();
+    ~Skybox();
+
+    // 禁止拷贝，允许移动
+    Skybox(const Skybox&) = delete;
+    Skybox& operator=(const Skybox&) = delete;
+    Skybox(Skybox&& other) noexcept;
+    Skybox& operator=(Skybox&& other) noexcept;
+
+    // 初始化
+    bool Initialize();
+
+    // 加载天空盒纹理
+    bool Load(const std::string& right, const std::string& left,
+              const std::string& top, const std::string& bottom,
+              const std::string& back, const std::string& front);
+    bool LoadFromConfig(const SkyboxConfig& config);
+
+    // 着色器
+    bool LoadShaders(const std::string& vertexPath, const std::string& fragmentPath);
+
+    // 渲染
+    void Render(const glm::mat4& projection, const glm::mat4& view);
+
+    // 纹理操作
+    void BindTexture(unsigned int textureUnit = 0) const;
+    unsigned int GetTextureID() const;
+
+    // 状态查询
+    bool IsLoaded() const;
+
+    // 旋转控制
+    void SetRotation(float rotationDegrees);
+    float GetRotation() const;
+};
+
+} // namespace Renderer
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Initialize()` | 无 | bool | 初始化天空盒，创建立方体网格 |
+| `Load()` | 6个面的文件路径 | bool | 从6个纹理文件加载天空盒 |
+| `LoadFromConfig()` | SkyboxConfig | bool | 从配置加载天空盒 |
+| `LoadShaders()` | vertexPath, fragmentPath | bool | 加载天空盒着色器 |
+| `Render()` | projection, view | void | 渲染天空盒 |
+| `BindTexture()` | textureUnit | void | 绑定天空盒纹理到指定纹理单元 |
+| `GetTextureID()` | 无 | unsigned int | 获取天空盒纹理ID |
+| `IsLoaded()` | 无 | bool | 检查天空盒是否已加载 |
+| `SetRotation()` | rotationDegrees | void | 设置旋转角度 |
+| `GetRotation()` | 无 | float | 获取旋转角度 |
+
+#### 使用示例
+
+```cpp
+// 1. 创建并初始化天空盒
+Renderer::Skybox skybox;
+skybox.Initialize();
+skybox.LoadShaders("assets/shader/skybox.vert", "assets/shader/skybox.frag");
+
+// 2. 使用SkyboxLoader加载配置
+auto config = Renderer::SkyboxLoader::CreateCustomConfig(
+    "assets/textures/skybox",
+    {"corona_rt.png", "corona_lf.png", "corona_up.png",
+     "corona_dn.png", "corona_bk.png", "corona_ft.png"},
+    Renderer::CubemapConvention::OPENGL
+);
+skybox.LoadFromConfig(config);
+
+// 3. 在渲染循环中（先渲染天空盒）
+glm::mat4 view = camera.GetViewMatrix();
+glm::mat4 projection = camera.GetProjectionMatrix(aspect);
+
+// 渲染天空盒（背景层）
+glDepthFunc(GL_LEQUAL);  // 深度测试改为<=
+glDepthMask(GL_FALSE);   // 禁止深度写入
+skybox.Render(projection, view);
+glDepthMask(GL_TRUE);    // 恢复深度写入
+glDepthFunc(GL_LESS);    // 恢复默认深度测试
+
+// 渲染场景物体
+// ...
+
+// 4. 设置环境光照
+ambientLighting.LoadFromSkybox(skybox.GetTextureID(), 0.3f);
+ambientLighting.ApplyToShader(shader);
+```
+
+---
+
+### SkyboxLoader 类
+
+天空盒加载工具类，支持多种cubemap约定和灵活的命名格式。
+
+```cpp
+namespace Renderer {
+
+// Cubemap约定枚举
+enum class CubemapConvention {
+    OPENGL,        // OpenGL标准: right, left, top, bottom, front(+Z), back(-Z)
+    DIRECTX,       // DirectX: left, right, top, bottom, front, back
+    MAYA,          // Maya/Corona: right, left, top, bottom, back(+Z), front(-Z)
+    BLENDER,       // Blender: right, left, top, bottom, front, back
+    CUSTOM         // 自定义映射
+};
+
+// 天空盒配置结构
+struct SkyboxConfig {
+    std::string directory;                           // 天空盒纹理目录
+    std::vector<std::string> faceFilenames;         // 6个面的文件名（按OpenGL顺序）
+    CubemapConvention convention;                   // 使用的约定
+    bool flipVertically;                            // 是否垂直翻转纹理
+    bool generateMipmaps;                           // 是否生成mipmaps
+};
+
+// Cubemap面命名方案
+struct FaceNamingScheme {
+    std::string right;   // +X 面
+    std::string left;    // -X 面
+    std::string top;     // +Y 面
+    std::string bottom;  // -Y 面
+    std::string back;    // +Z 面
+    std::string front;   // -Z 面
+
+    FaceNamingScheme(const std::string& r = "right",
+                     const std::string& l = "left",
+                     const std::string& t = "top",
+                     const std::string& b = "bottom",
+                     const std::string& bk = "back",
+                     const std::string& f = "front");
+
+    std::vector<std::string> ToArray() const;
+};
+
+class SkyboxLoader {
+public:
+    // 从标准命名约定创建配置
+    static SkyboxConfig CreateConfig(
+        const std::string& directory,
+        CubemapConvention convention,
+        const std::string& basename = "",
+        const std::string& extension = ".png"
+    );
+
+    // 从自定义文件名创建配置
+    static SkyboxConfig CreateCustomConfig(
+        const std::string& directory,
+        const std::vector<std::string>& filenames,
+        CubemapConvention convention = CubemapConvention::OPENGL
+    );
+
+    // 从文件模式创建配置（支持通配符）
+    static SkyboxConfig CreateFromPattern(
+        const std::string& directory,
+        const std::string& pattern,
+        CubemapConvention convention,
+        const std::string& extension = ".png"
+    );
+
+    // 从自定义面命名方案创建配置（完全自定义）
+    static SkyboxConfig CreateFromCustomScheme(
+        const std::string& directory,
+        const std::string& pattern,
+        const FaceNamingScheme& namingScheme,
+        CubemapConvention convention,
+        const std::string& extension = ".png"
+    );
+
+    // 获取约定对应的OpenGL标准顺序的文件名
+    static std::vector<std::string> ConvertToOpenGL(
+        CubemapConvention convention,
+        const std::vector<std::string>& inputNames
+    );
+
+    // 获取常用命名方案的预设
+    static FaceNamingScheme GetOpenGLScheme();
+    static FaceNamingScheme GetMayaScheme();
+    static FaceNamingScheme GetDirectXScheme();
+    static FaceNamingScheme GetHDRLabScheme();
+};
+
+} // namespace Renderer
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `CreateConfig()` | directory, convention, basename, extension | SkyboxConfig | 从标准命名约定创建配置 |
+| `CreateCustomConfig()` | directory, filenames, convention | SkyboxConfig | 从自定义文件名创建配置 |
+| `CreateFromPattern()` | directory, pattern, convention, extension | SkyboxConfig | 从文件模式创建配置 |
+| `CreateFromCustomScheme()` | directory, pattern, namingScheme, convention, extension | SkyboxConfig | 从自定义面命名方案创建配置 |
+| `ConvertToOpenGL()` | convention, inputNames | vector<string> | 转换到OpenGL标准顺序 |
+| `GetOpenGLScheme()` | 无 | FaceNamingScheme | 获取OpenGL标准命名方案 |
+| `GetMayaScheme()` | 无 | FaceNamingScheme | 获取Maya命名方案 |
+| `GetDirectXScheme()` | 无 | FaceNamingScheme | 获取DirectX命名方案 |
+| `GetHDRLabScheme()` | 无 | FaceNamingScheme | 获取HDR Lab命名方案 |
+
+#### 使用示例
+
+```cpp
+// 方式1：使用CreateCustomConfig（最直接）
+auto config1 = Renderer::SkyboxLoader::CreateCustomConfig(
+    "assets/textures/skybox",
+    {"corona_rt.png", "corona_lf.png", "corona_up.png",
+     "corona_dn.png", "corona_bk.png", "corona_ft.png"},
+    Renderer::CubemapConvention::OPENGL
+);
+
+// 方式2：使用CreateFromPattern（基于预设约定）
+auto config2 = Renderer::SkyboxLoader::CreateFromPattern(
+    "assets/textures/skybox",
+    "corona_{face}",
+    Renderer::CubemapConvention::MAYA,
+    ".png"
+);
+
+// 方式3：使用CreateFromCustomScheme（完全自定义）
+Renderer::FaceNamingScheme customScheme(
+    "rt", "lf", "up", "dn", "bk", "ft"
+);
+auto config3 = Renderer::SkyboxLoader::CreateFromCustomScheme(
+    "assets/textures/skybox",
+    "corona_{face}",
+    customScheme,
+    Renderer::CubemapConvention::OPENGL,
+    ".png"
+);
+
+// 方式4：使用预设命名方案
+auto config4 = Renderer::SkyboxLoader::CreateFromCustomScheme(
+    "assets/textures/skybox",
+    "{face}",
+    Renderer::SkyboxLoader::GetHDRLabScheme(),  // "px", "nx", "py", "ny", "pz", "nz"
+    Renderer::CubemapConvention::OPENGL,
+    ".hdr"
+);
+```
+
+---
+
+### AmbientLighting 类
+
+轻量级环境光照系统（非PBR），支持三种环境光模式。
+
+```cpp
+namespace Renderer {
+
+class AmbientLighting {
+public:
+    // 环境光照模式
+    enum class Mode {
+        SOLID_COLOR,      // 固定颜色环境光（传统Phong）
+        SKYBOX_SAMPLE,    // 从天空盒采样环境光（IBL）
+        HEMISPHERE        // 半球渐变环境光（天空/地面颜色插值）
+    };
+
+    AmbientLighting();
+    ~AmbientLighting() = default;
+
+    // 初始化
+    void Initialize();
+
+    // 从天空盒加载
+    bool LoadFromSkybox(unsigned int skyboxTextureID, float intensity = 0.3f);
+
+    // 设置模式
+    void SetMode(Mode mode);
+    Mode GetMode() const;
+
+    // 设置颜色
+    void SetSkyColor(const glm::vec3& color);
+    void SetGroundColor(const glm::vec3& color);
+    void SetIntensity(float intensity);
+    float GetIntensity() const;
+
+    // 应用到着色器
+    void ApplyToShader(Shader& shader) const;
+
+private:
+    void BindTexture(unsigned int textureUnit) const;
+};
+
+} // namespace Renderer
+```
+
+#### 接口说明
+
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `Initialize()` | 无 | void | 初始化环境光照系统 |
+| `LoadFromSkybox()` | skyboxTextureID, intensity | bool | 从天空盒加载环境光照 |
+| `SetMode()` | mode | void | 设置环境光照模式 |
+| `GetMode()` | 无 | Mode | 获取当前模式 |
+| `SetSkyColor()` | color | void | 设置天空颜色（用于HEMISPHERE模式） |
+| `SetGroundColor()` | color | void | 设置地面颜色（用于HEMISPHERE模式） |
+| `SetIntensity()` | intensity | void | 设置环境光强度 |
+| `GetIntensity()` | 无 | float | 获取环境光强度 |
+| `ApplyToShader()` | shader | void | 将环境光照设置应用到着色器 |
+
+#### 使用示例
+
+```cpp
+// 1. 创建并初始化环境光照
+Renderer::AmbientLighting ambientLighting;
+ambientLighting.Initialize();
+
+// 2. 从天空盒加载
+ambientLighting.LoadFromSkybox(skybox.GetTextureID(), 0.3f);
+
+// 3. 在渲染循环中应用
+ambientLighting.SetMode(Renderer::AmbientLighting::Mode::SKYBOX_SAMPLE);
+ambientLighting.ApplyToShader(shader);
+
+// 4. 运行时切换模式（键盘控制）
+if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+    ambientLighting.SetMode(Renderer::AmbientLighting::Mode::SOLID_COLOR);
+if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+    ambientLighting.SetMode(Renderer::AmbientLighting::Mode::SKYBOX_SAMPLE);
+if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+    ambientLighting.SetMode(Renderer::AmbientLighting::Mode::HEMISPHERE);
+
+// 5. 调整强度
+if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
+    ambientLighting.SetIntensity(ambientLighting.GetIntensity() + 0.05f);
+if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
+    ambientLighting.SetIntensity(ambientLighting.GetIntensity() - 0.05f);
+```
+
+#### 着色器集成
+
+在片段着色器中使用环境光照：
+
+```glsl
+// ambient_ibl.frag
+uniform int ambientMode;        // 0=SOLID_COLOR, 1=SKYBOX_SAMPLE, 2=HEMISPHERE
+uniform float ambientIntensity;
+uniform vec3 skyColor;           // 天空颜色（HEMISPHERE模式）
+uniform vec3 groundColor;        // 地面颜色（HEMISPHERE模式）
+uniform samplerCube skybox;      // 天空盒纹理（SKYBOX_SAMPLE模式）
+
+vec3 CalcAmbientLight(vec3 normal) {
+    vec3 ambient = vec3(0.0);
+
+    if (ambientMode == 0) {
+        // 固定颜色环境光
+        ambient = vec3(ambientIntensity);
+    }
+    else if (ambientMode == 1) {
+        // 从天空盒采样
+        ambient = texture(skybox, normal).rgb * ambientIntensity;
+    }
+    else if (ambientMode == 2) {
+        // 半球渐变
+        float hemi = normal.y * 0.5 + 0.5;  // 将[-1,1]映射到[0,1]
+        ambient = mix(groundColor, skyColor, hemi) * ambientIntensity;
+    }
+
+    return ambient;
+}
+
+void main() {
+    vec3 norm = normalize(Normal);
+    vec3 ambient = CalcAmbientLight(norm);
+    vec3 directLighting = /* 计算Phong光照 */;
+    vec3 result = (ambient + directLighting) * baseColor;
+    FragColor = vec4(result, 1.0);
+}
+```
 
 ---
 

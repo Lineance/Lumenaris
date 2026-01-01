@@ -76,9 +76,10 @@ LearningOpenGL/
 │       ├── Lighting/       # 光照系统
 │       │   ├── Light.hpp         # 光照基类
 │       │   └── LightManager.hpp  # 光照管理器
-│       ├── Environment/    # 环境渲染系统 (NEW)
+│       ├── Environment/    # 环境渲染系统
 │       │   ├── Skybox.hpp        # 天空盒渲染器
-│       │   └── IBL.hpp           # 基于图像的光照系统
+│       │   ├── SkyboxLoader.hpp  # 天空盒加载工具（支持多种约定）
+│       │   └── AmbientLighting.hpp # 轻量级环境光照系统
 │       ├── Renderer/       # 渲染器实现
 │       │   └── InstancedRenderer.hpp # 实例化渲染器
 │       └── Resources/      # 资源管理
@@ -200,6 +201,31 @@ LearningOpenGL/
   - 支持多光源渲染（最多16个点光源）
   - 批量应用光源到着色器
 
+**环境渲染系统** (`include/Renderer/Environment/`)
+- **Skybox 类**: 天空盒渲染器
+  - 6个面的立方体贴图渲染
+  - 视差移除（移除视图矩阵的平移分量）
+  - 无深度写入的正确渲染顺序（GL_LEQUAL + glDepthMask(GL_FALSE)）
+  - 支持旋转和纹理绑定
+
+- **SkyboxLoader 类**: 天空盒加载工具
+  - 支持多种cubemap约定（OpenGL、DirectX、Maya、Blender）
+  - 可配置的面名称后缀（FaceNamingScheme结构体）
+  - 自动转换面顺序到OpenGL标准
+  - 三种加载方式：
+    1. CreateFromPattern(): 基于约定和命名模式
+    2. CreateFromCustomScheme(): 使用自定义面名称
+    3. CreateCustomConfig(): 使用完整文件名列表
+  - 预设命名方案：GetOpenGLScheme()、GetMayaScheme()、GetDirectXScheme()、GetHDRLabScheme()
+
+- **AmbientLighting 类**: 轻量级环境光照（非PBR）
+  - 三种环境光照模式：
+    1. SOLID_COLOR: 固定颜色环境光（传统Phong）
+    2. SKYBOX_SAMPLE: 从天空盒采样环境光（IBL）
+    3. HEMISPHERE: 半球渐变环境光（天空/地面颜色插值）
+  - 与现有Phong光照系统集成
+  - 运行时切换模式和强度调整
+
 **Mesh 抽象层** (`include/Renderer/Geometry/Mesh.hpp`)
 - `IMesh` 接口定义统一的网格渲染标准
 - `MeshFactory` 工厂模式支持运行时几何体注册和创建
@@ -254,6 +280,26 @@ LearningOpenGL/
 - 集成纹理加载和管理
 - 提供完整的变换控制（位置、缩放、旋转）
 - 支持材质属性访问和查询
+
+**环境渲染实现** (`src/Renderer/Environment/`)
+- **Skybox.cpp**: 天空盒渲染实现
+  - 加载6个纹理文件（使用stbi_load）
+  - 生成cubemap纹理对象（GL_TEXTURE_CUBE_MAP）
+  - 创建立方体网格（36个顶点，6个面）
+  - 渲染时移除视图矩阵的平移分量（实现视差效果）
+
+- **SkyboxLoader.cpp**: 灵活的天空盒加载工具
+  - FaceNamingScheme结构体：定义6个面的名称后缀
+  - CreateFromPattern(): 使用预设约定（OPENGL、MAYA、DIRECTX等）
+  - CreateFromCustomScheme(): 完全自定义面名称后缀
+  - ConvertToOpenGL(): 自动转换不同约定的面顺序到OpenGL标准
+  - 映射数组：s_mayaMapping[]、s_directxMapping[]处理面顺序差异
+
+- **AmbientLighting.cpp**: 环境光照实现
+  - LoadFromSkybox(): 加载天空盒纹理ID，绑定到纹理单元10
+  - ApplyToShader(): 设置uniform变量（ambientMode、ambientIntensity、skyColor、groundColor）
+  - 三种模式的实现逻辑
+  - 与Phong光照系统的集成
 
 **数据容器** (Renderer/Data/)
 - **MeshData 类** (`src/Renderer/Data/MeshData.cpp`)
@@ -319,8 +365,13 @@ LearningOpenGL/
   - 自转动画: 每个球体独立三轴旋转
   - 公转动画: 8个彩色球围绕中心点（半径10m）公转
   - 实时更新: 每帧调用InstancedRenderer::UpdateInstanceData()更新1300个立方体
-  - 混乱光照: 16个点光源4种运动模式（椭圆、8字、螺旋、抖动圆）
+  - 混乱光照: 48个点光源（16个点光源 × 3层）多种运动模式
   - Fibonacci球算法: 均匀分布立方体在球面上
+- **天空盒系统**:
+  - 使用SkyboxLoader::CreateCustomConfig()加载Corona天空盒
+  - 配置约定：使用自定义文件名（corona_rt.png, corona_lf.png等）
+  - 环境光照：AmbientLighting系统与Phong光照集成
+  - 键盘控制：1/2/3切换环境光照模式，[/]调整强度
 
 ### 2. 构建系统
 

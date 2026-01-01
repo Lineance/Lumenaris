@@ -1,60 +1,3 @@
-/**
- * ========================================
- * Disco 舞台演示 - Disco Stage Demo (Enhanced with Skybox)
- * ========================================
- *
- * 超级Disco舞台：水平平面 + 超大中心球体 + 48个彩色光源 + 天空盒环境光照
- *
- * 特性：
- * - 天空盒背景渲染
- * - 轻量级IBL环境光照（从天空盒采样）
- * - 水平平面舞台（50x50纯白色地板）
- * - 中央巨型Disco球：800个立方体外层（边长0.4，分布半径4.0）+ 核心球体（半径3.0）
- * - 8个彩色球形灯：每个100个立方体外层（边长0.2，分布半径1.0）+ 核心球体（半径1.0）
- * - 48个混乱旋转彩色点光源（三层布局，覆盖整个舞台）
- * - 中央聚光灯（窄光束向下照射地板）
- * - 动态光源旋转效果
- * - 实时光照计算
- *
- * 光源系统（超级Disco风格）：
- * - 48个点光源分三层圆形布局
- *   * 内圈（16个）：半径7-9米，高度3-4米，强度10x，范围13米
- *   * 中圈（16个）：半径12.5-15.5米，高度4.5-5.5米，强度12x，范围32米
- *   * 外圈（16个）：半径18-22米，高度6-7米，强度15x，范围50米
- * - 48种不同颜色：基础色、亮色变体、深色变体
- * - 角度错开布局：内圈0°，中圈11.25°，外圈22.5°
- * - 覆盖范围：22米半径（整个舞台）
- *
- * 中心球体（增强版）：
- * - 立方体数量：800个（原来500个）
- * - 立方体大小：0.4米（原来0.35米）
- * - 分布半径：4.0米（原来2.5米）
- * - 核心球体半径：3.0米（原来1.8米）
- * - 整体尺寸增加60%，视觉冲击力更强
- *
- * 技术特点：
- * - 斐波那契球面算法确保立方体均匀分布
- * - 统一立方体大小：中央0.4，周边0.2
- * - 核心球体半径略小于立方体层，形成内部核心
- * - 立方体附着在核心球体表面，形成镜面反射层
- * - 总计1600个立方体 + 9个核心球体
- * - 3个渲染器（平面、立方体、球体）
- * - 48个混乱旋转彩色点光源，营造超级Disco氛围
- * - 天空盒环境光照，物体暗部显示天空颜色
- *
- * 控制说明：
- * - WASD: 前后左右移动
- * - Q/E: 上下移动
- * - 鼠标: 旋转视角
- * - TAB: 切换鼠标捕获
- * - ESC: 退出
- * - SPACE: 暂停/恢复光源动画
- * - 1/2/3: 切换环境光模式（固定颜色/天空盒采样/半球光照）
- * - [/]: 调整环境光强度
- *
- * ========================================
- */
-
 #include "Core/Window.hpp"
 #include "Core/Camera.hpp"
 #include "Core/MouseController.hpp"
@@ -75,6 +18,9 @@
 #include <vector>
 #include <cmath>
 #include <random>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // ========================================
 // 全局配置
@@ -92,6 +38,287 @@ int totalFrames = 0;
 // 全局变量（用于键盘控制）
 Renderer::AmbientLighting::Mode g_currentAmbientMode = Renderer::AmbientLighting::Mode::SKYBOX_SAMPLE;
 float g_ambientIntensity = 0.3f;
+
+// ========================================
+// 前置声明：DiscoStage 结构体
+// ========================================
+struct DiscoStage
+{
+    std::vector<std::unique_ptr<Renderer::InstancedRenderer>> renderers;
+    std::vector<std::shared_ptr<Renderer::MeshBuffer>> meshBuffers;
+    std::vector<std::shared_ptr<Renderer::InstanceData>> instanceDataList;
+    std::shared_ptr<Renderer::InstanceData> bunnyInstances; // 传入的实例数据
+    std::shared_ptr<Renderer::InstanceData> bunnyData;      // CreateForOBJ返回的实例数据（实际使用的）
+    size_t bunnyRendererStart = 0;                          // bunny渲染器起始索引
+    size_t bunnyRendererCount = 0;                          // bunny渲染器数量（材质数）
+};
+
+// ========================================
+// 辅助函数：计算光源运动模式
+// ========================================
+glm::vec3 CalculateLightMotion(int index, float time, float baseRadius, float baseHeight)
+{
+    int motionPattern = index % 4;
+    float angleOffset = static_cast<float>(index) * glm::two_pi<float>() / 48.0f;
+    float speed = 0.5f + static_cast<float>(index % 5) * 0.3f;
+
+    switch (motionPattern)
+    {
+    case 0: // 椭圆运动
+    {
+        float radiusX = baseRadius * 1.2f;
+        float radiusZ = baseRadius * 0.8f;
+        float height = baseHeight + std::sin(time * speed * 3.0f) * 0.8f;
+        return glm::vec3(
+            std::sin(time * speed + angleOffset) * radiusX,
+            height,
+            std::cos(time * speed + angleOffset) * radiusZ);
+    }
+    case 1: // 8字形运动（利萨如曲线）
+    {
+        float radius = baseRadius * 0.9f;
+        return glm::vec3(
+            std::sin(time * speed + angleOffset) * radius,
+            baseHeight + std::sin(time * speed * 2.0f) * 0.6f,
+            std::sin(time * speed * 2.0f + angleOffset) * radius * 0.7f);
+    }
+    case 2: // 螺旋进出运动
+    {
+        float radiusVariation = std::sin(time * speed * 0.5f) * (baseRadius * 0.25f);
+        float currentRadius = baseRadius + radiusVariation;
+        float height = baseHeight + std::cos(time * speed) * 1.0f;
+        return glm::vec3(
+            std::sin(time * speed * 1.5f + angleOffset) * currentRadius,
+            height,
+            std::cos(time * speed * 1.5f + angleOffset) * currentRadius);
+    }
+    default: // 随机抖动圆形运动
+    {
+        float radius = baseRadius * 1.1f;
+        float jitterX = std::sin(time * speed * 7.0f + index) * 2.0f;
+        float jitterZ = std::cos(time * speed * 5.0f + index) * 2.0f;
+        float height = baseHeight + std::sin(time * speed * 4.0f) * 0.7f;
+        return glm::vec3(
+            std::sin(time * speed * 0.8f + angleOffset) * radius + jitterX,
+            height,
+            std::cos(time * speed * 0.8f + angleOffset) * radius + jitterZ);
+    }
+    }
+}
+
+// ========================================
+// 辅助函数：更新Disco舞台动画
+// ========================================
+void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
+{
+    const float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
+
+    // 索引定义
+    const size_t cubeDataIndex = 1;
+    const size_t sphereDataIndex = 2;
+    const size_t torusDataIndex = 3;
+    const size_t platformDataIndex = 4;
+
+    auto &cubeMatrices = stage.instanceDataList[cubeDataIndex]->GetModelMatrices();
+    auto &sphereMatrices = stage.instanceDataList[sphereDataIndex]->GetModelMatrices();
+    auto &torusMatrices = stage.instanceDataList[torusDataIndex]->GetModelMatrices();
+    auto &platformMatrices = stage.instanceDataList[platformDataIndex]->GetModelMatrices();
+
+    // 中央球体自转
+    float centerRotX = std::sin(time * 0.3f) * 360.0f;
+    float centerRotY = time * 20.0f;
+    float centerRotZ = std::cos(time * 0.2f) * 360.0f;
+    glm::mat4 centerModel = glm::mat4(1.0f);
+    centerModel = glm::translate(centerModel, glm::vec3(0.0f, 8.0f, 0.0f));
+    centerModel = glm::rotate(centerModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+    centerModel = glm::rotate(centerModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+    centerModel = glm::rotate(centerModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+    centerModel = glm::scale(centerModel, glm::vec3(3.0f));
+    sphereMatrices[0] = centerModel;
+
+    // 中央disco球周围的800个立方体自转
+    const int centerCubesCount = 800;
+    const float discoBallRadius = 4.0f;
+    const float centerCubeSize = 0.4f;
+
+    for (int j = 0; j < centerCubesCount; ++j)
+    {
+        float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
+        float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / centerCubesCount);
+        glm::vec3 localOffset = glm::vec3(
+            discoBallRadius * std::sin(phi) * std::cos(theta),
+            discoBallRadius * std::sin(phi) * std::sin(theta),
+            discoBallRadius * std::cos(phi));
+        glm::vec3 cubePos = glm::vec3(0.0f, 8.0f, 0.0f) + localOffset;
+
+        glm::mat4 cubeModel = glm::mat4(1.0f);
+        cubeModel = glm::translate(cubeModel, cubePos);
+        cubeModel = glm::rotate(cubeModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+        cubeModel = glm::rotate(cubeModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+        cubeModel = glm::rotate(cubeModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+        cubeModel = glm::scale(cubeModel, glm::vec3(centerCubeSize));
+        cubeMatrices[j] = cubeModel;
+    }
+
+    // 8个彩色球体（自转 + 公转）
+    float orbitRadius = 10.0f;
+    float orbitSpeed = 0.5f;
+    const int cubesPerLight = 100;
+
+    for (int i = 0; i < 8; ++i)
+    {
+        float initialAngle = i * (360.0f / 8.0f);
+        float currentOrbitAngle = glm::radians(initialAngle + time * orbitSpeed * 50.0f);
+        float x = orbitRadius * std::cos(currentOrbitAngle);
+        float z = orbitRadius * std::sin(currentOrbitAngle);
+        glm::vec3 lightCenter(x, 5.0f, z);
+
+        // 自转
+        float selfRotSpeed = 0.5f + static_cast<float>(i) * 0.2f;
+        float selfRotX = std::sin(time * selfRotSpeed + i) * 180.0f;
+        float selfRotY = time * (50.0f + i * 15.0f);
+        float selfRotZ = std::cos(time * selfRotSpeed * 0.7f + i * 2.0f) * 180.0f;
+
+        glm::mat4 lightModel = glm::mat4(1.0f);
+        lightModel = glm::translate(lightModel, lightCenter);
+        lightModel = glm::rotate(lightModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+        lightModel = glm::rotate(lightModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+        lightModel = glm::rotate(lightModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+        lightModel = glm::scale(lightModel, glm::vec3(1.0f + (i % 3) * 0.2f));
+        sphereMatrices[i + 1] = lightModel;
+
+        // 更新每个彩色球体周围的100个立方体
+        const float lightCubeSize = 0.2f;
+        int cubeStartIndex = centerCubesCount + i * cubesPerLight;
+        float lightRadius = 1.0f + (i % 3) * 0.2f;
+
+        for (int j = 0; j < cubesPerLight; ++j)
+        {
+            float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
+            float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / cubesPerLight);
+            glm::vec3 localOffset = glm::vec3(
+                lightRadius * std::sin(phi) * std::cos(theta),
+                lightRadius * std::sin(phi) * std::sin(theta),
+                lightRadius * std::cos(phi));
+            glm::vec3 cubePos = lightCenter + localOffset;
+
+            glm::mat4 cubeModel = glm::mat4(1.0f);
+            cubeModel = glm::translate(cubeModel, cubePos);
+            cubeModel = glm::rotate(cubeModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
+            cubeModel = glm::rotate(cubeModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+            cubeModel = glm::rotate(cubeModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
+            cubeModel = glm::scale(cubeModel, glm::vec3(lightCubeSize));
+            cubeMatrices[cubeStartIndex + j] = cubeModel;
+        }
+    }
+
+    // 更新圆环动画（5个装饰性圆环）
+    const int numToruses = 5;
+    for (int i = 0; i < numToruses; ++i)
+    {
+        float baseY = 8.0f + (i - 2) * 1.5f;
+        float majorRadius = 5.0f + i * 0.8f;
+        float minorRadius = 0.15f - i * 0.01f;
+        float floatOffset = std::sin(time * 2.0f + i * 1.5f) * 0.5f;
+        float y = baseY + floatOffset;
+        float torusRot = time * (20.0f + i * 10.0f);
+        float majorScale = majorRadius;
+        float minorScale = minorRadius / 0.07f;
+
+        glm::mat4 torusModel = glm::mat4(1.0f);
+        torusModel = glm::translate(torusModel, glm::vec3(0.0f, y, 0.0f));
+        torusModel = glm::rotate(torusModel, glm::radians(90.0f + torusRot), glm::vec3(0.0f, 1.0f, 0.0f));
+        torusModel = glm::scale(torusModel, glm::vec3(majorScale, minorScale, majorScale));
+        torusMatrices[i] = torusModel;
+    }
+
+    // 更新平台动画（16个环形平台 + 18个螺旋楼梯）
+    const int numPlatforms = 16;
+    const int numSteps = 18;
+
+    // 更新16个环形平台
+    for (int i = 0; i < numPlatforms; ++i)
+    {
+        float baseAngle = i * (360.0f / numPlatforms);
+        float radius = 15.0f;
+        float orbitSpeed = 0.3f + (i % 4) * 0.1f;
+        float currentAngle = baseAngle + time * orbitSpeed * 10.0f;
+        float x = radius * cosf(glm::radians(currentAngle));
+        float z = radius * sinf(glm::radians(currentAngle));
+        float floatY = 0.5f + std::sin(time * 1.5f + i * 0.5f) * 0.3f;
+
+        glm::mat4 platformModel = glm::mat4(1.0f);
+        platformModel = glm::translate(platformModel, glm::vec3(x, floatY, z));
+        platformModel = glm::rotate(platformModel, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        platformModel = glm::rotate(platformModel, glm::radians(currentAngle), glm::vec3(0.0f, 0.0f, 1.0f));
+        platformModel = glm::scale(platformModel, glm::vec3(3.0f, 3.0f, 0.2f));
+        platformMatrices[i] = platformModel;
+    }
+
+    // 更新18个螺旋楼梯台阶
+    for (int i = 0; i < numSteps; ++i)
+    {
+        float baseAngle = i * (360.0f / numSteps) * 2.0f;
+        float spiralRadius = 6.0f;
+        float spiralHeight = 6.0f;
+        float stepHeight = spiralHeight / numSteps;
+        float x = spiralRadius * cosf(glm::radians(baseAngle));
+        float z = spiralRadius * sinf(glm::radians(baseAngle));
+        float y = 2.0f + i * stepHeight;
+        float overallRotation = time * 15.0f;
+        float rotatedX = x * std::cos(glm::radians(overallRotation)) - z * std::sin(glm::radians(overallRotation));
+        float rotatedZ = x * std::sin(glm::radians(overallRotation)) + z * std::cos(glm::radians(overallRotation));
+
+        glm::mat4 stepModel = glm::mat4(1.0f);
+        stepModel = glm::translate(stepModel, glm::vec3(rotatedX, y, rotatedZ));
+        stepModel = glm::rotate(stepModel, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        stepModel = glm::rotate(stepModel, glm::radians(baseAngle + overallRotation), glm::vec3(0.0f, 0.0f, 1.0f));
+        stepModel = glm::scale(stepModel, glm::vec3(1.2f, 1.0f, 1.0f));
+        platformMatrices[numPlatforms + i] = stepModel;
+    }
+
+    // ========================================
+    // 更新斯坦福兔子动画（正常方向跳舞）
+    // ========================================
+    if (stage.bunnyData)
+    {
+        auto &bunnyMatrices = stage.bunnyData->GetModelMatrices();
+
+        // 调试：每秒输出一次bunny的位置
+        static int debugFrameCount = 0;
+        static float lastDebugY = 0.0f;
+        if (++debugFrameCount % 60 == 0)
+        {
+            glm::vec3 currentPos = glm::vec3(bunnyMatrices[0][3]);
+            Core::Logger::GetInstance().Info("=== BUNNY ANIMATION DEBUG ===");
+            Core::Logger::GetInstance().Info("Time: " + std::to_string(time));
+            Core::Logger::GetInstance().Info("Bunny position: (" + std::to_string(currentPos.x) + ", " +
+                                             std::to_string(currentPos.y) + ", " + std::to_string(currentPos.z) + ")");
+            Core::Logger::GetInstance().Info("Y position changed: " + std::to_string(currentPos.y - lastDebugY));
+            Core::Logger::GetInstance().Info("bunnyData pointer: " + std::to_string(reinterpret_cast<uintptr_t>(stage.bunnyData.get())));
+            Core::Logger::GetInstance().Info("============================");
+            lastDebugY = currentPos.y;
+        }
+
+        float moveRadius = 3.0f; // 移动范围
+        float moveSpeed = 1.5f;  // 移动速度
+
+        float bunnyX = std::sin(time * moveSpeed * 0.7f) * moveRadius * 0.6f +
+                       std::sin(time * moveSpeed * 1.3f) * moveRadius * 0.3f;
+        float bunnyZ = std::cos(time * moveSpeed * 0.9f) * moveRadius * 0.5f +
+                       std::cos(time * moveSpeed * 1.1f) * moveRadius * 0.4f;
+        float jumpHeight = std::abs(std::sin(time * moveSpeed * 2.0f)) * 1.0f; // 跳跃高度
+        float bunnyY = 1.0f + jumpHeight;                                      // 基础高度1米
+        float bunnyRotY = std::atan2(bunnyX, bunnyZ) * 180.0f / glm::pi<float>() + 180.0f; // 加上初始180度
+        float breatheScale = 1.0f + std::sin(time * moveSpeed * 1.5f) * 0.1f; // 呼吸效果更明显
+
+        glm::mat4 bunnyModel = glm::mat4(1.0f);
+        bunnyModel = glm::translate(bunnyModel, glm::vec3(bunnyX, bunnyY, bunnyZ));
+        bunnyModel = glm::rotate(bunnyModel, glm::radians(bunnyRotY), glm::vec3(0.0f, 1.0f, 0.0f));
+        bunnyModel = glm::scale(bunnyModel, glm::vec3(2.0f * breatheScale)); // 使用2.0作为基准缩放
+        bunnyMatrices[0] = bunnyModel;
+    }
+}
 
 // ========================================
 // 场景生成函数
@@ -345,244 +572,6 @@ std::shared_ptr<Renderer::InstanceData> CreateMultiLightDemoPlane()
     return instances;
 }
 
-/**
- * 场景 1: 垂直立方体墙 (Vertical Cube Wall)
- * 创建一面垂直的立方体墙，用于展示光源在不同高度的效果
- */
-std::shared_ptr<Renderer::InstanceData> CreateVerticalCubeWall()
-{
-    Core::Logger::GetInstance().Info("Creating Vertical Cube Wall...");
-
-    auto instances = std::make_shared<Renderer::InstanceData>();
-
-    // 创建一面 20宽 x 15高 的墙
-    int width = 20;
-    int height = 15;
-    float spacing = 1.2f;
-    float cubeSize = 1.0f;
-
-    float offsetX = (width * spacing) / 2.0f;
-    float offsetZ = (height * spacing) / 2.0f;
-
-    for (int x = 0; x < width; ++x)
-    {
-        for (int y = 0; y < height; ++y)
-        {
-            glm::vec3 position(
-                x * spacing - offsetX,
-                y * spacing, // 从地面向上延伸
-                0.0f         // 墙在中心平面
-            );
-
-            glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-            glm::vec3 scale(cubeSize);
-
-            // 使用不同颜色：底部蓝色，中间绿色，顶部红色
-            float t = static_cast<float>(y) / static_cast<float>(height);
-            glm::vec3 color(
-                t,       // 红色从0到1
-                0.5f,    // 绿色固定
-                1.0f - t // 蓝色从1到0
-            );
-
-            instances->Add(position, rotation, scale, color);
-        }
-    }
-
-    Core::Logger::GetInstance().Info("Vertical Cube Wall created: " +
-                                     std::to_string(instances->GetCount()) + " cubes");
-    return instances;
-}
-
-/**
- * 场景 2: 球形立方体阵列 (Sphere of Cubes)
- * 创建球形分布的立方体，展示全方位光照效果
- */
-std::shared_ptr<Renderer::InstanceData> CreateSphereOfCubes()
-{
-    Core::Logger::GetInstance().Info("Creating Sphere of Cubes...");
-
-    auto instances = std::make_shared<Renderer::InstanceData>();
-
-    // 斐波那契球面算法
-    int numPoints = 400;
-    float radius = 10.0f;
-    float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
-
-    for (int i = 0; i < numPoints; ++i)
-    {
-        float theta = 2.0f * glm::pi<float>() * i / goldenRatio;
-        float phi = std::acos(1.0f - 2.0f * (i + 0.5f) / numPoints);
-
-        glm::vec3 position(
-            radius * std::sin(phi) * std::cos(theta),
-            radius * std::cos(phi) + radius, // 抬高，使球体在地面之上
-            radius * std::sin(phi) * std::sin(theta));
-
-        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-        glm::vec3 scale(0.8f);
-
-        // 根据位置着色
-        glm::vec3 color(
-            (position.x + radius) / (2.0f * radius),
-            (position.y) / (2.0f * radius),
-            (position.z + radius) / (2.0f * radius));
-
-        instances->Add(position, rotation, scale, color);
-    }
-
-    Core::Logger::GetInstance().Info("Sphere of Cubes created: " +
-                                     std::to_string(instances->GetCount()) + " cubes");
-    return instances;
-}
-
-/**
- * 场景 3: 隧道 (Cube Tunnel)
- * 创建一个立方体隧道，展示光源在封闭空间内的效果
- */
-std::shared_ptr<Renderer::InstanceData> CreateCubeTunnel()
-{
-    Core::Logger::GetInstance().Info("Creating Cube Tunnel...");
-
-    auto instances = std::make_shared<Renderer::InstanceData>();
-
-    int segments = 12; // 隧道段数
-    float segmentLength = 3.0f;
-    float tunnelRadius = 5.0f;
-    int cubesPerRing = 16; // 每圈的立方体数
-
-    for (int seg = 0; seg < segments; ++seg)
-    {
-        float z = seg * segmentLength;
-
-        for (int i = 0; i < cubesPerRing; ++i)
-        {
-            float angle = (i / static_cast<float>(cubesPerRing)) * glm::two_pi<float>();
-
-            // 创建圆形截面
-            glm::vec3 position(
-                std::cos(angle) * tunnelRadius,
-                std::sin(angle) * tunnelRadius,
-                z);
-
-            glm::vec3 rotation(
-                0.0f,
-                -glm::degrees(angle),
-                0.0f);
-            glm::vec3 scale(1.0f, 1.0f, 0.5f); // 扁平的立方体
-
-            // 彩虹色渐变
-            float t = static_cast<float>(seg) / static_cast<float>(segments);
-            glm::vec3 color(
-                std::sin(t * glm::two_pi<float>()) * 0.5f + 0.5f,
-                std::sin(t * glm::two_pi<float>() + 2.0f) * 0.5f + 0.5f,
-                std::sin(t * glm::two_pi<float>() + 4.0f) * 0.5f + 0.5f);
-
-            instances->Add(position, rotation, scale, color);
-        }
-    }
-
-    Core::Logger::GetInstance().Info("Cube Tunnel created: " +
-                                     std::to_string(instances->GetCount()) + " cubes");
-    return instances;
-}
-
-/**
- * 场景 4: 同心圆环 (Concentric Rings)
- * 创建多个同心圆环，展示距离对光照衰减的影响
- */
-std::shared_ptr<Renderer::InstanceData> CreateConcentricRings()
-{
-    Core::Logger::GetInstance().Info("Creating Concentric Rings...");
-
-    auto instances = std::make_shared<Renderer::InstanceData>();
-
-    int numRings = 6;
-    int cubesPerRing = 32;
-    float startRadius = 3.0f;
-    float ringSpacing = 2.5f;
-
-    for (int ring = 0; ring < numRings; ++ring)
-    {
-        float radius = startRadius + ring * ringSpacing;
-
-        for (int i = 0; i < cubesPerRing; ++i)
-        {
-            float angle = (i / static_cast<float>(cubesPerRing)) * glm::two_pi<float>();
-
-            glm::vec3 position(
-                std::cos(angle) * radius,
-                0.0f,
-                std::sin(angle) * radius);
-
-            glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-            glm::vec3 scale(1.0f);
-
-            // 白色，便于观察光照衰减
-            glm::vec3 color(0.9f, 0.9f, 0.9f);
-
-            instances->Add(position, rotation, scale, color);
-        }
-    }
-
-    Core::Logger::GetInstance().Info("Concentric Rings created: " +
-                                     std::to_string(instances->GetCount()) + " cubes");
-    return instances;
-}
-
-/**
- * 场景 5: 几何体展示场 (Geometry Showcase)
- * 展示不同几何体的旋转阵列（使用立方体）
- * 注意：由于InstancedRenderer的限制，每个场景只能使用一种几何体
- * 真正的混合几何体场景需要多个渲染器
- */
-std::shared_ptr<Renderer::InstanceData> CreateGeometryShowcase()
-{
-    Core::Logger::GetInstance().Info("Creating Geometry Showcase...");
-
-    auto instances = std::make_shared<Renderer::InstanceData>();
-
-    // 创建一个大的立方体环形阵列，类似几何体展示
-    int numObjects = 20;
-    float radius = 10.0f;
-
-    for (int i = 0; i < numObjects; ++i)
-    {
-        float angle = (i / static_cast<float>(numObjects)) * glm::two_pi<float>();
-
-        glm::vec3 position(
-            std::cos(angle) * radius,
-            1.0f,
-            std::sin(angle) * radius);
-
-        glm::vec3 rotation(0.0f, glm::degrees(angle), 0.0f);
-        glm::vec3 scale(1.0f);
-
-        // 彩虹色渐变
-        glm::vec3 color(
-            std::sin(angle) * 0.5f + 0.5f,
-            std::sin(angle + 2.0f) * 0.5f + 0.5f,
-            std::sin(angle + 4.0f) * 0.5f + 0.5f);
-
-        instances->Add(position, rotation, scale, color);
-    }
-
-    Core::Logger::GetInstance().Info("Geometry Showcase created: " +
-                                     std::to_string(instances->GetCount()) + " cubes");
-    return instances;
-}
-
-/**
- * 场景: Disco 舞台 (Disco Stage)
- * 使用所有几何体创建炫酷的Disco效果
- */
-struct DiscoStage
-{
-    std::vector<std::unique_ptr<Renderer::InstancedRenderer>> renderers;
-    std::vector<std::shared_ptr<Renderer::MeshBuffer>> meshBuffers;
-    std::vector<std::shared_ptr<Renderer::InstanceData>> instanceDataList;
-};
-
 DiscoStage CreateDiscoStage()
 {
     Core::Logger::GetInstance().Info("Creating Disco Stage...");
@@ -603,10 +592,12 @@ DiscoStage CreateDiscoStage()
     );
 
     // ========================================
-    // 立方体组合成的球形灯
+    // 立方体组合成的球形灯 + 新增几何体
     // ========================================
     auto cubeInstances = std::make_shared<Renderer::InstanceData>();
     auto sphereInstances = std::make_shared<Renderer::InstanceData>();
+    auto torusInstances = std::make_shared<Renderer::InstanceData>();    // 新增：圆环实例
+    auto platformInstances = std::make_shared<Renderer::InstanceData>(); // 新增：圆形平台实例
 
     // 中央Disco球 - 使用大量统一立方体密集拟合
     glm::vec3 centerPos(0.0f, 8.0f, 0.0f);
@@ -694,6 +685,92 @@ DiscoStage CreateDiscoStage()
     }
 
     // ========================================
+    // 新增：装饰性圆环（围绕中央Disco球）- 更细更圆
+    // ========================================
+    const int numToruses = 5; // 5个圆环
+    for (int i = 0; i < numToruses; ++i)
+    {
+        float y = 8.0f + (i - 2) * 1.5f;       // 不同高度
+        float majorRadius = 5.0f + i * 0.8f;   // 主半径（圆环半径）：5.0m -> 8.2m
+        float minorRadius = 0.15f - i * 0.01f; // 管半径（圆环粗细）：0.15m -> 0.11m（更细）
+
+        glm::vec3 torusColor(
+            0.8f + 0.2f * std::sin(i * 1.5f),
+            0.6f + 0.2f * std::cos(i * 1.5f),
+            0.9f);
+
+        // 基础Torus是 majorRadius=1.0, minorRadius=0.07
+        // 我们需要缩放到实际尺寸
+        // X和Z方向缩放：majorRadius / 1.0 = majorRadius
+        // Y方向缩放：minorRadius / 0.07
+        float majorScale = majorRadius;         // 主半径缩放
+        float minorScale = minorRadius / 0.07f; // 管半径缩放（相对于基础mesh）
+
+        torusInstances->Add(
+            glm::vec3(0.0f, y, 0.0f),
+            glm::vec3(90.0f, 0.0f, 0.0f),                  // 水平放置
+            glm::vec3(majorScale, minorScale, majorScale), // X和Z相同确保正圆，Y单独缩放管粗细
+            torusColor);
+    }
+
+    // ========================================
+    // 新增：环形平台（围绕8个球形灯的外圈）
+    // ========================================
+    const int numPlatforms = 16; // 16个圆形平台
+    for (int i = 0; i < numPlatforms; ++i)
+    {
+        float angle = i * (360.0f / numPlatforms);
+        float radius = 15.0f; // 比球形灯更外圈
+        float x = radius * cosf(glm::radians(angle));
+        float z = radius * sinf(glm::radians(angle));
+
+        glm::vec3 platformColor(
+            0.3f + 0.1f * (i % 3),
+            0.4f + 0.1f * ((i + 1) % 3),
+            0.5f + 0.1f * ((i + 2) % 3));
+
+        platformInstances->Add(
+            glm::vec3(x, 0.5f, z),         // 放在地面高度
+            glm::vec3(-90.0f, 0.0f, 0.0f), // 水平放置
+            glm::vec3(3.0f, 3.0f, 0.2f),   // 半径3米，厚度0.2米
+            platformColor);
+    }
+
+    // ========================================
+    // 新增：螺旋楼梯（围绕中央Disco球）- 更多台阶、更厚、间隔更小
+    // ========================================
+    const int numSteps = 18; // 增加到18级台阶
+    float spiralRadius = 6.0f;
+    float spiralHeight = 6.0f;
+    float stepWidth = 1.2f; // 台阶宽度
+    float stepDepth = 1.0f; // 增加台阶深度到1.0m（更厚）
+    float stepHeight = spiralHeight / numSteps;
+
+    for (int i = 0; i < numSteps; ++i)
+    {
+        float angle = i * (360.0f / numSteps) * 2.0f; // 旋转720度（2圈）
+        float x = spiralRadius * cosf(glm::radians(angle));
+        float z = spiralRadius * sinf(glm::radians(angle));
+        float y = 2.0f + i * stepHeight;
+
+        glm::vec3 stepColor(
+            0.7f,
+            0.5f + 0.1f * (i % 2),
+            0.9f - 0.1f * (i % 2));
+
+        platformInstances->Add(
+            glm::vec3(x, y, z),
+            glm::vec3(-90.0f, 0.0f, angle), // 水平 + 旋转
+            glm::vec3(stepWidth, stepDepth, 1.0f),
+            stepColor);
+    }
+
+    // ========================================
+    // 新增：斯坦福兔子在舞台上跳舞
+    // ========================================
+    // 注意：bunny将在最后添加到渲染列表
+
+    // ========================================
     // 创建渲染器
     // ========================================
 
@@ -711,6 +788,27 @@ DiscoStage CreateDiscoStage()
         floorRenderer->Initialize();
         stage.renderers.push_back(std::move(floorRenderer));
         stage.instanceDataList.push_back(floorInstances);
+
+        // 关键验证：确保floorInstances和bunnyData不是同一个对象
+        if (stage.bunnyData)
+        {
+            bool floorDifferentFromBunny = (floorInstances.get() != stage.bunnyData.get());
+            Core::Logger::GetInstance().Info("Floor vs Bunny pointers: " + std::string(floorDifferentFromBunny ? "DIFFERENT (GOOD)" : "SAME (BAD!)"));
+            if (!floorDifferentFromBunny)
+            {
+                Core::Logger::GetInstance().Error("CRITICAL: floorInstances and bunnyData are the SAME pointer!");
+            }
+        }
+
+        Core::Logger::GetInstance().Info("Floor renderer index: " + std::to_string(stage.renderers.size() - 1));
+
+        // 验证：输出floor的初始位置
+        auto &floorMatrices = floorInstances->GetModelMatrices();
+        glm::vec3 initialFloorPos = glm::vec3(floorMatrices[0][3]);
+        Core::Logger::GetInstance().Info("Initial floor position: (" +
+                                         std::to_string(initialFloorPos.x) + ", " +
+                                         std::to_string(initialFloorPos.y) + ", " +
+                                         std::to_string(initialFloorPos.z) + ")");
     }
     catch (const std::exception &e)
     {
@@ -731,6 +829,7 @@ DiscoStage CreateDiscoStage()
         cubeRenderer->Initialize();
         stage.renderers.push_back(std::move(cubeRenderer));
         stage.instanceDataList.push_back(cubeInstances);
+        Core::Logger::GetInstance().Info("Cube renderer index: " + std::to_string(stage.renderers.size() - 1));
     }
     catch (const std::exception &e)
     {
@@ -751,17 +850,204 @@ DiscoStage CreateDiscoStage()
         sphereRenderer->Initialize();
         stage.renderers.push_back(std::move(sphereRenderer));
         stage.instanceDataList.push_back(sphereInstances);
+        Core::Logger::GetInstance().Info("Sphere renderer index: " + std::to_string(stage.renderers.size() - 1));
     }
     catch (const std::exception &e)
     {
         Core::Logger::GetInstance().Error("Failed to create sphere renderer: " + std::string(e.what()));
     }
 
+    // ========================================
+    // 新增：圆环渲染器 - 使用高分段数和正确半径
+    // ========================================
+    Core::Logger::GetInstance().Info("Creating decorative torus renderer...");
+    try
+    {
+        // 创建单位圆环作为基础，然后通过实例缩放调整大小
+        // majorRadius=1.0, minorRadius=0.07 (相对比例，确保管足够粗)
+        Renderer::MeshBuffer torusMesh = Renderer::MeshBufferFactory::CreateTorusBuffer(1.0f, 0.07f, 96, 64);
+        auto torusMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(torusMesh));
+        stage.meshBuffers.push_back(torusMeshPtr);
+
+        auto torusRenderer = std::make_unique<Renderer::InstancedRenderer>();
+        torusRenderer->SetMesh(torusMeshPtr);
+        torusRenderer->SetInstances(torusInstances);
+        torusRenderer->Initialize();
+        stage.renderers.push_back(std::move(torusRenderer));
+        stage.instanceDataList.push_back(torusInstances);
+        Core::Logger::GetInstance().Info("Torus renderer index: " + std::to_string(stage.renderers.size() - 1));
+    }
+    catch (const std::exception &e)
+    {
+        Core::Logger::GetInstance().Error("Failed to create torus renderer: " + std::string(e.what()));
+    }
+
+    // ========================================
+    // 新增：平台渲染器（环形平台 + 螺旋楼梯）
+    // ========================================
+    Core::Logger::GetInstance().Info("Creating platform renderer...");
+    try
+    {
+        Renderer::MeshBuffer platformMesh = Renderer::MeshBufferFactory::CreatePlaneBuffer(1.0f, 1.0f, 1, 1);
+        auto platformMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(platformMesh));
+        stage.meshBuffers.push_back(platformMeshPtr);
+
+        auto platformRenderer = std::make_unique<Renderer::InstancedRenderer>();
+        platformRenderer->SetMesh(platformMeshPtr);
+        platformRenderer->SetInstances(platformInstances);
+        platformRenderer->Initialize();
+        stage.renderers.push_back(std::move(platformRenderer));
+        stage.instanceDataList.push_back(platformInstances);
+        Core::Logger::GetInstance().Info("Platform renderer index: " + std::to_string(stage.renderers.size() - 1));
+    }
+    catch (const std::exception &e)
+    {
+        Core::Logger::GetInstance().Error("Failed to create platform renderer: " + std::string(e.what()));
+    }
+
+    // ========================================
+    // 新增：斯坦福兔子在舞台上跳舞（最后添加）
+    // ========================================
+    std::string bunnyPath = "assets/models/bunny.obj";
+    std::shared_ptr<Renderer::InstanceData> bunnyInstances = nullptr;
+
+    try
+    {
+        bunnyInstances = std::make_shared<Renderer::InstanceData>();
+
+        // 添加1个兔子实例 - 放大尺寸以便观察
+        bunnyInstances->Add(
+            glm::vec3(0.0f, 1.0f, 0.0f), // 位置：舞台中心，地面以上1米
+            glm::vec3(0.0f, 180.0f, 0.0f), // 旋转180度面向相机
+            glm::vec3(2.0f),             // 缩放：2倍（显著增大）
+            glm::vec3(1.0f, 0.0f, 0.0f)  // 红色
+        );
+
+        // 创建实例化渲染器（每个材质一个）
+        auto [bunnyRenderers, bunnyMeshes, bunnyData] =
+            Renderer::InstancedRenderer::CreateForOBJ(bunnyPath, bunnyInstances);
+
+        // 记录bunny渲染器的索引范围
+        stage.bunnyRendererStart = stage.renderers.size();
+        stage.bunnyRendererCount = bunnyRenderers.size();
+
+        Core::Logger::GetInstance().Info("=== BUNNY RENDERER DEBUG ===");
+        Core::Logger::GetInstance().Info("Bunny has " + std::to_string(bunnyRenderers.size()) + " renderers (materials)");
+        Core::Logger::GetInstance().Info("Bunny has " + std::to_string(bunnyMeshes.size()) + " mesh buffers");
+        for (size_t i = 0; i < bunnyMeshes.size(); ++i)
+        {
+            Core::Logger::GetInstance().Info("  Mesh " + std::to_string(i) +
+                                             " VAO: " + std::to_string(bunnyMeshes[i]->GetVAO()) +
+                                             " Vertices: " + std::to_string(bunnyMeshes[i]->GetVertexCount()) +
+                                             " Indices: " + std::to_string(bunnyMeshes[i]->GetIndexCount()) +
+                                             " HasIndices: " + std::string(bunnyMeshes[i]->HasIndices() ? "YES" : "NO"));
+        }
+        Core::Logger::GetInstance().Info("================================");
+
+        size_t bunnyRendererIndex = stage.renderers.size();
+        for (auto &renderer : bunnyRenderers)
+        {
+            renderer.Initialize();
+            stage.renderers.push_back(std::make_unique<Renderer::InstancedRenderer>(std::move(renderer)));
+        }
+
+        // 先添加到instanceDataList，然后再验证
+        for (auto &mesh : bunnyMeshes)
+        {
+            stage.meshBuffers.push_back(mesh);
+        }
+        stage.instanceDataList.push_back(bunnyData);
+        stage.bunnyData = bunnyData; // 保存bunnyData到DiscoStage
+
+        // 现在可以安全地验证了
+        Core::Logger::GetInstance().Info("=== CRITICAL VERIFICATION ===");
+        Core::Logger::GetInstance().Info("Bunny renderer index: " + std::to_string(bunnyRendererIndex));
+        Core::Logger::GetInstance().Info("Bunny renderer uses instanceData at: " +
+                                         std::to_string(reinterpret_cast<uintptr_t>(bunnyInstances.get())));
+        Core::Logger::GetInstance().Info("instanceDataList at: " +
+                                         std::to_string(reinterpret_cast<uintptr_t>(stage.instanceDataList[stage.instanceDataList.size() - 1].get())));
+        Core::Logger::GetInstance().Info("bunnyData at: " +
+                                         std::to_string(reinterpret_cast<uintptr_t>(bunnyData.get())));
+        Core::Logger::GetInstance().Info("All three should be the SAME!");
+        Core::Logger::GetInstance().Info("================================");
+
+        Core::Logger::GetInstance().Info("Stanford Bunny loaded successfully - " +
+                                         std::to_string(bunnyRenderers.size()) + " renderers (materials)");
+        Core::Logger::GetInstance().Info("Bunny renderer indices: [" +
+                                         std::to_string(stage.bunnyRendererStart) + " to " +
+                                         std::to_string(stage.bunnyRendererStart + stage.bunnyRendererCount - 1) + "]");
+
+        // 验证指针地址
+        Core::Logger::GetInstance().Info("=== POINTER VERIFICATION ===");
+        Core::Logger::GetInstance().Info("bunnyInstances.get(): " + std::to_string(reinterpret_cast<uintptr_t>(bunnyInstances.get())));
+        Core::Logger::GetInstance().Info("bunnyData.get(): " + std::to_string(reinterpret_cast<uintptr_t>(bunnyData.get())));
+        Core::Logger::GetInstance().Info("stage.instanceDataList[last].get(): " + std::to_string(reinterpret_cast<uintptr_t>(stage.instanceDataList[stage.instanceDataList.size() - 1].get())));
+        Core::Logger::GetInstance().Info("stage.bunnyData.get(): " + std::to_string(reinterpret_cast<uintptr_t>(stage.bunnyData.get())));
+        Core::Logger::GetInstance().Info("Same pointer? " + std::string(bunnyData.get() == stage.instanceDataList[stage.instanceDataList.size() - 1].get() ? "YES" : "NO"));
+
+        // 关键：检查bunnyInstances和bunnyData是否是同一个指针
+        bool samePointer = (bunnyInstances.get() == bunnyData.get());
+        Core::Logger::GetInstance().Info("bunnyInstances == bunnyData? " + std::string(samePointer ? "YES" : "NO"));
+
+        if (!samePointer)
+        {
+            Core::Logger::GetInstance().Error("WARNING: bunnyInstances and bunnyData are DIFFERENT pointers!");
+            Core::Logger::GetInstance().Error("This means the renderer uses bunnyInstances, but we're modifying bunnyData!");
+        }
+
+        Core::Logger::GetInstance().Info("================================");
+    }
+    catch (const std::exception &e)
+    {
+        Core::Logger::GetInstance().Error("Failed to load Stanford Bunny: " + std::string(e.what()));
+        bunnyInstances = nullptr;
+    }
+
+    stage.bunnyInstances = bunnyInstances;
+
+    // 打印渲染器索引分配
+    Core::Logger::GetInstance().Info("========================================");
+    Core::Logger::GetInstance().Info("Renderer Index Distribution:");
+    Core::Logger::GetInstance().Info("========================================");
+
+    size_t idx = 0;
+    Core::Logger::GetInstance().Info("Floor renderer: " + std::to_string(idx++));
+    Core::Logger::GetInstance().Info("Cube renderer: " + std::to_string(idx++));
+    Core::Logger::GetInstance().Info("Sphere renderer: " + std::to_string(idx++));
+    Core::Logger::GetInstance().Info("Torus renderer: " + std::to_string(idx++));
+    Core::Logger::GetInstance().Info("Platform renderer: " + std::to_string(idx++));
+    if (stage.bunnyRendererCount > 0)
+    {
+        Core::Logger::GetInstance().Info("Bunny renderers: [" + std::to_string(stage.bunnyRendererStart) +
+                                         " to " + std::to_string(stage.bunnyRendererStart + stage.bunnyRendererCount - 1) + "] " +
+                                         "(" + std::to_string(stage.bunnyRendererCount) + " materials)");
+    }
+
+    Core::Logger::GetInstance().Info("========================================");
+    Core::Logger::GetInstance().Info("InstanceData List Index Distribution:");
+    Core::Logger::GetInstance().Info("========================================");
+
+    size_t dataIdx = 0;
+    Core::Logger::GetInstance().Info("Floor instanceData: " + std::to_string(dataIdx++));
+    Core::Logger::GetInstance().Info("Cube instanceData: " + std::to_string(dataIdx++));
+    Core::Logger::GetInstance().Info("Sphere instanceData: " + std::to_string(dataIdx++));
+    Core::Logger::GetInstance().Info("Torus instanceData: " + std::to_string(dataIdx++));
+    Core::Logger::GetInstance().Info("Platform instanceData: " + std::to_string(dataIdx++));
+    if (stage.bunnyData)
+    {
+        Core::Logger::GetInstance().Info("Bunny instanceData: " + std::to_string(dataIdx++));
+    }
+
+    Core::Logger::GetInstance().Info("========================================");
+
     Core::Logger::GetInstance().Info("Super Disco Stage created: " +
                                      std::to_string(stage.renderers.size()) + " renderer types - " +
                                      "1 floor, " +
                                      std::to_string(cubeInstances->GetCount()) + " cubes (800 center + 800 colored), " +
-                                     std::to_string(sphereInstances->GetCount()) + " core spheres (1 giant center + 8 colored)");
+                                     std::to_string(sphereInstances->GetCount()) + " core spheres (1 giant center + 8 colored), " +
+                                     std::to_string(torusInstances->GetCount()) + " decorative toruses, " +
+                                     std::to_string(platformInstances->GetCount()) + " platforms (16 outer + 18 spiral), " +
+                                     (bunnyInstances ? "1 dancing Stanford Bunny" : "0 bunny"));
 
     return stage;
 }
@@ -772,27 +1058,43 @@ DiscoStage CreateDiscoStage()
 
 int main()
 {
-    // ========================================
-    // 初始化日志系统
-    // ========================================
-    Core::LogRotationConfig rotationConfig;
-    rotationConfig.type = Core::RotationType::SIZE;
-    rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
-    rotationConfig.maxFiles = 3;
 
-    Core::Logger::GetInstance().Initialize(
-        "logs/cool_cubes_demo.log",
-        true,
-        Core::LogLevel::WARNING, // ✅ 改为WARNING级别，减少INFO输出
-        true,
-        rotationConfig);
-
-    Core::Logger::GetInstance().Info("========================================");
-    Core::Logger::GetInstance().Info("Cool Cubes Demo - Starting...");
-    Core::Logger::GetInstance().Info("========================================");
+    // Ensure logs directory exists
+    namespace fs = std::filesystem;
+    if (!fs::exists("logs"))
+    {
+        try
+        {
+            fs::create_directory("logs");
+        }
+        catch (const std::exception &e)
+        {
+            return 1;
+        }
+    }
 
     try
     {
+        // ========================================
+        // 初始化日志系统
+        // ========================================
+        Core::LogRotationConfig rotationConfig;
+        rotationConfig.type = Core::RotationType::SIZE;
+        rotationConfig.maxFileSize = 5 * 1024 * 1024; // 5MB
+        rotationConfig.maxFiles = 3;
+
+        std::string logPath = "logs/cool_cubes_demo.log";
+
+        Core::Logger::GetInstance().Initialize(
+            logPath,
+            true,
+            Core::LogLevel::INFO, // ✅ 改为INFO级别，确保能看到启动日志
+            true,
+            rotationConfig);
+
+        Core::Logger::GetInstance().Info("========================================");
+        Core::Logger::GetInstance().Info("Cool Cubes Demo - Starting...");
+        Core::Logger::GetInstance().Info("========================================");
         // ========================================
         // 创建窗口
         // ========================================
@@ -892,85 +1194,10 @@ int main()
         skybox.Initialize();
         skybox.LoadShaders("assets/shader/skybox.vert", "assets/shader/skybox.frag");
 
-        // ========================================
-        // 加载天空盒纹理 - 使用SkyboxLoader
-        // ========================================
-        //
-        // SkyboxLoader支持多种加载方式，适用于不同的天空盒资源格式：
-        //
-        // 方式1：CreateFromPattern - 基于约定和命名模式
-        //   适用于：corona_rt.png, skybox_right.jpg, px.hdr 等
-        //   使用预设的命名方案（OPENGL, MAYA, DIRECTX等）
-        //
-        // 方式2：CreateCustomScheme - 完全自定义面名称
-        //   适用于：任意命名的6个面，完全可配置的后缀格式
-        //   例如：FaceNamingScheme("rt", "lf", "up", "dn", "bk", "ft")
-        //
-        // 方式3：CreateCustomConfig - 完全自定义文件名
-        //   适用于：任意命名的6个完整文件名
-        //
-        // 支持的约定（Convention）：
-        //   - OPENGL: right, left, top, bottom, back, front
-        //   - MAYA/Corona: rt, lf, up, dn, bk, ft (front/back与OpenGL相反)
-        //   - DIRECTX: left, right, top, bottom, front, back
-        //   - BLENDER: 与OpenGL类似
-        //
-        // 预设命名方案：
-        //   - GetOpenGLScheme(): "right", "left", "top", "bottom", "back", "front"
-        //   - GetMayaScheme(): "rt", "lf", "up", "dn", "bk", "ft"
-        //   - GetDirectXScheme(): "left", "right", "top", "bottom", "front", "back"
-        //   - GetHDRLabScheme(): "px", "nx", "py", "ny", "pz", "nz"
-        //
-        // ========================================
-
-        // 加载Corona天空盒（使用完整自定义文件名）
         auto coronaConfig = Renderer::SkyboxLoader::CreateCustomConfig(
             "assets/textures/skybox",
             {"corona_rt.png", "corona_lf.png", "corona_up.png", "corona_dn.png", "corona_bk.png", "corona_ft.png"},
-            Renderer::CubemapConvention::OPENGL);
-
-        // 其他加载方式示例（注释掉，供参考）：
-        //
-        // 方式1：标准命名格式 (right.png, left.png, ...)
-        // auto standardConfig = SkyboxLoader::CreateFromPattern(
-        //     "assets/textures/skybox",
-        //     "{face}",  // 或 "skybox_{face}"
-        //     Renderer::CubemapConvention::OPENGL,
-        //     ".png"
-        // );
-        //
-        // 方式2：完全自定义面名称后缀
-        // Renderer::FaceNamingScheme customSuffixes(
-        //     "rt",   // right
-        //     "lf",   // left
-        //     "up",   // top
-        //     "dn",   // bottom
-        //     "bk",   // back
-        //     "ft"    // front
-        // );
-        // auto customSchemeConfig = SkyboxLoader::CreateFromCustomScheme(
-        //     "assets/textures/skybox",
-        //     "corona_{face}",
-        //     customSuffixes,
-        //     Renderer::CubemapConvention::MAYA,
-        //     ".png"
-        // );
-        //
-        // 方式3：使用预设命名方案（如HDR Lab格式）
-        // auto hdrConfig = SkyboxLoader::CreateFromCustomScheme(
-        //     "assets/textures/skybox",
-        //     "{face}",
-        //     SkyboxLoader::GetHDRLabScheme(),  // "px", "nx", "py", "ny", "pz", "nz"
-        //     Renderer::CubemapConvention::OPENGL,
-        //     ".hdr"
-        // );
-        //
-        // 方式4：完全自定义文件名
-        // auto fullyCustomConfig = SkyboxLoader::CreateCustomConfig(
-        //     "assets/textures/skybox",
-        //     {"my_rt.jpg", "my_lf.jpg", "my_up.jpg", "my_dn.jpg", "my_bk.jpg", "my_ft.jpg"},
-        //     Renderer::CubemapConvention::MAYA
-        // );
+            Renderer::CubemapConvention::BLENDER);
 
         bool skyboxLoaded = skybox.LoadFromConfig(coronaConfig);
 
@@ -1029,12 +1256,17 @@ int main()
 
         // 初始化所有实例数据到GPU
         Core::Logger::GetInstance().Info("Uploading instance data to GPU...");
+
         for (size_t i = 0; i < discoStage.renderers.size(); ++i)
         {
             discoStage.renderers[i]->UpdateInstanceData();
             Core::Logger::GetInstance().Info("  Updated renderer " + std::to_string(i) + " with " +
                                              std::to_string(discoStage.renderers[i]->GetInstanceCount()) + " instances");
         }
+
+        // ========================================
+        // 注册键盘回调
+        // ========================================
 
         // 光源控制回调
         bool animateLights = true;
@@ -1098,12 +1330,6 @@ int main()
         Core::Logger::GetInstance().Info("Configuring OpenGL...");
         glEnable(GL_DEPTH_TEST);
 
-        // 面剔除设置（临时禁用以确保所有面都可见）
-        // 如果某些面不可见，可能是顶点缠绕顺序问题
-        // glEnable(GL_CULL_FACE);
-        // glCullFace(GL_BACK);
-        // glFrontFace(GL_CCW);
-
         // 深色背景
         glClearColor(0.02f, 0.02f, 0.05f, 1.0f);
 
@@ -1158,82 +1384,18 @@ int main()
             // ========================================
             if (!animationPaused)
             {
-                // 更新旋转的点光源位置 - 48个光源三层布局
                 float time = static_cast<float>(glfwGetTime());
+
+                // 更新48个旋转点光源（使用辅助函数简化）
                 for (size_t i = 0; i < rotatingPointLights.size(); ++i)
                 {
-                    // 每个光源有独特的运动参数
-                    float angleOffset = static_cast<float>(i) * glm::two_pi<float>() / 48.0f; // 更新为48个光源
-                    float speed = 0.5f + static_cast<float>(i % 5) * 0.3f;
-
                     // 根据光源所在的层级调整运动范围
-                    float baseRadius, baseHeight;
-                    if (i < 16)
-                    {
-                        // 内圈（0-15）
-                        baseRadius = 8.0f;
-                        baseHeight = 3.5f;
-                    }
-                    else if (i < 32)
-                    {
-                        // 中圈（16-31）
-                        baseRadius = 14.0f;
-                        baseHeight = 5.0f;
-                    }
-                    else
-                    {
-                        // 外圈（32-47）
-                        baseRadius = 20.0f;
-                        baseHeight = 6.5f;
-                    }
+                    float baseRadius = (i < 16) ? 8.0f : (i < 32) ? 14.0f
+                                                                  : 20.0f;
+                    float baseHeight = (i < 16) ? 3.5f : (i < 32) ? 5.0f
+                                                                  : 6.5f;
 
-                    // 不同的运动模式
-                    int motionPattern = i % 4;
-                    glm::vec3 offset(0.0f);
-
-                    if (motionPattern == 0)
-                    {
-                        // 模式0：椭圆运动（水平拉伸）
-                        float radiusX = baseRadius * 1.2f;
-                        float radiusZ = baseRadius * 0.8f;
-                        float height = baseHeight + std::sin(time * speed * 3.0f) * 0.8f;
-                        offset = glm::vec3(
-                            std::sin(time * speed + angleOffset) * radiusX,
-                            height,
-                            std::cos(time * speed + angleOffset) * radiusZ);
-                    }
-                    else if (motionPattern == 1)
-                    {
-                        // 模式1：8字形运动（利萨如曲线）
-                        float radius = baseRadius * 0.9f;
-                        offset = glm::vec3(
-                            std::sin(time * speed + angleOffset) * radius,
-                            baseHeight + std::sin(time * speed * 2.0f) * 0.6f,
-                            std::sin(time * speed * 2.0f + angleOffset) * radius * 0.7f);
-                    }
-                    else if (motionPattern == 2)
-                    {
-                        // 模式2：螺旋进出运动
-                        float radiusVariation = std::sin(time * speed * 0.5f) * (baseRadius * 0.25f);
-                        float currentRadius = baseRadius + radiusVariation;
-                        float height = baseHeight + std::cos(time * speed) * 1.0f;
-                        offset = glm::vec3(
-                            std::sin(time * speed * 1.5f + angleOffset) * currentRadius,
-                            height,
-                            std::cos(time * speed * 1.5f + angleOffset) * currentRadius);
-                    }
-                    else
-                    {
-                        // 模式3：随机抖动圆形运动
-                        float radius = baseRadius * 1.1f;
-                        float jitterX = std::sin(time * speed * 7.0f + i) * 2.0f;
-                        float jitterZ = std::cos(time * speed * 5.0f + i) * 2.0f;
-                        float height = baseHeight + std::sin(time * speed * 4.0f) * 0.7f;
-                        offset = glm::vec3(
-                            std::sin(time * speed * 0.8f + angleOffset) * radius + jitterX,
-                            height,
-                            std::cos(time * speed * 0.8f + angleOffset) * radius + jitterZ);
-                    }
+                    glm::vec3 offset = CalculateLightMotion(i, time, baseRadius, baseHeight);
 
                     // 偶数索引添加额外的随机扰动
                     if (i % 2 == 0)
@@ -1245,120 +1407,8 @@ int main()
                     rotatingPointLights[i]->SetPosition(centerPosition + offset);
                 }
 
-                // 更新球体和立方体旋转（自转 + 公转）
-                auto &sphereMatrices = discoStage.instanceDataList[2]->GetModelMatrices();
-                auto &cubeMatrices = discoStage.instanceDataList[1]->GetModelMatrices();
-
-                const float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
-
-                // 中央球体自转（索引0）- 慢速三轴自转
-                float centerRotX = std::sin(time * 0.3f) * 360.0f;
-                float centerRotY = time * 20.0f;
-                float centerRotZ = std::cos(time * 0.2f) * 360.0f;
-                glm::mat4 centerModel = glm::mat4(1.0f);
-                centerModel = glm::translate(centerModel, glm::vec3(0.0f, 8.0f, 0.0f));
-                centerModel = glm::rotate(centerModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
-                centerModel = glm::rotate(centerModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-                centerModel = glm::rotate(centerModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
-                centerModel = glm::scale(centerModel, glm::vec3(3.0f)); // 更新为核心球体半径3.0米
-                sphereMatrices[0] = centerModel;
-
-                // 中央disco球周围的800个立方体自转（索引0-799）
-                const int centerCubesCount = 800;   // 更新为800个立方体
-                const float discoBallRadius = 4.0f; // 更新为4.0米半径
-                const float centerCubeSize = 0.4f;  // 更新为0.4米立方体
-
-                // 更新中心800个立方体的位置和旋转
-                for (int j = 0; j < centerCubesCount; ++j)
-                {
-                    // 使用Fibonacci球算法重新计算每个立方体的相对位置
-                    float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
-                    float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / centerCubesCount);
-
-                    float lx = discoBallRadius * std::sin(phi) * std::cos(theta);
-                    float ly = discoBallRadius * std::sin(phi) * std::sin(theta);
-                    float lz = discoBallRadius * std::cos(phi);
-
-                    glm::vec3 localOffset(lx, ly, lz);
-                    glm::vec3 cubePos = glm::vec3(0.0f, 8.0f, 0.0f) + localOffset;
-
-                    // 应用与中央球体相同的自转
-                    glm::mat4 cubeModel = glm::mat4(1.0f);
-                    cubeModel = glm::translate(cubeModel, cubePos);
-                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
-                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-                    cubeModel = glm::rotate(cubeModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
-                    cubeModel = glm::scale(cubeModel, glm::vec3(centerCubeSize));
-
-                    cubeMatrices[j] = cubeModel;
-                }
-
-                // 8个彩色球体（索引1-8）- 自转 + 围绕中心公转
-                float orbitRadius = 10.0f; // 公转半径
-                float orbitSpeed = 0.5f;   // 公转速度
-                const int cubesPerLight = 100;
-
-                for (int i = 0; i < 8; ++i)
-                {
-                    // 初始角度位置
-                    float initialAngle = i * (360.0f / 8.0f);
-
-                    // 公转：围绕中心点(0, 8, 0)旋转
-                    float currentOrbitAngle = glm::radians(initialAngle + time * orbitSpeed * 50.0f);
-                    float x = orbitRadius * std::cos(currentOrbitAngle);
-                    float z = orbitRadius * std::sin(currentOrbitAngle);
-
-                    // 球体中心位置（包含公转）
-                    glm::vec3 lightCenter(x, 5.0f, z);
-
-                    // 自转：每个球体独特的自转速度
-                    float selfRotSpeed = 0.5f + static_cast<float>(i) * 0.2f;
-                    float selfRotX = std::sin(time * selfRotSpeed + i) * 180.0f;
-                    float selfRotY = time * (50.0f + i * 15.0f); // 快速自转
-                    float selfRotZ = std::cos(time * selfRotSpeed * 0.7f + i * 2.0f) * 180.0f;
-
-                    // 构建模型矩阵：先平移到公转位置，再应用自转
-                    glm::mat4 lightModel = glm::mat4(1.0f);
-                    lightModel = glm::translate(lightModel, lightCenter);
-                    lightModel = glm::rotate(lightModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
-                    lightModel = glm::rotate(lightModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-                    lightModel = glm::rotate(lightModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
-
-                    // 不同大小的球体
-                    float lightRadius = 1.0f + (i % 3) * 0.2f;
-                    lightModel = glm::scale(lightModel, glm::vec3(lightRadius));
-
-                    sphereMatrices[i + 1] = lightModel; // 索引1-8对应8个彩色球体
-
-                    // 更新每个彩色球体周围的100个立方体（索引800-1599）
-                    const float lightCubeSize = 0.2f;
-                    int cubeStartIndex = centerCubesCount + i * cubesPerLight; // 800 + i * 100
-
-                    // 更新第i个彩色球体的100个立方体
-                    for (int j = 0; j < cubesPerLight; ++j)
-                    {
-                        // 使用Fibonacci球算法计算立方体的相对位置
-                        float theta = 2.0f * glm::pi<float>() * j / goldenRatio;
-                        float phi = std::acos(1.0f - 2.0f * (j + 0.5f) / cubesPerLight);
-
-                        float lx = lightRadius * std::sin(phi) * std::cos(theta);
-                        float ly = lightRadius * std::sin(phi) * std::sin(theta);
-                        float lz = lightRadius * std::cos(phi);
-
-                        glm::vec3 localOffset(lx, ly, lz);
-                        glm::vec3 cubePos = lightCenter + localOffset;
-
-                        // 应用与球体相同的自转
-                        glm::mat4 cubeModel = glm::mat4(1.0f);
-                        cubeModel = glm::translate(cubeModel, cubePos);
-                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotX), glm::vec3(1.0f, 0.0f, 0.0f));
-                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotY), glm::vec3(0.0f, 1.0f, 0.0f));
-                        cubeModel = glm::rotate(cubeModel, glm::radians(selfRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
-                        cubeModel = glm::scale(cubeModel, glm::vec3(lightCubeSize));
-
-                        cubeMatrices[cubeStartIndex + j] = cubeModel;
-                    }
-                }
+                // 更新Disco舞台几何体动画
+                UpdateDiscoStageAnimation(discoStage, time);
 
                 // 更新手电筒位置和方向
                 if (flashlight)
@@ -1369,8 +1419,52 @@ int main()
             }
 
             // 更新实例数据到GPU
-            discoStage.renderers[1]->UpdateInstanceData(); // 更新立方体
-            discoStage.renderers[2]->UpdateInstanceData(); // 更新球体
+            // 索引顺序：floor=0, cube=1, sphere=2, torus=3, platform=4, bunny=5+
+            const size_t cubeIndex = 1;
+            const size_t sphereIndex = 2;
+            const size_t torusIndex = 3;
+            const size_t platformIndex = 4;
+
+            // 更新几何体渲染器
+            discoStage.renderers[cubeIndex]->UpdateInstanceData();
+            discoStage.renderers[sphereIndex]->UpdateInstanceData();
+            discoStage.renderers[torusIndex]->UpdateInstanceData();
+            discoStage.renderers[platformIndex]->UpdateInstanceData();
+
+            // 更新bunny的所有材质渲染器
+            static bool firstBunnyUpdate = true;
+            if (firstBunnyUpdate)
+            {
+                Core::Logger::GetInstance().Info("=== BUNNY UPDATE DEBUG ===");
+                Core::Logger::GetInstance().Info("bunnyRendererStart: " + std::to_string(discoStage.bunnyRendererStart));
+                Core::Logger::GetInstance().Info("bunnyRendererCount: " + std::to_string(discoStage.bunnyRendererCount));
+                Core::Logger::GetInstance().Info("renderers.size(): " + std::to_string(discoStage.renderers.size()));
+                Core::Logger::GetInstance().Info("Will update renderers " +
+                                                 std::to_string(discoStage.bunnyRendererStart) + " to " +
+                                                 std::to_string(discoStage.bunnyRendererStart + discoStage.bunnyRendererCount - 1));
+                Core::Logger::GetInstance().Info("========================");
+                firstBunnyUpdate = false;
+            }
+
+            for (size_t i = discoStage.bunnyRendererStart;
+                 i < discoStage.bunnyRendererStart + discoStage.bunnyRendererCount; ++i)
+            {
+                if (i < discoStage.renderers.size())
+                {
+                    // 获取renderer使用的instances指针
+                    auto rendererInstances = discoStage.renderers[i]->GetInstances();
+
+                    static int updateCount = 0;
+                    if (++updateCount <= 5) // 只输出前5次
+                    {
+                        Core::Logger::GetInstance().Info("Renderer " + std::to_string(i) +
+                                                         " UpdateInstanceData() - instances pointer: " +
+                                                         std::to_string(reinterpret_cast<uintptr_t>(rendererInstances.get())));
+                    }
+
+                    discoStage.renderers[i]->UpdateInstanceData();
+                }
+            }
 
             // ========================================
             // 输入处理
@@ -1448,9 +1542,23 @@ int main()
             }
 
             // 渲染所有渲染器
-            for (const auto &renderer : discoStage.renderers)
+            if (firstRender)
             {
-                renderer->Render();
+                Core::Logger::GetInstance().Info("=== RENDERING ===");
+                Core::Logger::GetInstance().Info("Total renderers: " + std::to_string(discoStage.renderers.size()));
+                for (size_t i = 0; i < discoStage.renderers.size(); ++i)
+                {
+                    Core::Logger::GetInstance().Info("Renderer " + std::to_string(i) +
+                                                     " VAO: " + std::to_string(discoStage.renderers[i]->GetMesh()->GetVAO()) +
+                                                     " Instances: " + std::to_string(discoStage.renderers[i]->GetInstanceCount()));
+                }
+                Core::Logger::GetInstance().Info("================");
+                firstRender = false;
+            }
+
+            for (size_t i = 0; i < discoStage.renderers.size(); ++i)
+            {
+                discoStage.renderers[i]->Render();
             }
 
             // ========================================
@@ -1472,11 +1580,25 @@ int main()
     }
     catch (const std::exception &e)
     {
-        Core::Logger::GetInstance().Error("Fatal error: " + std::string(e.what()));
-        Core::Logger::GetInstance().Shutdown();
+        // Try to log the error, but if logger is not initialized, use stderr
+        try
+        {
+            Core::Logger::GetInstance().Error("Fatal error: " + std::string(e.what()));
+            Core::Logger::GetInstance().Shutdown();
+        }
+        catch (...)
+        {
+        }
         return -1;
     }
 
-    Core::Logger::GetInstance().Shutdown();
+    try
+    {
+        Core::Logger::GetInstance().Shutdown();
+    }
+    catch (...)
+    {
+        // Ignore shutdown errors
+    }
     return 0;
 }

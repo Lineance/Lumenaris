@@ -100,6 +100,18 @@ namespace Renderer
         unsigned int GetVAO() const { return m_vao; }
 
         /**
+         * @brief 获取 VBO（用于创建独立VAO）
+         * @return OpenGL VBO ID
+         */
+        unsigned int GetVBO() const { return m_vbo; }
+
+        /**
+         * @brief 获取 EBO（用于创建独立VAO）
+         * @return OpenGL EBO ID
+         */
+        unsigned int GetEBO() const { return m_ebo; }
+
+        /**
          * @brief 获取顶点数量
          */
         size_t GetVertexCount() const { return m_data.GetVertexCount(); }

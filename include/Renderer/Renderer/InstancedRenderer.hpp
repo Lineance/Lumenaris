@@ -82,6 +82,7 @@ namespace Renderer
         // 获取信息
         size_t GetInstanceCount() const { return m_instanceCount; }
         const std::shared_ptr<MeshBuffer>& GetMesh() const { return m_meshBuffer; }
+        const std::shared_ptr<InstanceData>& GetInstances() const { return m_instances; }
 
         // 更新实例数据到GPU（用于动画）
         void UpdateInstanceData();
@@ -96,13 +97,15 @@ namespace Renderer
                           std::shared_ptr<InstanceData>>
         CreateForOBJ(const std::string& objPath, const std::shared_ptr<InstanceData>& instances);
 
-        // 禁用拷贝（但允许移动，用于放入vector）
+        // 禁用拷贝（防止OpenGL资源双重释放）
         InstancedRenderer(const InstancedRenderer&) = delete;
         InstancedRenderer& operator=(const InstancedRenderer&) = delete;
 
-        // 允许移动构造和移动赋值
-        InstancedRenderer(InstancedRenderer&&) noexcept = default;
-        InstancedRenderer& operator=(InstancedRenderer&&) noexcept = default;
+        // 移动构造（转移OpenGL资源所有权）
+        InstancedRenderer(InstancedRenderer&& other) noexcept;
+
+        // 移动赋值（释放当前资源 + 转移所有权）
+        InstancedRenderer& operator=(InstancedRenderer&& other) noexcept;
 
     private:
         // 网格和实例数据
@@ -111,6 +114,7 @@ namespace Renderer
         size_t m_instanceCount = 0;                   // 实例数量
 
         // OpenGL 对象
+        GLuint m_vao = 0;                             // 独立VAO（每个渲染器一个，避免状态污染）
         GLuint m_instanceVBO = 0;                     // 实例化 VBO（存储矩阵和颜色）
 
         // 材质和纹理
@@ -119,7 +123,7 @@ namespace Renderer
 
         // 内部方法
         void UploadInstanceData();
-        void SetupInstanceAttributes();
+        std::vector<float> PrepareInstanceBuffer() const;  // 辅助方法：准备缓冲区数据
     };
 
 } // namespace Renderer

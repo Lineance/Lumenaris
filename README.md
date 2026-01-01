@@ -1,4 +1,4 @@
-# DarkRoomEngine
+# WhiteHouseEngine
 
 一个基于OpenGL 3.3的轻量级3D渲染引擎，专注OBJ模型加载、实例化渲染与风格化着色。采用现代C++17模块化架构，适合3D图形学习与实时渲染演示。
 
@@ -9,10 +9,15 @@
 - **高性能实例化渲染**：单次绘制调用渲染1000+物体，性能提升10-100倍
 - **完整OBJ工作流**：支持多材质/纹理/变换，自动解析.mtl材质文件
 - **8种风格化着色器**：卡通、玻璃、墨水、霓虹、像素噪点、素描
+- **天空盒系统**：轻量级环境光照（IBL），与Phong光照系统集成
 - **智能资源管理**：`shared_ptr`自动管理`MeshBuffer`/纹理生命周期，零内存泄漏
 - **异步日志系统**：后台线程写入，Release编译零开销
 
-- 测试场景为超级迪斯科舞台，enjoy
+<div align="center">
+🎪✨ 测试场景：超级宇宙迪斯科舞台 🕺💃 <br>
+📦 1300+立方体 + 🌐 9球体 + 💡48动态光源 + 🌌 宇宙天空盒 <br>
+🎉 Enjoy the chaos! 🎆
+</div>
 
 ---
 
@@ -42,25 +47,10 @@
 
 ```bash
 git clone <repository-url>
-cd DarkRoomEngine
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ```
-
-### 运行演示
-
-```bash
-./HelloWindow
-```
-
-**操作说明**：
-
-- `WASD`：前后左右移动
-- `QE`：垂直飞行
-- `鼠标`：3D视角旋转
-- `TAB`：切换鼠标捕获
-- `ESC`：退出
 
 ---
 
@@ -140,24 +130,37 @@ renderer.Render();
 ## 📁 项目结构
 
 ```
-DarkRoomEngine/
+WhiteHouseEngine/
 ├── assets/                    # 资源文件
 │   ├── models/               # 3D模型（跑车、云朵、康奈尔盒）
-│   ├── shader/              # 着色器（8种风格）
+│   ├── shader/              # 着色器（8种风格 + 天空盒 + 环境光照）
+│   ├── textures/            # 纹理资源（含天空盒）
 │   └── picture/             # 纹理资源
 ├── include/                  # 头文件
 │   ├── Core/                # 核心系统（窗口、摄像机、输入）
 │   └── Renderer/            # 渲染系统
 │       ├── Core/            # IRenderer接口
 │       ├── Data/            # MeshData/InstanceData
+│       ├── Environment/     # 环境渲染（天空盒、环境光照）
+│       ├── Factory/         # 网格工厂
 │       ├── Geometry/        # 几何体实现
 │       ├── Lighting/        # 光照系统
+│       ├── Renderer/        # 渲染器实现
 │       └── Resources/       # 资源加载器
 ├── src/                      # 源代码
+│   ├── Core/                # 核心系统实现
+│   └── Renderer/            # 渲染系统实现
+│       ├── Data/            # 数据容器
+│       ├── Environment/     # 环境渲染实现
+│       ├── Factory/         # 工厂实现
+│       ├── Geometry/        # 几何体实现
+│       ├── Lighting/        # 光照系统实现
+│       ├── Renderer/        # 渲染器实现
+│       └── Resources/       # 资源实现
 ├── vendor/                  # 第三方库
 ├── docs/                    # 文档
 │   ├── ARCHITECTURE.md     # 架构详解
-│   └── interfaces/         # 接口文档
+│   └── INTERFACES.md       # 接口文档
 ├── CMakeLists.txt          # 构建配置
 └── README.md               # 本文件
 ```
@@ -190,11 +193,59 @@ for (const auto& path : stylePaths) {
 
 ---
 
+## 🎨 天空盒系统
+
+### 支持的Cubemap约定
+
+- **OpenGL**：right, left, top, bottom, back, front
+- **DirectX**：left, right, top, bottom, front, back
+- **Maya/Corona**：rt, lf, up, dn, bk, ft
+- **HDR Lab**：px, nx, py, ny, pz, nz
+
+### 灵活的加载方式
+
+```cpp
+// 方式1：完整自定义文件名
+auto config = SkyboxLoader::CreateCustomConfig(
+    "assets/textures/skybox",
+    {"corona_rt.png", "corona_lf.png", "corona_up.png",
+     "corona_dn.png", "corona_bk.png", "corona_ft.png"},
+    CubemapConvention::OPENGL
+);
+
+// 方式2：基于约定和命名模式
+auto config = SkyboxLoader::CreateFromPattern(
+    "assets/textures/skybox",
+    "corona_{face}",
+    CubemapConvention::MAYA,
+    ".png"
+);
+
+// 方式3：完全自定义面名称后缀
+FaceNamingScheme custom("rt", "lf", "up", "dn", "bk", "ft");
+auto config = SkyboxLoader::CreateFromCustomScheme(
+    "assets/textures/skybox",
+    "corona_{face}",
+    custom,
+    CubemapConvention::OPENGL,
+    ".png"
+);
+```
+
+### 环境光照模式
+
+- **SOLID_COLOR**：传统Phong固定颜色环境光
+- **SKYBOX_SAMPLE**：从天空盒采样IBL环境光
+- **HEMISPHERE**：半球渐变环境光（天空/地面插值）
+
+---
+
 **优化成果**：
 
 - **实例化渲染**：减少90% DrawCall
 - **异步日志**：主线程无阻塞
 - **智能指针**：零内存泄漏，自动回收
+- **灵活天空盒**：支持任意cubemap格式，无需修改源码
 
 ---
 
@@ -225,12 +276,22 @@ for (const auto& path : stylePaths) {
 
 ---
 
+## 特别注意
+
+索引混乱：bunny OBJ模型可能有多个材质（每个材质创建一个独立的renderer），但代码中使用硬编码的索引[0, 2, 3, 4, 5]，导致：
+
+- 如果bunny有多个材质，会占用renderers[0], renderers[1], ...等多个位置
+- 后续的floor、cube等渲染器的索引会被向后推移
+- 但动画代码仍在使用固定的索引，导致更新了错误的几何体
+
+---
+
 ## 🤝 贡献指南
 
 1. **代码规范**：遵循C++17标准，使用现代智能指针
 2. **架构约束**：新增功能需符合`IRenderer`接口，保持职责分离
 3. **性能优先**：渲染循环避免堆分配，优先使用实例化
-4. **文档同步**：修改接口需更新`docs/interfaces/INTERFACES.md`
+4. **文档同步**：修改接口需更新`docs/INTERFACES.md`
 
 ---
 
