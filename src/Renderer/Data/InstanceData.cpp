@@ -1,4 +1,4 @@
-#include "Renderer/InstanceData.hpp"
+#include "Renderer/Data/InstanceData.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 

@@ -1,4 +1,4 @@
-#include "Renderer/Shader.hpp"
+#include "Renderer/Resources/Shader.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <fstream>

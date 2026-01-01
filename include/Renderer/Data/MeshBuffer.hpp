@@ -1,6 +1,6 @@
 #pragma once
-#include "Renderer/MeshData.hpp"
-#include "Renderer/Texture.hpp"
+#include "Renderer/Data/MeshData.hpp"
+#include "Renderer/Resources/Texture.hpp"
 #include "Core/GLM.hpp"
 #include <memory>
 #include <glad/glad.h>

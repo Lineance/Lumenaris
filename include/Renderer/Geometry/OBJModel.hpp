@@ -1,7 +1,7 @@
 #pragma once
-#include "Renderer/Mesh.hpp"
-#include "Renderer/OBJLoader.hpp"
-#include "Renderer/Texture.hpp"
+#include "Renderer/Geometry/Mesh.hpp"
+#include "Renderer/Resources/OBJLoader.hpp"
+#include "Renderer/Resources/Texture.hpp"
 #include "Core/GLM.hpp"
 #include <string>
 #include <vector>

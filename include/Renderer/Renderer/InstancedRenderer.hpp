@@ -1,9 +1,9 @@
 #pragma once
-#include "Renderer/Mesh.hpp"
-#include "Renderer/MeshBuffer.hpp"
-#include "Renderer/Texture.hpp"
-#include "Renderer/InstanceData.hpp"
-#include "Renderer/IRenderer.hpp"
+#include "Renderer/Geometry/Mesh.hpp"
+#include "Renderer/Data/MeshBuffer.hpp"
+#include "Renderer/Resources/Texture.hpp"
+#include "Renderer/Data/InstanceData.hpp"
+#include "Renderer/Core/IRenderer.hpp"
 #include "Core/GLM.hpp"
 #include <vector>
 #include <memory>

@@ -1,7 +1,7 @@
-#include "Renderer/InstancedRenderer.hpp"
-#include "Renderer/MeshBuffer.hpp"
-#include "Renderer/MeshDataFactory.hpp"
-#include "Renderer/OBJModel.hpp"
+#include "Renderer/Renderer/InstancedRenderer.hpp"
+#include "Renderer/Data/MeshBuffer.hpp"
+#include "Renderer/Factory/MeshDataFactory.hpp"
+#include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 

@@ -45,8 +45,8 @@ endif()
 
 # 5. 定义 Renderer 库
 add_library(Renderer STATIC
-    src/Renderer/Shader.cpp
-    src/Renderer/Texture.cpp
+    src/Renderer/Resources/Shader.cpp
+    src/Renderer/Resources/Texture.cpp
 )
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -56,17 +56,18 @@ target_include_directories(Renderer PUBLIC
 target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 
 # 网格库 - 支持基础网格和OBJ模型加载
+# ✅ 重构后的新文件结构
 add_library(Geometry OBJECT
-    src/Renderer/Mesh.cpp
-    src/Renderer/Cube.cpp
-    src/Renderer/Sphere.cpp
-    src/Renderer/OBJLoader.cpp    # OBJ文件解析器
-    src/Renderer/OBJModel.cpp     # OBJ模型渲染器
-    src/Renderer/InstanceData.cpp # 实例数据容器
-    src/Renderer/MeshData.cpp     # 网格数据容器
-    src/Renderer/MeshBuffer.cpp   # 网格缓冲区
-    src/Renderer/MeshDataFactory.cpp # 网格数据工厂
-    src/Renderer/InstancedRenderer.cpp # 实例化渲染器
+    src/Renderer/Geometry/Mesh.cpp
+    src/Renderer/Geometry/Cube.cpp
+    src/Renderer/Geometry/Sphere.cpp
+    src/Renderer/Resources/OBJLoader.cpp    # OBJ文件解析器
+    src/Renderer/Geometry/OBJModel.cpp     # OBJ模型渲染器
+    src/Renderer/Data/InstanceData.cpp # 实例数据容器
+    src/Renderer/Data/MeshData.cpp     # 网格数据容器
+    src/Renderer/Data/MeshBuffer.cpp   # 网格缓冲区
+    src/Renderer/Factory/MeshDataFactory.cpp # 网格数据工厂
+    src/Renderer/Renderer/InstancedRenderer.cpp # 实例化渲染器
 )
 
 target_include_directories(Geometry PUBLIC

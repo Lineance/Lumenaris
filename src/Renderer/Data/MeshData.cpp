@@ -1,4 +1,4 @@
-#include "Renderer/MeshData.hpp"
+#include "Renderer/Data/MeshData.hpp"
 
 namespace Renderer
 {

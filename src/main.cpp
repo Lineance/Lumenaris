@@ -32,11 +32,11 @@
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
-#include "Renderer/Shader.hpp"
-#include "Renderer/MeshBuffer.hpp"
-#include "Renderer/MeshDataFactory.hpp"
-#include "Renderer/InstancedRenderer.hpp"
-#include "Renderer/InstanceData.hpp"
+#include "Renderer/Resources/Shader.hpp"
+#include "Renderer/Data/MeshBuffer.hpp"
+#include "Renderer/Factory/MeshDataFactory.hpp"
+#include "Renderer/Renderer/InstancedRenderer.hpp"
+#include "Renderer/Data/InstanceData.hpp"
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vector>

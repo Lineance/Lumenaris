@@ -1,7 +1,7 @@
-#include "Renderer/MeshDataFactory.hpp"
-#include "Renderer/Cube.hpp"
-#include "Renderer/Sphere.hpp"
-#include "Renderer/OBJModel.hpp"
+#include "Renderer/Factory/MeshDataFactory.hpp"
+#include "Renderer/Geometry/Cube.hpp"
+#include "Renderer/Geometry/Sphere.hpp"
+#include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 

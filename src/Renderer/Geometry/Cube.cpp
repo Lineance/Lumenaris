@@ -1,4 +1,4 @@
-#include "Renderer/Cube.hpp"
+#include "Renderer/Geometry/Cube.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <vector>

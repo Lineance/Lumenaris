@@ -1,6 +1,6 @@
 #pragma once
-#include "Renderer/MeshData.hpp"
-#include "Renderer/MeshBuffer.hpp"  // 前向声明改为完整包含
+#include "Renderer/Data/MeshData.hpp"
+#include "Renderer/Data/MeshBuffer.hpp"  // 前向声明改为完整包含
 #include <string>
 #include <vector>
 

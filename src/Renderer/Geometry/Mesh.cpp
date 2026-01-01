@@ -1,4 +1,4 @@
-#include "Renderer/Mesh.hpp"
+#include "Renderer/Geometry/Mesh.hpp"
 #include "Core/Logger.hpp"
 #include <stdexcept>
 

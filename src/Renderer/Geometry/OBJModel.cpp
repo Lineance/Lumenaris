@@ -1,4 +1,4 @@
-#include "Renderer/OBJModel.hpp"
+#include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <iostream>

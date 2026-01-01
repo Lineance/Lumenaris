@@ -1,4 +1,4 @@
-#include "Renderer/MeshBuffer.hpp"
+#include "Renderer/Data/MeshBuffer.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 

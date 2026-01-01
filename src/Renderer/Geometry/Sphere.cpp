@@ -1,4 +1,4 @@
-#include "Renderer/Sphere.hpp"
+#include "Renderer/Geometry/Sphere.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
 #include <vector>

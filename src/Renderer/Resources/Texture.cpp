@@ -1,5 +1,5 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include "Renderer/Texture.hpp"
+#include "Renderer/Resources/Texture.hpp"
 #include "Core/Logger.hpp"
 #include <iostream>
 #include <stb_image.h>

@@ -1,5 +1,5 @@
 #pragma once
-#include "Renderer/Mesh.hpp"
+#include "Renderer/Geometry/Mesh.hpp"
 #include "Core/GLM.hpp"
 
 namespace Renderer

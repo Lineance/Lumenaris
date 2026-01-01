@@ -1,5 +1,5 @@
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "Renderer/OBJLoader.hpp"
+#include "Renderer/Resources/OBJLoader.hpp"
 #include "Core/Logger.hpp"
 #include <iostream>
 #include <filesystem>
