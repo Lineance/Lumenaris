@@ -48,6 +48,8 @@ endif()
 add_library(Renderer STATIC
     src/Renderer/Resources/Shader.cpp
     src/Renderer/Resources/Texture.cpp
+    src/Renderer/Lighting/Light.cpp
+    src/Renderer/Lighting/LightManager.cpp
 )
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -62,6 +64,8 @@ add_library(Geometry OBJECT
     src/Renderer/Geometry/Mesh.cpp
     src/Renderer/Geometry/Cube.cpp
     src/Renderer/Geometry/Sphere.cpp
+    src/Renderer/Geometry/Torus.cpp         # 圆环体
+    src/Renderer/Geometry/Plane.cpp         # 平面
     src/Renderer/Resources/OBJLoader.cpp    # OBJ文件解析器
     src/Renderer/Geometry/OBJModel.cpp     # OBJ模型渲染器
     src/Renderer/Data/InstanceData.cpp # 实例数据容器
@@ -90,6 +94,18 @@ target_include_directories(HelloWindow PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
 )
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
+
+# # 多光源演示程序
+# add_executable(MultiLightDemo
+#     src/main_multilight.cpp
+#     src/glad.c
+#     $<TARGET_OBJECTS:Geometry>
+# )
+# target_include_directories(MultiLightDemo PRIVATE
+#     ${CMAKE_CURRENT_SOURCE_DIR}/include
+#     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
+# )
+# target_link_libraries(MultiLightDemo PRIVATE Core Renderer OpenGL::GL)
 
 # # 性能优化测试程序
 # add_executable(TestPerformanceOptimization

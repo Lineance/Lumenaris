@@ -27,6 +27,11 @@ namespace Renderer
         float GetRadius() const { return m_radius; }
         glm::mat4 GetModelMatrix() const;
 
+        // 静态方法：获取球体的顶点数据（用于实例化渲染）
+        static std::vector<float> GetVertexData();
+        static std::vector<unsigned int> GetIndexData();
+        static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
+
         // IMesh接口实现
         unsigned int GetVAO() const override { return m_vao; }
         size_t GetVertexCount() const override { return m_vertexCount; }

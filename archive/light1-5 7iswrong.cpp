@@ -1,3 +1,4 @@
+// ！！！注意里面的场景实现，这种切换才是正确的，之前的场景切换有误
 /**
  * ========================================
  * 多光源系统演示 - Multi-Light Demo
@@ -51,7 +52,7 @@
 // 窗口设置
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
-const char* WINDOW_TITLE = "Sphere Demo - 9 Spheres | SPACE: Pause Animation";
+const char* WINDOW_TITLE = "Multi-Light Demo - 1-7: Scenes | SPACE: Pause Animation";
 
 // 性能统计
 float fps = 0.0f;
@@ -430,8 +431,9 @@ std::shared_ptr<Renderer::InstanceData> CreateGeometryShowcase()
 }
 
 /**
- * 场景: 混合几何体对比 (Mixed Geometry Comparison)
- * 展示球体、平面、圆环体
+ * 场景 6: 混合几何体对比 (Mixed Geometry Comparison)
+ * 使用不同的几何体类型，展示它们在相同光照下的效果
+ * 这个场景会创建多个独立的渲染器，每个渲染器使用不同的几何体
  */
 struct MixedGeometryScene
 {
@@ -442,167 +444,94 @@ struct MixedGeometryScene
 
 MixedGeometryScene CreateMixedGeometryScene()
 {
-    Core::Logger::GetInstance().Info("Creating Mixed Geometry Scene (Spheres, Planes, Tori)...");
+    Core::Logger::GetInstance().Info("Creating Mixed Geometry Scene...");
 
     MixedGeometryScene scene;
 
     // ========================================
-    // 创建球体实例（3行3列）
+    // 1. 创建球体实例
     // ========================================
     auto sphereInstances = std::make_shared<Renderer::InstanceData>();
-
-    for (int row = 0; row < 3; ++row)
+    for (int i = 0; i < 3; ++i)
     {
-        for (int col = 0; col < 3; ++col)
-        {
-            glm::vec3 position(-6.0f + col * 6.0f, 1.0f, -8.0f + row * 8.0f);
-            glm::vec3 rotation(0.0f, 0.0f, 0.0f);
-            glm::vec3 scale(1.2f);
-
-            // 不同颜色
-            glm::vec3 color;
-            if (row == 0)
-                color = glm::vec3(0.2f, 0.6f, 1.0f);  // 蓝色
-            else if (row == 1)
-                color = glm::vec3(0.2f, 1.0f, 0.4f);  // 绿色
-            else
-                color = glm::vec3(1.0f, 0.6f, 0.2f);  // 橙色
-
-            sphereInstances->Add(position, rotation, scale, color);
-        }
+        glm::vec3 position(-6.0f + i * 6.0f, 1.0f, -8.0f);
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+        glm::vec3 scale(1.2f);
+        glm::vec3 color(0.2f, 0.6f, 1.0f); // 蓝色
+        sphereInstances->Add(position, rotation, scale, color);
     }
 
     // ========================================
-    // 创建平面实例（3个平面，沿X轴排列）
+    // 2. 创建圆柱体实例
     // ========================================
-    auto planeInstances = std::make_shared<Renderer::InstanceData>();
-
-    // 平面1：左侧，红色
-    planeInstances->Add(
-        glm::vec3(-15.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),  // 旋转使其竖立
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(1.0f, 0.3f, 0.3f)
-    );
-
-    // 平面2：中间，黄色
-    planeInstances->Add(
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(1.0f, 1.0f, 0.3f)
-    );
-
-    // 平面3：右侧，紫色
-    planeInstances->Add(
-        glm::vec3(15.0f, 0.0f, 0.0f),
-        glm::vec3(-90.0f, 0.0f, 0.0f),
-        glm::vec3(4.0f, 4.0f, 1.0f),
-        glm::vec3(0.8f, 0.3f, 1.0f)
-    );
-
-    // ========================================
-    // 创建圆环体实例（2行2列）
-    // ========================================
-    auto torusInstances = std::make_shared<Renderer::InstanceData>();
-
-    for (int row = 0; row < 2; ++row)
+    auto cylinderInstances = std::make_shared<Renderer::InstanceData>();
+    for (int i = 0; i < 3; ++i)
     {
-        for (int col = 0; col < 2; ++col)
-        {
-            glm::vec3 position(-4.5f + col * 9.0f, 2.5f, 12.0f + row * 6.0f);
-            glm::vec3 rotation(90.0f, 0.0f, 0.0f);  // 平躺
-            glm::vec3 scale(1.5f);
+        glm::vec3 position(-6.0f + i * 6.0f, 1.5f, 0.0f);
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+        glm::vec3 scale(1.0f);
+        glm::vec3 color(0.2f, 1.0f, 0.4f); // 绿色
+        cylinderInstances->Add(position, rotation, scale, color);
+    }
 
-            // 青色和品红色交替
-            glm::vec3 color = (row + col) % 2 == 0 ?
-                glm::vec3(0.3f, 1.0f, 1.0f) :  // 青色
-                glm::vec3(1.0f, 0.3f, 1.0f);  // 品红
-
-            torusInstances->Add(position, rotation, scale, color);
-        }
+    // ========================================
+    // 3. 创建圆锥体实例
+    // ========================================
+    auto coneInstances = std::make_shared<Renderer::InstanceData>();
+    for (int i = 0; i < 3; ++i)
+    {
+        glm::vec3 position(-6.0f + i * 6.0f, 1.5f, 8.0f);
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+        glm::vec3 scale(1.0f);
+        glm::vec3 color(1.0f, 0.6f, 0.2f); // 橙色
+        coneInstances->Add(position, rotation, scale, color);
     }
 
     // ========================================
     // 创建球体渲染器
     // ========================================
-    Core::Logger::GetInstance().Info("Creating sphere renderer...");
+    Renderer::MeshBuffer sphereMesh = Renderer::MeshBufferFactory::CreateSphereBuffer(32, 32, 1.0f);
+    auto sphereMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(sphereMesh));
+    scene.meshBuffers.push_back(sphereMeshPtr);
 
-    try
-    {
-        Renderer::MeshBuffer sphereMesh = Renderer::MeshBufferFactory::CreateSphereBuffer(32, 32, 1.0f);
-        auto sphereMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(sphereMesh));
-        scene.meshBuffers.push_back(sphereMeshPtr);
-
-        auto sphereRenderer = std::make_unique<Renderer::InstancedRenderer>();
-        sphereRenderer->SetMesh(sphereMeshPtr);
-        sphereRenderer->SetInstances(sphereInstances);
-        sphereRenderer->Initialize();
-        scene.renderers.push_back(std::move(sphereRenderer));
-        scene.instanceDataList.push_back(sphereInstances);
-
-        Core::Logger::GetInstance().Info("Sphere renderer created successfully");
-    }
-    catch (const std::exception& e)
-    {
-        Core::Logger::GetInstance().Error("Failed to create sphere renderer: " + std::string(e.what()));
-    }
+    auto sphereRenderer = std::make_unique<Renderer::InstancedRenderer>();
+    sphereRenderer->SetMesh(sphereMeshPtr);
+    sphereRenderer->SetInstances(sphereInstances);
+    sphereRenderer->Initialize();
+    scene.renderers.push_back(std::move(sphereRenderer));
+    scene.instanceDataList.push_back(sphereInstances);
 
     // ========================================
-    // 创建平面渲染器
+    // 创建圆柱体渲染器
     // ========================================
-    Core::Logger::GetInstance().Info("Creating plane renderer...");
+    Renderer::MeshBuffer cylinderMesh = Renderer::MeshBufferFactory::CreateCylinderBuffer(1.0f, 2.0f, 32);
+    auto cylinderMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(cylinderMesh));
+    scene.meshBuffers.push_back(cylinderMeshPtr);
 
-    try
-    {
-        Renderer::MeshBuffer planeMesh = Renderer::MeshBufferFactory::CreatePlaneBuffer(1.0f, 1.0f, 1, 1);
-        auto planeMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(planeMesh));
-        scene.meshBuffers.push_back(planeMeshPtr);
-
-        auto planeRenderer = std::make_unique<Renderer::InstancedRenderer>();
-        planeRenderer->SetMesh(planeMeshPtr);
-        planeRenderer->SetInstances(planeInstances);
-        planeRenderer->Initialize();
-        scene.renderers.push_back(std::move(planeRenderer));
-        scene.instanceDataList.push_back(planeInstances);
-
-        Core::Logger::GetInstance().Info("Plane renderer created successfully");
-    }
-    catch (const std::exception& e)
-    {
-        Core::Logger::GetInstance().Error("Failed to create plane renderer: " + std::string(e.what()));
-    }
+    auto cylinderRenderer = std::make_unique<Renderer::InstancedRenderer>();
+    cylinderRenderer->SetMesh(cylinderMeshPtr);
+    cylinderRenderer->SetInstances(cylinderInstances);
+    cylinderRenderer->Initialize();
+    scene.renderers.push_back(std::move(cylinderRenderer));
+    scene.instanceDataList.push_back(cylinderInstances);
 
     // ========================================
-    // 创建圆环体渲染器
+    // 创建圆锥体渲染器
     // ========================================
-    Core::Logger::GetInstance().Info("Creating torus renderer...");
+    Renderer::MeshBuffer coneMesh = Renderer::MeshBufferFactory::CreateConeBuffer(1.0f, 2.0f, 32);
+    auto coneMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(coneMesh));
+    scene.meshBuffers.push_back(coneMeshPtr);
 
-    try
-    {
-        Renderer::MeshBuffer torusMesh = Renderer::MeshBufferFactory::CreateTorusBuffer(1.0f, 0.3f, 32, 24);
-        auto torusMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(torusMesh));
-        scene.meshBuffers.push_back(torusMeshPtr);
-
-        auto torusRenderer = std::make_unique<Renderer::InstancedRenderer>();
-        torusRenderer->SetMesh(torusMeshPtr);
-        torusRenderer->SetInstances(torusInstances);
-        torusRenderer->Initialize();
-        scene.renderers.push_back(std::move(torusRenderer));
-        scene.instanceDataList.push_back(torusInstances);
-
-        Core::Logger::GetInstance().Info("Torus renderer created successfully");
-    }
-    catch (const std::exception& e)
-    {
-        Core::Logger::GetInstance().Error("Failed to create torus renderer: " + std::string(e.what()));
-    }
+    auto coneRenderer = std::make_unique<Renderer::InstancedRenderer>();
+    coneRenderer->SetMesh(coneMeshPtr);
+    coneRenderer->SetInstances(coneInstances);
+    coneRenderer->Initialize();
+    scene.renderers.push_back(std::move(coneRenderer));
+    scene.instanceDataList.push_back(coneInstances);
 
     Core::Logger::GetInstance().Info("Mixed Geometry Scene created: " +
                                      std::to_string(scene.renderers.size()) + " renderer types, " +
-                                     std::to_string(sphereInstances->GetCount()) + " spheres, " +
-                                     std::to_string(planeInstances->GetCount()) + " planes, " +
-                                     std::to_string(torusInstances->GetCount()) + " tori");
+                                     std::to_string(sphereInstances->GetCount() + cylinderInstances->GetCount() + coneInstances->GetCount()) + " total objects");
 
     return scene;
 }
@@ -734,9 +663,98 @@ int main()
         multiLightShader.Load("assets/shader/multi_light.vert", "assets/shader/multi_light.frag");
 
         // ========================================
-        // 创建混合几何体场景
+        // 创建场景
+        // ========================================
+        std::vector<std::shared_ptr<Renderer::InstanceData>> scenes;
+        scenes.push_back(CreateMultiLightDemoPlane());     // 场景 0: 多光源演示平面
+        scenes.push_back(CreateVerticalCubeWall());        // 场景 1: 垂直立方体墙
+        scenes.push_back(CreateSphereOfCubes());           // 场景 2: 球形立方体阵列
+        scenes.push_back(CreateCubeTunnel());              // 场景 3: 隧道
+        scenes.push_back(CreateConcentricRings());         // 场景 4: 同心圆环
+        scenes.push_back(CreateGeometryShowcase());        // 场景 5: 几何体展示场
+
+        int currentScene = 0;
+
+        // ========================================
+        // 创建混合几何体场景（特殊场景）
         // ========================================
         MixedGeometryScene mixedGeometryScene = CreateMixedGeometryScene();
+
+        // ========================================
+        // 创建渲染器
+        // ========================================
+        Core::Logger::GetInstance().Info("Creating instanced renderers...");
+
+        std::vector<std::unique_ptr<Renderer::InstancedRenderer>> renderers;
+        std::vector<std::shared_ptr<Renderer::MeshBuffer>> meshBuffers;  // 保持mesh存活
+
+        // 为每个场景创建独立的 MeshBuffer 和渲染器
+        for (size_t i = 0; i < scenes.size(); ++i)
+        {
+            // 为每个场景创建独立的 MeshBuffer（避免共享VAO导致实例属性冲突）
+            Renderer::MeshBuffer cubeMesh = Renderer::MeshBufferFactory::CreateCubeBuffer();
+            auto cubeMeshPtr = std::make_shared<Renderer::MeshBuffer>(std::move(cubeMesh));
+            meshBuffers.push_back(cubeMeshPtr);
+
+            auto renderer = std::make_unique<Renderer::InstancedRenderer>();
+            renderer->SetMesh(cubeMeshPtr);
+            renderer->SetInstances(scenes[i]);
+            renderer->Initialize();
+            renderers.push_back(std::move(renderer));
+
+            Core::Logger::GetInstance().Info("Scene " + std::to_string(i + 1) + " created with " +
+                                             std::to_string(scenes[i]->GetCount()) + " instances");
+        }
+
+        // 场景切换回调
+        keyboardController.RegisterKeyCallback(GLFW_KEY_1, [&currentScene, &camera]()
+        {
+            currentScene = 0;
+            camera.SetPosition(glm::vec3(0.0f, 12.0f, 25.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 1: Multi-Light Demo Plane (30x30 plane)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_2, [&currentScene, &camera]()
+        {
+            currentScene = 1;
+            camera.SetPosition(glm::vec3(0.0f, 10.0f, 20.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 2: Vertical Cube Wall (20x15 wall)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_3, [&currentScene, &camera]()
+        {
+            currentScene = 2;
+            camera.SetPosition(glm::vec3(0.0f, 12.0f, 25.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 3: Sphere of Cubes (400 cubes)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_4, [&currentScene, &camera]()
+        {
+            currentScene = 3;
+            camera.SetPosition(glm::vec3(0.0f, 5.0f, -5.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 4: Cube Tunnel (12 segments)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_5, [&currentScene, &camera]()
+        {
+            currentScene = 4;
+            camera.SetPosition(glm::vec3(0.0f, 20.0f, 0.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 5: Concentric Rings (6 rings)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_6, [&currentScene, &camera]()
+        {
+            currentScene = 5;
+            camera.SetPosition(glm::vec3(0.0f, 5.0f, 15.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 6: Geometry Showcase (20 objects)");
+        });
+
+        keyboardController.RegisterKeyCallback(GLFW_KEY_7, [&currentScene, &camera]()
+        {
+            currentScene = 6;
+            camera.SetPosition(glm::vec3(0.0f, 3.0f, 12.0f));
+            Core::Logger::GetInstance().Info("Switched to Scene 7: Mixed Geometry (9 objects - Sphere, Cylinder, Cone)");
+        });
 
         // 光源控制回调
         bool animateLights = true;
@@ -748,14 +766,15 @@ int main()
         });
 
         Core::Logger::GetInstance().Info("========================================");
-        Core::Logger::GetInstance().Info("Mixed Geometry Scene loaded successfully!");
-        Core::Logger::GetInstance().Info("Total renderers: " + std::to_string(mixedGeometryScene.renderers.size()));
+        Core::Logger::GetInstance().Info("Multi-light demo scenes loaded successfully!");
+        Core::Logger::GetInstance().Info("Total scenes: " + std::to_string(scenes.size() + 1)); // +1 for mixed geometry
         Core::Logger::GetInstance().Info("========================================");
         Core::Logger::GetInstance().Info("Controls:");
         Core::Logger::GetInstance().Info("  WASD - Move camera");
         Core::Logger::GetInstance().Info("  Q/E  - Move up/down");
         Core::Logger::GetInstance().Info("  Mouse - Look around");
         Core::Logger::GetInstance().Info("  TAB  - Toggle mouse capture");
+        Core::Logger::GetInstance().Info("  1-7  - Switch scenes");
         Core::Logger::GetInstance().Info("  SPACE - Pause/Resume light animation");
         Core::Logger::GetInstance().Info("  ESC  - Exit");
         Core::Logger::GetInstance().Info("========================================");
@@ -803,11 +822,12 @@ int main()
                 static int logCounter = 0;
                 if (++logCounter >= 2)  // 每1秒输出一次
                 {
-                    std::string logMessage = "Mixed Geometry | FPS: " +
-                                             std::to_string(static_cast<int>(fps)) +
-                                             " | Total Frames: " +
-                                             std::to_string(totalFrameCount);
-                    Core::Logger::GetInstance().Info(logMessage);
+                    Core::Logger::GetInstance().Info(
+                        "Scene " + std::to_string(currentScene + 1) + " | " +
+                        "FPS: " + std::to_string(static_cast<int>(fps)) + " | " +
+                        "Instances: " + std::to_string(scenes[currentScene]->GetCount()) + " | " +
+                        "Total Frames: " + std::to_string(totalFrameCount)
+                    );
                     logCounter = 0;
                 }
 
@@ -879,10 +899,10 @@ int main()
 
             // 设置日志上下文
             Core::LogContext renderContext;
-            renderContext.renderPass = "MixedGeometry";
-            renderContext.batchIndex = 0;
+            renderContext.renderPass = "CoolCubesDemo";
+            renderContext.batchIndex = currentScene;
             renderContext.drawCallCount = 1;
-            renderContext.currentShader = "MultiLightShader";
+            renderContext.currentShader = "InstancedShader";
             Core::Logger::GetInstance().SetContext(renderContext);
 
             // 清空缓冲区
@@ -904,21 +924,37 @@ int main()
             Renderer::Lighting::LightManager::GetInstance().ApplyToShader(multiLightShader);
 
             // ========================================
-            // 渲染混合几何体场景
+            // 渲染当前场景
             // ========================================
 
-            static bool firstRender = true;
-            if (firstRender)
+            // ✅ 添加场景渲染的调试信息
+            static int lastScene = -1;
+            if (lastScene != currentScene)
             {
-                Core::Logger::GetInstance().Info("Rendering Mixed Geometry Scene with " +
-                                                 std::to_string(mixedGeometryScene.renderers.size()) + " renderers");
-                firstRender = false;
+                if (currentScene == 6) // 混合几何体场景
+                {
+                    Core::Logger::GetInstance().Info("Rendering scene 7 (Mixed Geometry) with " +
+                                                     std::to_string(mixedGeometryScene.renderers.size()) + " renderer types");
+                }
+                else
+                {
+                    Core::Logger::GetInstance().Info("Rendering scene " + std::to_string(currentScene + 1) +
+                                                     " with " + std::to_string(scenes[currentScene]->GetCount()) + " instances");
+                }
+                lastScene = currentScene;
             }
 
-            // 渲染所有渲染器
-            for (const auto& renderer : mixedGeometryScene.renderers)
+            // 场景6是特殊的混合几何体场景，需要渲染多个渲染器
+            if (currentScene == 6)
             {
-                renderer->Render();
+                for (const auto& renderer : mixedGeometryScene.renderers)
+                {
+                    renderer->Render();
+                }
+            }
+            else
+            {
+                renderers[currentScene]->Render();
             }
 
             // ========================================

@@ -38,6 +38,28 @@ namespace Renderer
          */
         static MeshData CreateSphereData(int stacks = 32, int slices = 32, float radius = 1.0f);
 
+        /**
+         * @brief 创建圆环体数据
+         * @param majorRadius 主半径（从中心到管中心的距离）
+         * @param minorRadius 次半径（管的粗细）
+         * @param majorSegments 主分段数（环的分段）
+         * @param minorSegments 次分段数（管的分段）
+         * @return MeshData 包含圆环体的顶点和索引数据
+         */
+        static MeshData CreateTorusData(float majorRadius = 1.0f, float minorRadius = 0.3f,
+                                       int majorSegments = 32, int minorSegments = 24);
+
+        /**
+         * @brief 创建平面数据
+         * @param width 平面宽度
+         * @param height 平面高度
+         * @param widthSegments 宽度方向的分段数
+         * @param heightSegments 高度方向的分段数
+         * @return MeshData 包含平面的顶点和索引数据
+         */
+        static MeshData CreatePlaneData(float width = 1.0f, float height = 1.0f,
+                                       int widthSegments = 1, int heightSegments = 1);
+
         // ============================================================
         // OBJ 模型
         // ============================================================
@@ -104,6 +126,28 @@ namespace Renderer
          * @return MeshBuffer 包含球体的 GPU 资源
          */
         static MeshBuffer CreateSphereBuffer(int stacks = 32, int slices = 32, float radius = 1.0f);
+
+        /**
+         * @brief 创建圆环体缓冲区（已上传到 GPU）
+         * @param majorRadius 主半径
+         * @param minorRadius 次半径
+         * @param majorSegments 主分段数
+         * @param minorSegments 次分段数
+         * @return MeshBuffer 包含圆环体的 GPU 资源
+         */
+        static MeshBuffer CreateTorusBuffer(float majorRadius = 1.0f, float minorRadius = 0.3f,
+                                           int majorSegments = 32, int minorSegments = 24);
+
+        /**
+         * @brief 创建平面缓冲区（已上传到 GPU）
+         * @param width 平面宽度
+         * @param height 平面高度
+         * @param widthSegments 宽度方向分段数
+         * @param heightSegments 高度方向分段数
+         * @return MeshBuffer 包含平面的 GPU 资源
+         */
+        static MeshBuffer CreatePlaneBuffer(float width = 1.0f, float height = 1.0f,
+                                           int widthSegments = 1, int heightSegments = 1);
 
         // ============================================================
         // OBJ 模型（自动上传到 GPU）

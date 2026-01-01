@@ -1,6 +1,8 @@
 #include "Renderer/Factory/MeshDataFactory.hpp"
 #include "Renderer/Geometry/Cube.hpp"
 #include "Renderer/Geometry/Sphere.hpp"
+#include "Renderer/Geometry/Torus.hpp"
+#include "Renderer/Geometry/Plane.hpp"
 #include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
@@ -122,6 +124,46 @@ namespace Renderer
         return data;
     }
 
+    MeshData MeshDataFactory::CreateTorusData(float majorRadius, float minorRadius,
+                                               int majorSegments, int minorSegments)
+    {
+        // 使用 Torus 类的静态方法获取顶点数据
+        std::vector<float> vertices = Renderer::Torus::GetVertexData();
+        std::vector<unsigned int> indices = Renderer::Torus::GetIndexData();
+
+        MeshData data;
+        data.SetVertices(std::move(vertices), 8);
+        data.SetIndices(std::move(indices));
+        data.SetVertexLayout({0, 3, 6}, {3, 3, 2});
+        data.SetMaterialColor(glm::vec3(1.0f));
+
+        Core::Logger::GetInstance().Debug("MeshDataFactory::CreateTorusData() - Created torus data: " +
+                                          std::to_string(data.GetVertexCount()) + " vertices, " +
+                                          std::to_string(data.GetIndexCount()) + " indices");
+
+        return data;
+    }
+
+    MeshData MeshDataFactory::CreatePlaneData(float width, float height,
+                                               int widthSegments, int heightSegments)
+    {
+        // 使用 Plane 类的静态方法获取顶点数据
+        std::vector<float> vertices = Renderer::Plane::GetVertexData();
+        std::vector<unsigned int> indices = Renderer::Plane::GetIndexData();
+
+        MeshData data;
+        data.SetVertices(std::move(vertices), 8);
+        data.SetIndices(std::move(indices));
+        data.SetVertexLayout({0, 3, 6}, {3, 3, 2});
+        data.SetMaterialColor(glm::vec3(1.0f));
+
+        Core::Logger::GetInstance().Debug("MeshDataFactory::CreatePlaneData() - Created plane data: " +
+                                          std::to_string(data.GetVertexCount()) + " vertices, " +
+                                          std::to_string(data.GetIndexCount()) + " indices");
+
+        return data;
+    }
+
     std::vector<MeshData> MeshDataFactory::CreateOBJData(const std::string& objPath)
     {
         // 使用 OBJModel 的静态方法获取按材质分离的顶点数据
@@ -185,6 +227,20 @@ namespace Renderer
     MeshBuffer MeshBufferFactory::CreateSphereBuffer(int stacks, int slices, float radius)
     {
         MeshData data = MeshDataFactory::CreateSphereData(stacks, slices, radius);
+        return CreateFromMeshData(data);
+    }
+
+    MeshBuffer MeshBufferFactory::CreateTorusBuffer(float majorRadius, float minorRadius,
+                                                     int majorSegments, int minorSegments)
+    {
+        MeshData data = MeshDataFactory::CreateTorusData(majorRadius, minorRadius, majorSegments, minorSegments);
+        return CreateFromMeshData(data);
+    }
+
+    MeshBuffer MeshBufferFactory::CreatePlaneBuffer(float width, float height,
+                                                     int widthSegments, int heightSegments)
+    {
+        MeshData data = MeshDataFactory::CreatePlaneData(width, height, widthSegments, heightSegments);
         return CreateFromMeshData(data);
     }
 
