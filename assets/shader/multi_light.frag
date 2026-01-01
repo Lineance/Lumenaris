@@ -57,7 +57,7 @@ struct SpotLight
 // ========================================
 
 #define NR_DIR_LIGHTS 4
-#define NR_POINT_LIGHTS 16
+#define NR_POINT_LIGHTS 48  // 更新为48以支持三层光源布局
 #define NR_SPOT_LIGHTS 8
 
 uniform DirectionalLight dirLights[NR_DIR_LIGHTS];

@@ -43,7 +43,7 @@ namespace Renderer
             // ========================================
 
             static const int MAX_DIRECTIONAL_LIGHTS = 4;
-            static const int MAX_POINT_LIGHTS = 16;
+            static const int MAX_POINT_LIGHTS = 48;  // 更新为48以支持三层光源布局
             static const int MAX_SPOT_LIGHTS = 8;
 
             // ========================================

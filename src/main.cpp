@@ -1,40 +1,43 @@
 /**
  * ========================================
- * Disco 舞台演示 - Disco Stage Demo
+ * Disco 舞台演示 - Disco Stage Demo (Enhanced)
  * ========================================
  *
- * 简洁的Disco舞台：水平平面 + 统一立方体密集拟合 + 全部核心球体 + 混乱多彩光源
+ * 超级Disco舞台：水平平面 + 超大中心球体 + 48个彩色光源布满舞台
  *
  * 特性：
  * - 水平平面舞台（50x50纯白色地板）
- * - 中央Disco球：500个立方体外层（边长0.35，分布半径2.5）+ 核心球体（半径2.5，与立方体层一致）
- * - 8个彩色球形灯：每个100个立方体外层（边长0.2，分布半径1.0）+ 核心球体（半径1.0，与立方体层一致）
- * - 16个混乱旋转彩色点光源（不同运动模式）
+ * - 中央巨型Disco球：800个立方体外层（边长0.4，分布半径4.0）+ 核心球体（半径3.0）
+ * - 8个彩色球形灯：每个100个立方体外层（边长0.2，分布半径1.0）+ 核心球体（半径1.0）
+ * - 48个混乱旋转彩色点光源（三层布局，覆盖整个舞台）
  * - 中央聚光灯（窄光束向下照射地板）
  * - 动态光源旋转效果
  * - 实时光照计算
  *
- * 光源系统（混乱Disco风格）：
- * - 16种不同颜色：红绿蓝黄、洋红青、橙紫、粉红天蓝、酸橙金色、薰衣草绿松石、珊瑚薄荷
- * - 点光源范围：13米（缩小光圈，更集中）
- * - 4种混乱运动模式：
- *   * 模式0：椭圆运动（12x8米，高度波动）
- *   * 模式1：8字形运动（利萨如曲线，复杂轨迹）
- *   * 模式2：螺旋进出（半径8-14米动态变化）
- *   * 模式3：随机抖动圆形（额外2米抖动）
- * - 不同旋转速度：0.5, 0.8, 1.1, 1.4, 1.7
- * - 偶数索引额外扰动：±1.5米随机偏移
- * - 高度动态变化：3.0-5.0米之间复杂波动
- * - 聚光灯角度：15-25度（窄光束）
+ * 光源系统（超级Disco风格）：
+ * - 48个点光源分三层圆形布局
+ *   * 内圈（16个）：半径7-9米，高度3-4米，强度10x，范围13米
+ *   * 中圈（16个）：半径12.5-15.5米，高度4.5-5.5米，强度12x，范围32米
+ *   * 外圈（16个）：半径18-22米，高度6-7米，强度15x，范围50米
+ * - 48种不同颜色：基础色、亮色变体、深色变体
+ * - 角度错开布局：内圈0°，中圈11.25°，外圈22.5°
+ * - 覆盖范围：22米半径（整个舞台）
+ *
+ * 中心球体（增强版）：
+ * - 立方体数量：800个（原来500个）
+ * - 立方体大小：0.4米（原来0.35米）
+ * - 分布半径：4.0米（原来2.5米）
+ * - 核心球体半径：3.0米（原来1.8米）
+ * - 整体尺寸增加60%，视觉冲击力更强
  *
  * 技术特点：
  * - 斐波那契球面算法确保立方体均匀分布
- * - 统一立方体大小：中央0.35，周边0.2（增大）
- * - 核心球体半径等于立方体层半径，完全填充内部空间
+ * - 统一立方体大小：中央0.4，周边0.2
+ * - 核心球体半径略小于立方体层，形成内部核心
  * - 立方体附着在核心球体表面，形成镜面反射层
- * - 总计1300个立方体 + 9个核心球体
+ * - 总计1600个立方体 + 9个核心球体
  * - 3个渲染器（平面、立方体、球体）
- * - 16个混乱旋转彩色点光源，营造真实Disco氛围
+ * - 48个混乱旋转彩色点光源，营造超级Disco氛围
  *
  * 控制说明：
  * - WASD: 前后左右移动
@@ -73,7 +76,7 @@
 // 窗口设置
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
-const char* WINDOW_TITLE = "Disco Stage - Press SPACE to Pause Lights";
+const char* WINDOW_TITLE = "Super Disco Stage - 48 Lights + Giant Center Ball (Press SPACE to Pause)";
 
 // 性能统计
 float fps = 0.0f;
@@ -107,9 +110,10 @@ void SetupLighting(
     lightManager.AddDirectionalLight(sun);
     Core::Logger::GetInstance().Info("✓ Added weak sun (directional light) from above");
 
-    // 2. 彩色点光源阵列（16个）- Disco舞台专用配置，丰富多彩
-    // 使用更多样化的颜色混合
+    // 2. 彩色点光源阵列（48个）- Disco舞台专用配置，布满整个舞台
+    // 使用更多样化的颜色混合，分三层布局
     glm::vec3 pointLightColors[] = {
+        // 第一层：基础颜色（16个）
         glm::vec3(1.0f, 0.0f, 0.0f),      // 纯红
         glm::vec3(0.0f, 1.0f, 0.0f),      // 纯绿
         glm::vec3(0.0f, 0.0f, 1.0f),      // 纯蓝
@@ -125,19 +129,52 @@ void SetupLighting(
         glm::vec3(0.8f, 0.0f, 1.0f),      // 薰衣草
         glm::vec3(0.0f, 1.0f, 0.5f),      // 绿松石
         glm::vec3(1.0f, 0.5f, 0.5f),      // 珊瑚色
-        glm::vec3(0.5f, 1.0f, 0.8f)       // 薄荷绿
+        glm::vec3(0.5f, 1.0f, 0.8f),      // 薄荷绿
+        // 第二层：亮色变体（16个）
+        glm::vec3(1.0f, 0.2f, 0.2f),      // 亮红
+        glm::vec3(0.2f, 1.0f, 0.2f),      // 亮绿
+        glm::vec3(0.2f, 0.2f, 1.0f),      // 亮蓝
+        glm::vec3(1.0f, 1.0f, 0.2f),      // 亮黄
+        glm::vec3(1.0f, 0.2f, 1.0f),      // 亮洋红
+        glm::vec3(0.2f, 1.0f, 1.0f),      // 亮青
+        glm::vec3(1.0f, 0.6f, 0.2f),      // 亮橙
+        glm::vec3(0.6f, 0.2f, 1.0f),      // 亮紫
+        glm::vec3(1.0f, 0.2f, 0.6f),      // 亮粉红
+        glm::vec3(0.2f, 0.6f, 1.0f),      // 亮天蓝
+        glm::vec3(0.6f, 1.0f, 0.2f),      // 亮酸橙
+        glm::vec3(1.0f, 0.9f, 0.2f),      // 亮金色
+        glm::vec3(0.9f, 0.2f, 1.0f),      // 亮薰衣草
+        glm::vec3(0.2f, 1.0f, 0.6f),      // 亮绿松石
+        glm::vec3(1.0f, 0.6f, 0.6f),      // 亮珊瑚色
+        glm::vec3(0.6f, 1.0f, 0.9f),      // 亮薄荷绿
+        // 第三层：深色变体（16个）
+        glm::vec3(0.8f, 0.0f, 0.0f),      // 深红
+        glm::vec3(0.0f, 0.8f, 0.0f),      // 深绿
+        glm::vec3(0.0f, 0.0f, 0.8f),      // 深蓝
+        glm::vec3(0.8f, 0.8f, 0.0f),      // 深黄
+        glm::vec3(0.8f, 0.0f, 0.8f),      // 深洋红
+        glm::vec3(0.0f, 0.8f, 0.8f),      // 深青
+        glm::vec3(0.8f, 0.4f, 0.0f),      // 深橙
+        glm::vec3(0.4f, 0.0f, 0.8f),      // 深紫
+        glm::vec3(0.8f, 0.0f, 0.4f),      // 深粉红
+        glm::vec3(0.0f, 0.4f, 0.8f),      // 深天蓝
+        glm::vec3(0.4f, 0.8f, 0.0f),      // 深酸橙
+        glm::vec3(0.8f, 0.7f, 0.0f),      // 深金色
+        glm::vec3(0.7f, 0.0f, 0.8f),      // 深薰衣草
+        glm::vec3(0.0f, 0.8f, 0.4f),      // 深绿松石
+        glm::vec3(0.8f, 0.4f, 0.4f),      // 深珊瑚色
+        glm::vec3(0.4f, 0.8f, 0.7f)       // 深薄荷绿
     };
 
-    float baseRadius = 12.0f;  // 基础旋转半径
-    float baseHeight = 3.5f;   // 基础高度
     outRotatingLights.clear();
+    const int totalLights = 48;  // 增加到48个光源
 
+    // 第一层：内圈（16个）- 半径8米，高度3-5米
     for (int i = 0; i < 16; ++i)
     {
-        // 每个光源有不同的初始角度、半径和高度
         float angle = i * glm::two_pi<float>() / 16.0f;
-        float radius = baseRadius + (i % 3 - 1) * 2.0f;  // 半径变化：10, 12, 14米
-        float height = baseHeight + (i % 2) * 1.0f;       // 高度变化：3.5, 4.5米
+        float radius = 8.0f + (i % 3 - 1) * 1.0f;  // 半径变化：7, 8, 9米
+        float height = 3.0f + (i % 2) * 1.0f;       // 高度变化：3, 4米
 
         glm::vec3 pos(
             std::cos(angle) * radius,
@@ -148,13 +185,65 @@ void SetupLighting(
         auto pointLight = std::make_shared<Renderer::Lighting::PointLight>(
             pos,
             pointLightColors[i],
-            8.0f,                              // 降低强度，避免过曝
+            10.0f,                             // 增加强度
             0.0f, 0.0f, 1.0f,                  // 无环境光，只有漫反射和镜面
-            Renderer::Lighting::PointLight::Attenuation::Range13()  // 13米范围，缩小光圈
+            Renderer::Lighting::PointLight::Attenuation::Range13()  // 13米范围
         );
         lightManager.AddPointLight(pointLight);
         outRotatingLights.push_back(pointLight);
-        Core::Logger::GetInstance().Info("✓ Added chaotic rotating point light " + std::to_string(i) +
+        Core::Logger::GetInstance().Info("✓ Added inner circle point light " + std::to_string(i) +
+                                         " at (" + std::to_string(pos.x) + ", " + std::to_string(pos.y) + ", " + std::to_string(pos.z) + ")");
+    }
+
+    // 第二层：中圈（16个）- 半径14米，高度4-6米
+    for (int i = 0; i < 16; ++i)
+    {
+        float angle = i * glm::two_pi<float>() / 16.0f + glm::radians(11.25f);  // 错开角度
+        float radius = 14.0f + (i % 3 - 1) * 1.5f;  // 半径变化：12.5, 14, 15.5米
+        float height = 4.5f + (i % 2) * 1.0f;       // 高度变化：4.5, 5.5米
+
+        glm::vec3 pos(
+            std::cos(angle) * radius,
+            height,
+            std::sin(angle) * radius
+        );
+
+        auto pointLight = std::make_shared<Renderer::Lighting::PointLight>(
+            pos,
+            pointLightColors[16 + i],  // 使用第二层颜色
+            12.0f,                             // 更强强度
+            0.0f, 0.0f, 1.0f,
+            Renderer::Lighting::PointLight::Attenuation::Range32()  // 32米范围，覆盖更大区域
+        );
+        lightManager.AddPointLight(pointLight);
+        outRotatingLights.push_back(pointLight);
+        Core::Logger::GetInstance().Info("✓ Added middle circle point light " + std::to_string(16 + i) +
+                                         " at (" + std::to_string(pos.x) + ", " + std::to_string(pos.y) + ", " + std::to_string(pos.z) + ")");
+    }
+
+    // 第三层：外圈（16个）- 半径20米，高度5-7米
+    for (int i = 0; i < 16; ++i)
+    {
+        float angle = i * glm::two_pi<float>() / 16.0f + glm::radians(22.5f);  // 再次错开角度
+        float radius = 20.0f + (i % 3 - 1) * 2.0f;  // 半径变化：18, 20, 22米
+        float height = 6.0f + (i % 2) * 1.0f;       // 高度变化：6, 7米
+
+        glm::vec3 pos(
+            std::cos(angle) * radius,
+            height,
+            std::sin(angle) * radius
+        );
+
+        auto pointLight = std::make_shared<Renderer::Lighting::PointLight>(
+            pos,
+            pointLightColors[32 + i],  // 使用第三层颜色
+            15.0f,                             // 最强强度
+            0.0f, 0.0f, 1.0f,
+            Renderer::Lighting::PointLight::Attenuation::Range50()  // 50米范围，覆盖整个舞台
+        );
+        lightManager.AddPointLight(pointLight);
+        outRotatingLights.push_back(pointLight);
+        Core::Logger::GetInstance().Info("✓ Added outer circle point light " + std::to_string(32 + i) +
                                          " at (" + std::to_string(pos.x) + ", " + std::to_string(pos.y) + ", " + std::to_string(pos.z) + ")");
     }
 
@@ -187,13 +276,15 @@ void SetupLighting(
     Core::Logger::GetInstance().Info("✓ Added flashlight (spot light)");
 
     // 中心点位置（用于旋转动画）
-    outCenterPosition = glm::vec3(0.0f, baseHeight, 0.0f);
+    outCenterPosition = glm::vec3(0.0f, 4.5f, 0.0f);  // 调整为三层平均高度
 
     Core::Logger::GetInstance().Info("========================================");
-    Core::Logger::GetInstance().Info("Multi-light configuration:");
-    Core::Logger::GetInstance().Info("  - Point light base radius: " + std::to_string(baseRadius) + "m");
-    Core::Logger::GetInstance().Info("  - Point light base height: " + std::to_string(baseHeight) + "m");
-    Core::Logger::GetInstance().Info("  - Point light intensity: 8.0x");
+    Core::Logger::GetInstance().Info("Multi-light configuration (48 lights):");
+    Core::Logger::GetInstance().Info("  - Inner circle: 16 lights @ 7-9m radius, 3-4m height, 10.0x intensity, 13m range");
+    Core::Logger::GetInstance().Info("  - Middle circle: 16 lights @ 12.5-15.5m radius, 4.5-5.5m height, 12.0x intensity, 32m range");
+    Core::Logger::GetInstance().Info("  - Outer circle: 16 lights @ 18-22m radius, 6-7m height, 15.0x intensity, 50m range");
+    Core::Logger::GetInstance().Info("  - Total coverage: 22m radius (entire stage)");
+    Core::Logger::GetInstance().Info("  - Color scheme: 48 unique colors (base/bright/dark variants)");
     Core::Logger::GetInstance().Info("  - Chaotic rotation: different speeds, directions, radii");
     Core::Logger::GetInstance().Info("========================================");
     lightManager.PrintAllLights();
@@ -520,12 +611,12 @@ DiscoStage CreateDiscoStage()
 
     // 中央Disco球 - 使用大量统一立方体密集拟合
     glm::vec3 centerPos(0.0f, 8.0f, 0.0f);
-    float discoBallRadius = 2.5f;
+    float discoBallRadius = 4.0f;  // 增大到4.0米（原来2.5米）
 
     // 使用斐波那契球面分布算法均匀分布立方体
-    const int numCubes = 500;  // 500个立方体密集拟合球体
+    const int numCubes = 800;  // 增加到800个立方体（原来500个）
     const float goldenRatio = (1.0f + std::sqrt(5.0f)) / 2.0f;
-    const float uniformCubeSize = 0.35f;  // 增大统一的立方体大小
+    const float uniformCubeSize = 0.4f;  // 增大立方体大小到0.4米（原来0.35米）
 
     for (int i = 0; i < numCubes; ++i)
     {
@@ -547,11 +638,11 @@ DiscoStage CreateDiscoStage()
         cubeInstances->Add(centerPos + offset, glm::vec3(0.0f), glm::vec3(uniformCubeSize), cubeColor);
     }
 
-    // 中央核心球体 - 缩小，作为内部核心
+    // 中央核心球体 - 增大，作为内部核心
     sphereInstances->Add(
         glm::vec3(0.0f, 8.0f, 0.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),  // 旋转在渲染循环中应用
-        glm::vec3(1.8f),  // 核心球体半径1.8，小于立方体层半径2.5
+        glm::vec3(3.0f),  // 核心球体半径3.0米（原来1.8米），与立方体层更协调
         glm::vec3(1.0f, 1.0f, 0.95f)  // 亮银白色
     );
 
@@ -667,11 +758,11 @@ DiscoStage CreateDiscoStage()
         Core::Logger::GetInstance().Error("Failed to create sphere renderer: " + std::string(e.what()));
     }
 
-    Core::Logger::GetInstance().Info("Disco Stage created: " +
+    Core::Logger::GetInstance().Info("Super Disco Stage created: " +
                                      std::to_string(stage.renderers.size()) + " renderer types - " +
                                      "1 floor, " +
-                                     std::to_string(cubeInstances->GetCount()) + " cubes, " +
-                                     std::to_string(sphereInstances->GetCount()) + " core spheres (1 center + 8 colored)");
+                                     std::to_string(cubeInstances->GetCount()) + " cubes (800 center + 800 colored), " +
+                                     std::to_string(sphereInstances->GetCount()) + " core spheres (1 giant center + 8 colored)");
 
     return stage;
 }
@@ -895,13 +986,29 @@ int main()
             // ========================================
             if (!animationPaused)
             {
-                // 更新旋转的点光源位置 - 真正混乱的Disco风格
+                // 更新旋转的点光源位置 - 48个光源三层布局
                 float time = static_cast<float>(glfwGetTime());
                 for (size_t i = 0; i < rotatingPointLights.size(); ++i)
                 {
                     // 每个光源有独特的运动参数
-                    float angleOffset = static_cast<float>(i) * glm::two_pi<float>() / 16.0f;
+                    float angleOffset = static_cast<float>(i) * glm::two_pi<float>() / 48.0f;  // 更新为48个光源
                     float speed = 0.5f + static_cast<float>(i % 5) * 0.3f;
+
+                    // 根据光源所在的层级调整运动范围
+                    float baseRadius, baseHeight;
+                    if (i < 16) {
+                        // 内圈（0-15）
+                        baseRadius = 8.0f;
+                        baseHeight = 3.5f;
+                    } else if (i < 32) {
+                        // 中圈（16-31）
+                        baseRadius = 14.0f;
+                        baseHeight = 5.0f;
+                    } else {
+                        // 外圈（32-47）
+                        baseRadius = 20.0f;
+                        baseHeight = 6.5f;
+                    }
 
                     // 不同的运动模式
                     int motionPattern = i % 4;
@@ -910,9 +1017,9 @@ int main()
                     if (motionPattern == 0)
                     {
                         // 模式0：椭圆运动（水平拉伸）
-                        float radiusX = 12.0f;
-                        float radiusZ = 8.0f;
-                        float height = 4.0f + std::sin(time * speed * 3.0f) * 0.8f;
+                        float radiusX = baseRadius * 1.2f;
+                        float radiusZ = baseRadius * 0.8f;
+                        float height = baseHeight + std::sin(time * speed * 3.0f) * 0.8f;
                         offset = glm::vec3(
                             std::sin(time * speed + angleOffset) * radiusX,
                             height,
@@ -922,20 +1029,19 @@ int main()
                     else if (motionPattern == 1)
                     {
                         // 模式1：8字形运动（利萨如曲线）
-                        float radius = 10.0f;
+                        float radius = baseRadius * 0.9f;
                         offset = glm::vec3(
                             std::sin(time * speed + angleOffset) * radius,
-                            4.0f + std::sin(time * speed * 2.0f) * 0.6f,
+                            baseHeight + std::sin(time * speed * 2.0f) * 0.6f,
                             std::sin(time * speed * 2.0f + angleOffset) * radius * 0.7f
                         );
                     }
                     else if (motionPattern == 2)
                     {
                         // 模式2：螺旋进出运动
-                        float baseRadius = 11.0f;
-                        float radiusVariation = std::sin(time * speed * 0.5f) * 3.0f;
+                        float radiusVariation = std::sin(time * speed * 0.5f) * (baseRadius * 0.25f);
                         float currentRadius = baseRadius + radiusVariation;
-                        float height = 3.5f + std::cos(time * speed) * 1.0f;
+                        float height = baseHeight + std::cos(time * speed) * 1.0f;
                         offset = glm::vec3(
                             std::sin(time * speed * 1.5f + angleOffset) * currentRadius,
                             height,
@@ -945,10 +1051,10 @@ int main()
                     else
                     {
                         // 模式3：随机抖动圆形运动
-                        float radius = 13.0f;
+                        float radius = baseRadius * 1.1f;
                         float jitterX = std::sin(time * speed * 7.0f + i) * 2.0f;
                         float jitterZ = std::cos(time * speed * 5.0f + i) * 2.0f;
-                        float height = 3.8f + std::sin(time * speed * 4.0f) * 0.7f;
+                        float height = baseHeight + std::sin(time * speed * 4.0f) * 0.7f;
                         offset = glm::vec3(
                             std::sin(time * speed * 0.8f + angleOffset) * radius + jitterX,
                             height,
@@ -981,14 +1087,15 @@ int main()
                 centerModel = glm::rotate(centerModel, glm::radians(centerRotX), glm::vec3(1.0f, 0.0f, 0.0f));
                 centerModel = glm::rotate(centerModel, glm::radians(centerRotY), glm::vec3(0.0f, 1.0f, 0.0f));
                 centerModel = glm::rotate(centerModel, glm::radians(centerRotZ), glm::vec3(0.0f, 0.0f, 1.0f));
-                centerModel = glm::scale(centerModel, glm::vec3(1.8f));
+                centerModel = glm::scale(centerModel, glm::vec3(3.0f));  // 更新为核心球体半径3.0米
                 sphereMatrices[0] = centerModel;
 
-                // 中央disco球周围的500个立方体自转（索引0-499）
-                const int centerCubesCount = 500;
-                const float discoBallRadius = 2.5f;
-                const float centerCubeSize = 0.35f;
+                // 中央disco球周围的800个立方体自转（索引0-799）
+                const int centerCubesCount = 800;  // 更新为800个立方体
+                const float discoBallRadius = 4.0f;  // 更新为4.0米半径
+                const float centerCubeSize = 0.4f;  // 更新为0.4米立方体
 
+                // 更新中心800个立方体的位置和旋转
                 for (int j = 0; j < centerCubesCount; ++j)
                 {
                     // 使用Fibonacci球算法重新计算每个立方体的相对位置
@@ -1050,10 +1157,11 @@ int main()
 
                     sphereMatrices[i + 1] = lightModel;  // 索引1-8对应8个彩色球体
 
-                    // 更新每个彩色球体周围的100个立方体（索引500-1299）
+                    // 更新每个彩色球体周围的100个立方体（索引800-1599）
                     const float lightCubeSize = 0.2f;
-                    int cubeStartIndex = centerCubesCount + i * cubesPerLight;
+                    int cubeStartIndex = centerCubesCount + i * cubesPerLight;  // 800 + i * 100
 
+                    // 更新第i个彩色球体的100个立方体
                     for (int j = 0; j < cubesPerLight; ++j)
                     {
                         // 使用Fibonacci球算法计算立方体的相对位置
