@@ -4,6 +4,7 @@
 #include "Renderer/Resources/Shader.hpp"
 #include <string>
 #include <memory>
+#include <cstdint>
 
 namespace Renderer
 {
@@ -18,6 +19,44 @@ namespace Renderer
             DIRECTIONAL,  // 平行光（方向光，如太阳光）
             POINT,        // 点光源（从一个点向所有方向发光，如灯泡）
             SPOT          // 聚光灯（从一个点向特定方向锥形发光）
+        };
+
+        /**
+         * LightHandle - 光源句柄（修复索引失效问题）
+         *
+         * 设计要点：
+         * - 使用稳定的 generation ID 而非容器索引
+         * - 禁用拷贝，仅可移动
+         * - 类型安全，包含光源类型标签
+         */
+        class LightHandle
+        {
+        public:
+            LightHandle() : m_id(0), m_generation(0), m_type(LightType::DIRECTIONAL) {}
+
+            LightHandle(size_t id, size_t generation, LightType type)
+                : m_id(id), m_generation(generation), m_type(type) {}
+
+            // 禁用拷贝
+            LightHandle(const LightHandle&) = delete;
+            LightHandle& operator=(const LightHandle&) = delete;
+
+            // 允许移动
+            LightHandle(LightHandle&&) noexcept = default;
+            LightHandle& operator=(LightHandle&&) noexcept = default;
+
+            // 访问器
+            size_t GetId() const { return m_id; }
+            size_t GetGeneration() const { return m_generation; }
+            LightType GetType() const { return m_type; }
+
+            // 有效性检查
+            bool IsValid() const { return m_generation > 0; }
+
+        private:
+            size_t m_id;          // 稳定的 ID
+            size_t m_generation;  // 代数标记（用于检测失效句柄）
+            LightType m_type;     // 光源类型
         };
 
         /**
@@ -201,7 +240,7 @@ namespace Renderer
         };
 
         /**
-         * SpotLight 类 - 聚光灯
+         * SpotLight 类 - 聚光灯（修复：使用组合而非继承）
          *
          * 特点：
          * - 从一个点向特定方向锥形发光
@@ -209,10 +248,18 @@ namespace Renderer
          * - 有截止角度（内锥和外锥）
          * - 随距离衰减
          * - 适用于：手电筒、台灯、舞台灯光
+         *
+         * 修复说明：
+         * - 不再继承 PointLight（违反 Liskov 原则）
+         * - 直接继承 Light，组合位置和衰减属性
+         * - 避免 is-a 语义错误
          */
-        class SpotLight : public PointLight
+        class SpotLight : public Light
         {
         public:
+            // 衰减参数（与 PointLight 相同）
+            using Attenuation = PointLight::Attenuation;
+
             SpotLight(
                 const glm::vec3 &position = glm::vec3(0.0f),
                 const glm::vec3 &direction = glm::vec3(0.0f, -1.0f, 0.0f),
@@ -221,7 +268,7 @@ namespace Renderer
                 float ambient = 0.1f,
                 float diffuse = 0.8f,
                 float specular = 0.5f,
-                const PointLight::Attenuation &attenuation = PointLight::Attenuation::Range20(),
+                const Attenuation &attenuation = PointLight::Attenuation::Range20(),
                 float cutOff = glm::radians(12.5f),
                 float outerCutOff = glm::radians(15.0f));
 
@@ -230,9 +277,20 @@ namespace Renderer
             void ApplyToShader(class Shader &shader, int index = 0) const override;
             std::string GetDescription() const override;
 
+            // 位置属性
+            const glm::vec3 &GetPosition() const { return m_position; }
+            void SetPosition(const glm::vec3 &position) { m_position = position; }
+
             // 方向属性
             const glm::vec3 &GetDirection() const { return m_direction; }
             void SetDirection(const glm::vec3 &direction) { m_direction = direction; }
+
+            // 衰减属性
+            const Attenuation &GetAttenuation() const { return m_attenuation; }
+            void SetAttenuation(const Attenuation &attenuation) { m_attenuation = attenuation; }
+
+            // 获取有效距离（近似值）
+            float GetEffectiveRange() const;
 
             // 截止角度
             float GetCutOff() const { return m_cutOff; }
@@ -250,7 +308,9 @@ namespace Renderer
             void SetOuterCutOffDegrees(float degrees) { m_outerCutOff = glm::radians(degrees); }
 
         private:
+            glm::vec3 m_position;
             glm::vec3 m_direction;
+            Attenuation m_attenuation;
             float m_cutOff;        // 内锥角度（弧度）
             float m_outerCutOff;   // 外锥角度（弧度，用于边缘柔化）
         };

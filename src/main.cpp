@@ -3,7 +3,7 @@
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
-#include "Renderer/Lighting/LightManager.hpp"
+#include "Renderer/Core/RenderContext.hpp"  // ⭐ NEW - 多Context架构
 #include "Renderer/Lighting/Light.hpp"
 #include "Renderer/Resources/Shader.hpp"
 #include "Renderer/Data/MeshBuffer.hpp"
@@ -328,11 +328,12 @@ void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
  * 初始化多光源系统
  */
 void SetupLighting(
+    Renderer::Core::RenderContext &renderContext,
     std::vector<Renderer::Lighting::PointLightPtr> &outRotatingLights,
     Renderer::Lighting::SpotLightPtr &outFlashlight,
     glm::vec3 &outCenterPosition)
 {
-    auto &lightManager = Renderer::Lighting::LightManager::GetInstance();
+    auto &lightManager = renderContext.GetLightManager();  // ⭐ 使用RenderContext
 
     Core::Logger::GetInstance().Info("========================================");
     Core::Logger::GetInstance().Info("Setting up multi-light system...");
@@ -1176,12 +1177,17 @@ int main()
                                                { mouseController.ToggleMouseCapture(); });
 
         // ========================================
+        // ⭐ 创建主场景RenderContext
+        // ========================================
+        Renderer::Core::RenderContext mainContext;
+
+        // ========================================
         // 初始化多光源系统
         // ========================================
         std::vector<Renderer::Lighting::PointLightPtr> rotatingPointLights;
         Renderer::Lighting::SpotLightPtr flashlight;
         glm::vec3 centerPosition(0.0f, 0.0f, 0.0f);
-        SetupLighting(rotatingPointLights, flashlight, centerPosition);
+        SetupLighting(mainContext, rotatingPointLights, flashlight, centerPosition);  // ⭐ 传递Context
 
         // ========================================
         // 创建Skybox系统
@@ -1526,8 +1532,8 @@ int main()
             // 应用环境光照
             ambientLighting.ApplyToShader(ambientShader);
 
-            // 应用所有直接光源
-            Renderer::Lighting::LightManager::GetInstance().ApplyToShader(ambientShader);
+            // ⭐ 应用所有直接光源（使用RenderContext）
+            mainContext.GetLightManager().ApplyToShader(ambientShader);
 
             // ========================================
             // 渲染Disco舞台

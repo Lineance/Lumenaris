@@ -195,11 +195,44 @@ LearningOpenGL/
   - Phong光照模型：环境光、漫反射、镜面反射
   - 光照强度、颜色、开关状态控制
   - ApplyToShader()方法将光照数据传递给着色器
+  - ⚠️ **修复**: 禁用光源时设置零值uniform而非跳过（避免未初始化数据）
 
-- **LightManager 类**: 光照管理器（单例模式）
+- **LightHandle 类**: ⭐ NEW - 光源句柄系统
+  - 使用稳定的 `id + generation` 机制（避免索引失效）
+  - 禁用拷贝，仅可移动（避免意外复制）
+  - 类型安全，包含光源类型标签
+  - 线程安全支持
+
+- **LightManager 类**: ⭐ **可实例化类** - 光照管理器（完全移除单例）
   - 统一管理所有光源
-  - 支持多光源渲染（最多16个点光源）
-  - 批量应用光源到着色器
+  - ⭐ **多Context架构**: 每个RenderContext拥有独立实例
+  - ⭐ **线程安全**: 使用 `std::shared_mutex` 支持读写并发
+  - ⭐ **稳定引用**: 使用 `LightHandle` 替代容易失效的索引
+  - ⭐ **修复ODR违规**: 使用 `inline static constexpr`
+  - 支持多光源渲染（最多48个点光源、4个平行光、8个聚光灯）
+  - 批量应用光源到着色器（线程安全）
+  - 完全隔离，无全局状态污染
+
+- **SpotLight 类**: 聚光灯（⭐ **架构重构**）
+  - ⭐ **修复**: 不再继承 PointLight，改为直接继承 Light（组合模式）
+  - 避免违反 Liskov 原则
+  - 独立实现位置、方向、衰减属性
+  - 支持内锥角和外锥角控制
+
+**RenderContext 类**: ⭐ NEW - 多Context架构核心 (`include/Renderer/Core/RenderContext.hpp`)
+- **设计目标**:
+  - 每个渲染场景（主场景、ImGui层、预览窗口）拥有独立的Context
+  - Context包含完全独立的光照、环境、渲染状态
+  - 避免单例模式导致的全局状态污染
+- **架构优势**:
+  - ✅ ImGui2D层可以拥有零光照环境，不影响主场景
+  - ✅ 多窗口预览完全独立，无状态覆盖问题
+  - ✅ 线程安全：每个Context独立加锁，无跨Context锁竞争
+  - ✅ 可测试性：每个Context独立创建销毁
+- **成员组件**:
+  - `LightManager`: 独立的光照管理器
+  - `Skybox`: 独立的天空盒
+  - `AmbientLighting`: 独立的环境光照
 
 **环境渲染系统** (`include/Renderer/Environment/`)
 - **Skybox 类**: 天空盒渲染器

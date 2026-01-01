@@ -9,6 +9,7 @@
   - [KeyboardController 类](#keyboardcontroller-类)
   - [Logger 类](#logger-类)
 - [Lighting 模块接口](#lighting-模块接口)
+  - [LightHandle 类](#lighthandle-类)
   - [Light 类](#light-类)
   - [DirectionalLight 类](#directionallight-类)
   - [PointLight 类](#pointlight-类)
@@ -470,6 +471,59 @@ public:
 
 ## Lighting 模块接口
 
+### LightHandle 类 ⭐ NEW
+
+**文件**: `include/Renderer/Lighting/Light.hpp`
+
+**描述**: 光源句柄，提供稳定的引用机制，替代容易失效的索引系统。
+
+**设计要点**:
+- 使用稳定的 `id + generation` 机制（避免索引失效问题）
+- 禁用拷贝，仅可移动（避免意外复制）
+- 类型安全，包含光源类型标签
+- 线程安全支持
+
+```cpp
+class LightHandle {
+public:
+    LightHandle();  // 默认构造无效句柄
+
+    // 访问器
+    size_t GetId() const;           // 获取稳定ID
+    size_t GetGeneration() const;   // 获取代数标记
+    LightType GetType() const;      // 获取光源类型
+
+    // 有效性检查
+    bool IsValid() const;           // 检查句柄是否有效
+
+    // 禁用拷贝，仅可移动
+    LightHandle(const LightHandle&) = delete;
+    LightHandle& operator=(const LightHandle&) = delete;
+    LightHandle(LightHandle&&) noexcept = default;
+    LightHandle& operator=(LightHandle&&) noexcept = default;
+};
+```
+
+**使用示例**:
+```cpp
+// 添加光源，返回LightHandle
+auto pointLight = std::make_shared<PointLight>(...);
+LightHandle handle = lightManager.AddPointLight(pointLight);
+
+// 使用句柄获取光源
+auto light = lightManager.GetPointLight(handle);
+if (light) {
+    light->SetIntensity(10.0f);
+}
+
+// 使用句柄移除光源
+lightManager.RemovePointLight(handle);
+```
+
+**线程安全**: 是（所有操作都是只读的，完全线程安全）
+
+---
+
 ### Light 类
 
 光照系统基类，定义了所有光源的通用属性和接口。
@@ -652,9 +706,11 @@ public:
 
 ---
 
-### SpotLight 类
+### SpotLight 类 ⭐ UPDATED
 
 聚光灯，从一个点向特定方向锥形发光。
+
+**架构更新**: 不再继承 `PointLight`，改为直接继承 `Light`，使用组合模式（修复Liskov原则违反）。
 
 ```cpp
 namespace Renderer {
@@ -662,6 +718,9 @@ namespace Lighting {
 
 class SpotLight : public Light {
 public:
+    // 使用PointLight的Attenuation类型（兼容性）
+    using Attenuation = PointLight::Attenuation;
+
     SpotLight(
         const glm::vec3 &position,
         const glm::vec3 &direction,
@@ -670,26 +729,35 @@ public:
         float ambient = 0.0f,
         float diffuse = 0.8f,
         float specular = 1.0f,
-        const PointLight::Attenuation &attenuation = PointLight::Attenuation(),
-        float cutOff = glm::cos(glm::radians(12.5f)),
-        float outerCutOff = glm::cos(glm::radians(17.5f)));
+        const Attenuation &attenuation = PointLight::Attenuation(),
+        float cutOff = glm::radians(12.5f),      // ⚠️ 注意：现在使用弧度
+        float outerCutOff = glm::radians(17.5f));
 
-    // 位置、方向和衰减
+    // 位置、方向和衰减（组合而非继承）
     const glm::vec3 &GetPosition() const;
     void SetPosition(const glm::vec3 &position);
 
     const glm::vec3 &GetDirection() const;
     void SetDirection(const glm::vec3 &direction);
 
-    const PointLight::Attenuation &GetAttenuation() const;
-    void SetAttenuation(const PointLight::Attenuation &attenuation);
+    const Attenuation &GetAttenuation() const;
+    void SetAttenuation(const Attenuation &attenuation);
 
-    // 锥形角度
+    // 有效距离计算
+    float GetEffectiveRange() const;
+
+    // 锥形角度（度数和弧度）
     float GetCutOff() const;
     void SetCutOff(float cutOff);
 
     float GetOuterCutOff() const;
     void SetOuterCutOff(float outerCutOff);
+
+    float GetCutOffDegrees() const;
+    void SetCutOffDegrees(float degrees);
+
+    float GetOuterCutOffDegrees() const;
+    void SetOuterCutOffDegrees(float degrees);
 
     // 接口实现
     LightType GetType() const override;
@@ -705,21 +773,30 @@ public:
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `SpotLight()` | position, direction, color, ... | - | 构造聚光灯，设置位置、方向和锥角 |
+| `SpotLight()` | position, direction, color, ... | - | 构造聚光灯，设置位置、方向和锥角（弧度） |
 | `GetPosition()` | 无 | const glm::vec3& | 获取光源位置 |
 | `SetPosition()` | position | void | 设置光源位置 |
 | `GetDirection()` | 无 | const glm::vec3& | 获取光照方向 |
 | `SetDirection()` | direction | void | 设置光照方向 |
-| `GetCutOff()` | 无 | float | 获取内锥角（余弦值） |
-| `SetCutOff()` | cutOff | void | 设置内锥角（余弦值） |
+| `GetEffectiveRange()` | 无 | float | 计算有效光照距离（近似值） |
+| `GetCutOff()` | 无 | float | 获取内锥角（弧度） |
+| `SetCutOff()` | cutOff | void | 设置内锥角（弧度） |
+| `GetCutOffDegrees()` | 无 | float | 获取内锥角（度数） |
+| `SetCutOffDegrees()` | degrees | void | 设置内锥角（度数） |
 | `GetOuterCutOff()` | 无 | float | 获取外锥角（余弦值） |
 | `SetOuterCutOff()` | outerCutOff | void | 设置外锥角（余弦值） |
 
 ---
 
-### LightManager 类
+### LightManager 类 ⭐ UPDATED
 
 光照管理器，统一管理所有光源（单例模式）。
+
+**重大更新**:
+- ✅ 线程安全：使用 `std::shared_mutex` 支持读写并发
+- ✅ 稳定引用：使用 `LightHandle` 替代容易失效的索引
+- ✅ 修复ODR违规：使用 `inline static constexpr`
+- ✅ 修复Uniform未初始化：禁用光源时设置零值
 
 ```cpp
 namespace Renderer {
@@ -730,21 +807,44 @@ public:
     // 获取单例实例
     static LightManager &GetInstance();
 
-    // 添加光源
-    void AddDirectionalLight(std::shared_ptr<DirectionalLight> light);
-    void AddPointLight(std::shared_ptr<PointLight> light);
-    void AddSpotLight(std::shared_ptr<SpotLight> light);
+    // 光源数量限制（与着色器中的数组大小对应）
+    inline static constexpr int MAX_DIRECTIONAL_LIGHTS = 4;
+    inline static constexpr int MAX_POINT_LIGHTS = 48;
+    inline static constexpr int MAX_SPOT_LIGHTS = 8;
 
-    // 获取光源列表
-    const std::vector<std::shared_ptr<DirectionalLight>>& GetDirectionalLights() const;
-    const std::vector<std::shared_ptr<PointLight>>& GetPointLights() const;
-    const std::vector<std::shared_ptr<SpotLight>>& GetSpotLights() const;
+    // ⭐ 添加光源（返回LightHandle）
+    LightHandle AddDirectionalLight(const DirectionalLightPtr &light);
+    LightHandle AddPointLight(const PointLightPtr &light);
+    LightHandle AddSpotLight(const SpotLightPtr &light);
 
-    // 应用所有光源到着色器
+    // ⭐ 移除光源（使用LightHandle）
+    bool RemoveDirectionalLight(const LightHandle &handle);
+    bool RemovePointLight(const LightHandle &handle);
+    bool RemoveSpotLight(const LightHandle &handle);
+
+    // ⭐ 获取光源（使用LightHandle）
+    DirectionalLightPtr GetDirectionalLight(const LightHandle &handle);
+    PointLightPtr GetPointLight(const LightHandle &handle);
+    SpotLightPtr GetSpotLight(const LightHandle &handle);
+
+    // 清空所有光源
+    void ClearAll();
+
+    // 查询光源数量
+    int GetDirectionalLightCount() const;
+    int GetPointLightCount() const;
+    int GetSpotLightCount() const;
+    int GetTotalLightCount() const;
+
+    // 应用所有光源到着色器（线程安全）
     void ApplyToShader(Shader &shader) const;
 
-    // 清除所有光源
-    void Clear();
+    // 调试信息
+    std::string GetStatistics() const;
+    void PrintAllLights() const;
+
+private:
+    LightManager() = default;  // 私有构造函数（单例）
 };
 
 } // namespace Lighting
@@ -756,30 +856,44 @@ public:
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
 | `GetInstance()` | 无 | LightManager& | 获取单例实例 |
-| `AddDirectionalLight()` | shared_ptr<DirectionalLight> | void | 添加平行光 |
-| `AddPointLight()` | shared_ptr<PointLight> | void | 添加点光源 |
-| `AddSpotLight()` | shared_ptr<SpotLight> | void | 添加聚光灯 |
-| `GetDirectionalLights()` | 无 | const vector& | 获取所有平行光 |
-| `GetPointLights()` | 无 | const vector& | 获取所有点光源 |
-| `GetSpotLights()` | 无 | const vector& | 获取所有聚光灯 |
-| `ApplyToShader()` | shader | void | 将所有光源应用到着色器 |
-| `Clear()` | 无 | void | 清除所有光源 |
+| `AddDirectionalLight()` | shared_ptr<DirectionalLight> | LightHandle | 添加平行光，返回稳定句柄 |
+| `AddPointLight()` | shared_ptr<PointLight> | LightHandle | 添加点光源，返回稳定句柄 |
+| `AddSpotLight()` | shared_ptr<SpotLight> | LightHandle | 添加聚光灯，返回稳定句柄 |
+| `RemoveDirectionalLight()` | LightHandle | bool | 移除平行光（使用句柄） |
+| `RemovePointLight()` | LightHandle | bool | 移除点光源（使用句柄） |
+| `RemoveSpotLight()` | LightHandle | bool | 移除聚光灯（使用句柄） |
+| `GetDirectionalLight()` | LightHandle | shared_ptr | 获取平行光（使用句柄） |
+| `GetPointLight()` | LightHandle | shared_ptr | 获取点光源（使用句柄） |
+| `GetSpotLight()` | LightHandle | shared_ptr | 获取聚光灯（使用句柄） |
+| `ClearAll()` | 无 | void | 清空所有光源 |
+| `GetDirectionalLightCount()` | 无 | int | 获取平行光数量 |
+| `GetPointLightCount()` | 无 | int | 获取点光源数量 |
+| `GetSpotLightCount()` | 无 | int | 获取聚光灯数量 |
+| `GetTotalLightCount()` | 无 | int | 获取总光源数量 |
+| `ApplyToShader()` | shader | void | 将所有光源应用到着色器（线程安全） |
+| `GetStatistics()` | 无 | string | 获取统计信息 |
+| `PrintAllLights()` | 无 | void | 打印所有光源信息 |
 
-#### 使用示例
+**线程安全**: 所有公共方法都是线程安全的
+- 读操作使用共享锁（允许并发读）
+- 写操作使用独占锁
+- `ApplyToShader` 可在渲染线程并发调用
+
+#### 使用示例 ⭐ UPDATED
 
 ```cpp
 // 1. 创建光照管理器
 auto& lightManager = Renderer::Lighting::LightManager::GetInstance();
 
-// 2. 添加平行光（太阳光）
+// 2. 添加平行光（太阳光），返回LightHandle
 auto dirLight = std::make_shared<Renderer::Lighting::DirectionalLight>(
     glm::vec3(0.0f, -1.0f, -0.3f),  // 方向
     glm::vec3(1.0f, 0.95f, 0.9f),     // 颜色（暖白光）
     0.5f                             // 强度
 );
-lightManager.AddDirectionalLight(dirLight);
+Renderer::Lighting::LightHandle dirHandle = lightManager.AddDirectionalLight(dirLight);
 
-// 3. 添加点光源（彩色灯球）
+// 3. 添加点光源（彩色灯球），返回LightHandle
 auto pointLight1 = std::make_shared<Renderer::Lighting::PointLight>(
     glm::vec3(0.0f, 8.0f, 0.0f),     // 位置
     glm::vec3(1.0f, 0.1f, 0.1f),     // 红色
@@ -787,9 +901,15 @@ auto pointLight1 = std::make_shared<Renderer::Lighting::PointLight>(
     0.0f, 0.8f, 1.0f,                // ambient, diffuse, specular
     Renderer::Lighting::PointLight::Attenuation::Range32()  // 32米衰减
 );
-lightManager.AddPointLight(pointLight1);
+Renderer::Lighting::LightHandle pointHandle = lightManager.AddPointLight(pointLight1);
 
-// 4. 添加聚光灯（手电筒）
+// 4. 使用句柄获取光源并修改
+auto light = lightManager.GetPointLight(pointHandle);
+if (light) {
+    light->SetIntensity(10.0f);
+}
+
+// 5. 添加聚光灯（手电筒）
 auto flashlight = std::make_shared<Renderer::Lighting::SpotLight>(
     camera.GetPosition(),            // 位置（跟随摄像机）
     camera.GetFront(),               // 方向（摄像机朝向）
@@ -797,12 +917,15 @@ auto flashlight = std::make_shared<Renderer::Lighting::SpotLight>(
     1.0f,                            // 强度
     0.0f, 0.8f, 1.0f,                // ambient, diffuse, specular
     Renderer::Lighting::PointLight::Attenuation::Range50(),  // 50米衰减
-    glm::cos(glm::radians(12.5f)),   // 内锥角12.5度
-    glm::cos(glm::radians(17.5f))    // 外锥角17.5度
+    glm::radians(12.5f),            // ⚠️ 注意：现在使用弧度
+    glm::radians(17.5f)
 );
-lightManager.AddSpotLight(flashlight);
+Renderer::Lighting::LightHandle spotHandle = lightManager.AddSpotLight(flashlight);
 
-// 5. 在渲染循环中应用光源
+// 6. 使用句柄移除光源
+lightManager.RemovePointLight(pointHandle);
+
+// 7. 在渲染循环中应用光源（线程安全）
 shader.Use();
 lightManager.ApplyToShader(shader);
 ```

@@ -29,8 +29,8 @@
 #include "Core/MouseController.hpp"
 #include "Core/KeyboardController.hpp"
 #include "Core/Logger.hpp"
+#include "Renderer/Core/RenderContext.hpp"  // ⭐ NEW - 多Context架构
 #include "Renderer/Environment/Skybox.hpp"
-#include "Renderer/Lighting/LightManager.hpp"
 #include "Renderer/Lighting/Light.hpp"
 #include "Renderer/Resources/Shader.hpp"
 #include "Renderer/Data/MeshBuffer.hpp"
@@ -109,9 +109,9 @@ std::shared_ptr<Renderer::InstanceData> CreateFloor()
 /**
  * 设置光照
  */
-void SetupLighting()
+void SetupLighting(Renderer::Core::RenderContext& renderContext)
 {
-    auto& lightManager = Renderer::Lighting::LightManager::GetInstance();
+    auto& lightManager = renderContext.GetLightManager();
 
     // 太阳光（平行光）
     auto sun = std::make_shared<Renderer::Lighting::DirectionalLight>(

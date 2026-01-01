@@ -53,6 +53,7 @@ add_library(Renderer STATIC
     src/Renderer/Environment/Skybox.cpp
     src/Renderer/Environment/SkyboxLoader.cpp
     src/Renderer/Environment/AmbientLighting.cpp
+    src/Renderer/Core/RenderContext.cpp  # ⭐ NEW - 多Context架构支持
 )
 target_include_directories(Renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

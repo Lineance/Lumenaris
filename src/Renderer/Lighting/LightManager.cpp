@@ -3,6 +3,7 @@
 #include "Core/Logger.hpp"
 #include "Core/GLM.hpp"
 #include <sstream>
+#include <shared_mutex>
 
 namespace Renderer
 {
@@ -10,193 +11,337 @@ namespace Renderer
     {
 
         // ========================================
-        // 单例实现
+        // 构造函数和析构函数
         // ========================================
 
-        LightManager &LightManager::GetInstance()
-        {
-            static LightManager instance;
-            return instance;
-        }
+        // LightManager 现在是可实例化类，通过 RenderContext 创建
+        // 不再有单例模式
 
         // ========================================
-        // 添加光源
+        // 添加光源（返回LightHandle）
         // ========================================
 
-        int LightManager::AddDirectionalLight(const DirectionalLightPtr &light)
+        LightHandle LightManager::AddDirectionalLight(const DirectionalLightPtr &light)
         {
             if (!light)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Attempted to add null directional light");
-                return -1;
+                return LightHandle();
             }
+
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
 
             if (m_directionalLights.size() >= MAX_DIRECTIONAL_LIGHTS)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Maximum directional lights reached (" +
                                                     std::to_string(MAX_DIRECTIONAL_LIGHTS) + ")");
-                return -1;
+                return LightHandle();
             }
 
-            m_directionalLights.push_back(light);
-            Core::Logger::GetInstance().Info("LightManager: Added directional light [" + light->GetDescription() + "]");
+            size_t id = m_nextDirectionalId++;
+            m_directionalLights[id] = LightEntry{light, 1};
 
-            return static_cast<int>(m_directionalLights.size()) - 1;
+            Core::Logger::GetInstance().Info("LightManager: Added directional light [" + light->GetDescription() + "] with ID " + std::to_string(id));
+
+            return LightHandle(id, 1, LightType::DIRECTIONAL);
         }
 
-        int LightManager::AddPointLight(const PointLightPtr &light)
+        LightHandle LightManager::AddPointLight(const PointLightPtr &light)
         {
             if (!light)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Attempted to add null point light");
-                return -1;
+                return LightHandle();
             }
+
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
 
             if (m_pointLights.size() >= MAX_POINT_LIGHTS)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Maximum point lights reached (" +
                                                     std::to_string(MAX_POINT_LIGHTS) + ")");
-                return -1;
+                return LightHandle();
             }
 
-            m_pointLights.push_back(light);
-            Core::Logger::GetInstance().Info("LightManager: Added point light [" + light->GetDescription() + "]");
+            size_t id = m_nextPointId++;
+            m_pointLights[id] = LightEntry{light, 1};
 
-            return static_cast<int>(m_pointLights.size()) - 1;
+            Core::Logger::GetInstance().Info("LightManager: Added point light [" + light->GetDescription() + "] with ID " + std::to_string(id));
+
+            return LightHandle(id, 1, LightType::POINT);
         }
 
-        int LightManager::AddSpotLight(const SpotLightPtr &light)
+        LightHandle LightManager::AddSpotLight(const SpotLightPtr &light)
         {
             if (!light)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Attempted to add null spot light");
-                return -1;
+                return LightHandle();
             }
+
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
 
             if (m_spotLights.size() >= MAX_SPOT_LIGHTS)
             {
                 Core::Logger::GetInstance().Warning("LightManager: Maximum spot lights reached (" +
                                                     std::to_string(MAX_SPOT_LIGHTS) + ")");
-                return -1;
+                return LightHandle();
             }
 
-            m_spotLights.push_back(light);
-            Core::Logger::GetInstance().Info("LightManager: Added spot light [" + light->GetDescription() + "]");
+            size_t id = m_nextSpotId++;
+            m_spotLights[id] = LightEntry{light, 1};
 
-            return static_cast<int>(m_spotLights.size()) - 1;
+            Core::Logger::GetInstance().Info("LightManager: Added spot light [" + light->GetDescription() + "] with ID " + std::to_string(id));
+
+            return LightHandle(id, 1, LightType::SPOT);
         }
 
         // ========================================
-        // 移除光源
+        // 移除光源（使用LightHandle）
         // ========================================
 
-        bool LightManager::RemoveDirectionalLight(int index)
+        bool LightManager::RemoveDirectionalLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_directionalLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::DIRECTIONAL)
             {
-                Core::Logger::GetInstance().Warning("LightManager: Invalid directional light index: " +
-                                                    std::to_string(index));
+                Core::Logger::GetInstance().Warning("LightManager: Invalid directional light handle");
                 return false;
             }
 
-            Core::Logger::GetInstance().Info("LightManager: Removed directional light at index " +
-                                            std::to_string(index));
-            m_directionalLights.erase(m_directionalLights.begin() + index);
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_directionalLights.find(handle.GetId());
+            if (it == m_directionalLights.end())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Directional light ID " +
+                                                    std::to_string(handle.GetId()) + " not found");
+                return false;
+            }
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Directional light handle is stale (generation mismatch)");
+                return false;
+            }
+
+            Core::Logger::GetInstance().Info("LightManager: Removed directional light with ID " + std::to_string(handle.GetId()));
+            m_directionalLights.erase(it);
             return true;
         }
 
-        bool LightManager::RemovePointLight(int index)
+        bool LightManager::RemovePointLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_pointLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::POINT)
             {
-                Core::Logger::GetInstance().Warning("LightManager: Invalid point light index: " +
-                                                    std::to_string(index));
+                Core::Logger::GetInstance().Warning("LightManager: Invalid point light handle");
                 return false;
             }
 
-            Core::Logger::GetInstance().Info("LightManager: Removed point light at index " +
-                                            std::to_string(index));
-            m_pointLights.erase(m_pointLights.begin() + index);
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_pointLights.find(handle.GetId());
+            if (it == m_pointLights.end())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Point light ID " +
+                                                    std::to_string(handle.GetId()) + " not found");
+                return false;
+            }
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Point light handle is stale (generation mismatch)");
+                return false;
+            }
+
+            Core::Logger::GetInstance().Info("LightManager: Removed point light with ID " + std::to_string(handle.GetId()));
+            m_pointLights.erase(it);
             return true;
         }
 
-        bool LightManager::RemoveSpotLight(int index)
+        bool LightManager::RemoveSpotLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_spotLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::SPOT)
             {
-                Core::Logger::GetInstance().Warning("LightManager: Invalid spot light index: " +
-                                                    std::to_string(index));
+                Core::Logger::GetInstance().Warning("LightManager: Invalid spot light handle");
                 return false;
             }
 
-            Core::Logger::GetInstance().Info("LightManager: Removed spot light at index " +
-                                            std::to_string(index));
-            m_spotLights.erase(m_spotLights.begin() + index);
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_spotLights.find(handle.GetId());
+            if (it == m_spotLights.end())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Spot light ID " +
+                                                    std::to_string(handle.GetId()) + " not found");
+                return false;
+            }
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+            {
+                Core::Logger::GetInstance().Warning("LightManager: Spot light handle is stale (generation mismatch)");
+                return false;
+            }
+
+            Core::Logger::GetInstance().Info("LightManager: Removed spot light with ID " + std::to_string(handle.GetId()));
+            m_spotLights.erase(it);
             return true;
         }
 
         void LightManager::ClearAll()
         {
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+
             int total = GetTotalLightCount();
             m_directionalLights.clear();
             m_pointLights.clear();
             m_spotLights.clear();
+
+            // 重置ID生成器
+            m_nextDirectionalId = 1;
+            m_nextPointId = 1;
+            m_nextSpotId = 1;
+
             Core::Logger::GetInstance().Info("LightManager: Cleared all lights (" +
                                             std::to_string(total) + " lights removed)");
         }
 
         // ========================================
-        // 获取光源
+        // 获取光源（使用LightHandle）
         // ========================================
 
-        DirectionalLightPtr LightManager::GetDirectionalLight(int index)
+        DirectionalLightPtr LightManager::GetDirectionalLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_directionalLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::DIRECTIONAL)
                 return nullptr;
-            return m_directionalLights[index];
+
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_directionalLights.find(handle.GetId());
+            if (it == m_directionalLights.end())
+                return nullptr;
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+                return nullptr;
+
+            return std::dynamic_pointer_cast<DirectionalLight>(it->second.light);
         }
 
-        PointLightPtr LightManager::GetPointLight(int index)
+        PointLightPtr LightManager::GetPointLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_pointLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::POINT)
                 return nullptr;
-            return m_pointLights[index];
+
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_pointLights.find(handle.GetId());
+            if (it == m_pointLights.end())
+                return nullptr;
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+                return nullptr;
+
+            return std::dynamic_pointer_cast<PointLight>(it->second.light);
         }
 
-        SpotLightPtr LightManager::GetSpotLight(int index)
+        SpotLightPtr LightManager::GetSpotLight(const LightHandle &handle)
         {
-            if (index < 0 || index >= static_cast<int>(m_spotLights.size()))
+            if (!handle.IsValid() || handle.GetType() != LightType::SPOT)
                 return nullptr;
-            return m_spotLights[index];
+
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
+            auto it = m_spotLights.find(handle.GetId());
+            if (it == m_spotLights.end())
+                return nullptr;
+
+            // 检查代数标记
+            if (it->second.generation != handle.GetGeneration())
+                return nullptr;
+
+            return std::dynamic_pointer_cast<SpotLight>(it->second.light);
         }
 
         // ========================================
-        // 应用光源到着色器
+        // 查询光源数量
+        // ========================================
+
+        int LightManager::GetDirectionalLightCount() const
+        {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+            return static_cast<int>(m_directionalLights.size());
+        }
+
+        int LightManager::GetPointLightCount() const
+        {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+            return static_cast<int>(m_pointLights.size());
+        }
+
+        int LightManager::GetSpotLightCount() const
+        {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+            return static_cast<int>(m_spotLights.size());
+        }
+
+        int LightManager::GetTotalLightCount() const
+        {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+            return GetDirectionalLightCount() + GetPointLightCount() + GetSpotLightCount();
+        }
+
+        // ========================================
+        // 应用光源到着色器（线程安全）
         // ========================================
 
         void LightManager::ApplyToShader(Shader &shader) const
         {
+            // 使用共享锁，允许多个渲染线程并发调用
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
             // 设置各类光源的数量
             shader.SetInt("nrDirLights", static_cast<int>(m_directionalLights.size()));
             shader.SetInt("nrPointLights", static_cast<int>(m_pointLights.size()));
             shader.SetInt("nrSpotLights", static_cast<int>(m_spotLights.size()));
 
             // 应用平行光
-            for (size_t i = 0; i < m_directionalLights.size(); ++i)
+            int index = 0;
+            for (const auto& pair : m_directionalLights)
             {
-                m_directionalLights[i]->ApplyToShader(shader, static_cast<int>(i));
+                auto dirLight = std::dynamic_pointer_cast<DirectionalLight>(pair.second.light);
+                if (dirLight)
+                {
+                    dirLight->ApplyToShader(shader, index);
+                    index++;
+                }
             }
 
             // 应用点光源
-            for (size_t i = 0; i < m_pointLights.size(); ++i)
+            index = 0;
+            for (const auto& pair : m_pointLights)
             {
-                m_pointLights[i]->ApplyToShader(shader, static_cast<int>(i));
+                auto pointLight = std::dynamic_pointer_cast<PointLight>(pair.second.light);
+                if (pointLight)
+                {
+                    pointLight->ApplyToShader(shader, index);
+                    index++;
+                }
             }
 
             // 应用聚光灯
-            for (size_t i = 0; i < m_spotLights.size(); ++i)
+            index = 0;
+            for (const auto& pair : m_spotLights)
             {
-                m_spotLights[i]->ApplyToShader(shader, static_cast<int>(i));
+                auto spotLight = std::dynamic_pointer_cast<SpotLight>(pair.second.light);
+                if (spotLight)
+                {
+                    spotLight->ApplyToShader(shader, index);
+                    index++;
+                }
             }
         }
 
@@ -206,38 +351,54 @@ namespace Renderer
 
         std::string LightManager::GetStatistics() const
         {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
             std::ostringstream oss;
             oss << "LightManager Statistics:\n";
             oss << "  Directional Lights: " << m_directionalLights.size() << "/" << MAX_DIRECTIONAL_LIGHTS << "\n";
             oss << "  Point Lights: " << m_pointLights.size() << "/" << MAX_POINT_LIGHTS << "\n";
             oss << "  Spot Lights: " << m_spotLights.size() << "/" << MAX_SPOT_LIGHTS << "\n";
-            oss << "  Total Lights: " << GetTotalLightCount();
+            oss << "  Total Lights: " << (m_directionalLights.size() + m_pointLights.size() + m_spotLights.size());
 
             return oss.str();
         }
 
         void LightManager::PrintAllLights() const
         {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+
             Core::Logger::GetInstance().Info("========================================");
             Core::Logger::GetInstance().Info(GetStatistics());
             Core::Logger::GetInstance().Info("========================================");
 
-            for (size_t i = 0; i < m_directionalLights.size(); ++i)
+            for (const auto& pair : m_directionalLights)
             {
-                Core::Logger::GetInstance().Info("  [" + std::to_string(i) + "] " +
-                                                 m_directionalLights[i]->GetDescription());
+                auto dirLight = std::dynamic_pointer_cast<DirectionalLight>(pair.second.light);
+                if (dirLight)
+                {
+                    Core::Logger::GetInstance().Info("  [ID:" + std::to_string(pair.first) + "] " +
+                                                     dirLight->GetDescription());
+                }
             }
 
-            for (size_t i = 0; i < m_pointLights.size(); ++i)
+            for (const auto& pair : m_pointLights)
             {
-                Core::Logger::GetInstance().Info("  [" + std::to_string(i) + "] " +
-                                                 m_pointLights[i]->GetDescription());
+                auto pointLight = std::dynamic_pointer_cast<PointLight>(pair.second.light);
+                if (pointLight)
+                {
+                    Core::Logger::GetInstance().Info("  [ID:" + std::to_string(pair.first) + "] " +
+                                                     pointLight->GetDescription());
+                }
             }
 
-            for (size_t i = 0; i < m_spotLights.size(); ++i)
+            for (const auto& pair : m_spotLights)
             {
-                Core::Logger::GetInstance().Info("  [" + std::to_string(i) + "] " +
-                                                 m_spotLights[i]->GetDescription());
+                auto spotLight = std::dynamic_pointer_cast<SpotLight>(pair.second.light);
+                if (spotLight)
+                {
+                    Core::Logger::GetInstance().Info("  [ID:" + std::to_string(pair.first) + "] " +
+                                                     spotLight->GetDescription());
+                }
             }
 
             Core::Logger::GetInstance().Info("========================================");
