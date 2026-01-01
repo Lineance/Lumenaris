@@ -27,10 +27,13 @@ void main() {
     vec3 reflectDir = reflect(-lightDir, norm);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
     vec3 specular = spec * lightColor * 0.5;
-    
-    
+
+
     vec3 result = (ambient + diffuse + specular) ;
     result = clamp(result, 0.0, 1.0);
-    
+
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    result = pow(result, vec3(1.0 / 2.2));
+
     FragColor = vec4(result, 1.0);
 }

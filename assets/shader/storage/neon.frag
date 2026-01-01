@@ -46,6 +46,9 @@ void main() {
     // 确保颜色不会过亮
     finalColor = clamp(finalColor, 0.0, 1.0);
 
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    finalColor = pow(finalColor, vec3(1.0 / 2.2));
+
     // 霓虹通常不透明，但有轻微的透明度变化
     float alpha = 0.9 + edgeGlow * 0.1;
 

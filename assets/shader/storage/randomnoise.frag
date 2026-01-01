@@ -50,7 +50,11 @@ void main() {
 
     float final = mix(grain, blur, blurAmount);
     float binary = (final > threshold) ? 1.0 : 0.0;
-    
+
     vec3 result = binary * objectColor;
+
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    result = pow(result, vec3(1.0 / 2.2));
+
     FragColor = vec4(result, 1.0);
 }

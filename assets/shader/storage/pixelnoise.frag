@@ -33,6 +33,11 @@ void main() {
 
     // ✅ 4. 二值化（阈值0.5）
     float binary = (grain > threshold) ? 1.0 : 0.0;
-    
-    FragColor = vec4(binary * objectColor, 1.0);
+
+    vec3 result = binary * objectColor;
+
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    result = pow(result, vec3(1.0 / 2.2));
+
+    FragColor = vec4(result, 1.0);
 }

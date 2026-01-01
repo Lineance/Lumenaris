@@ -42,5 +42,8 @@ void main() {
     float edgeDarkening = smoothstep(0.7, 1.0, fresnel);
     baseInk = mix(baseInk, inkColor * 0.5, edgeDarkening * 0.3);
 
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    baseInk = pow(baseInk, vec3(1.0 / 2.2));
+
     FragColor = vec4(baseInk, 1.0);
 }

@@ -39,6 +39,9 @@ void main() {
     vec3 result = ambient + diffuse + specular;
     result = clamp(result, 0.0, 1.0);
 
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    result = pow(result, vec3(1.0 / 2.2));
+
     // 添加轮廓线效果 (简单的黑边)
     float edge = 1.0 - dot(viewDir, norm);
     float outline = step(0.4, edge);

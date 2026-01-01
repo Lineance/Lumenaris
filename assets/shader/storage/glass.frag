@@ -42,6 +42,9 @@ void main() {
     vec3 glassReflection = mix(glassColor, reflectionColor, fresnel * 0.8);
     vec3 finalColor = glassReflection + diffuse + specular;
 
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    finalColor = pow(finalColor, vec3(1.0 / 2.2));
+
     // 玻璃的透明度
     float alpha = 0.7 + fresnel * 0.3; // 边缘更透明
 

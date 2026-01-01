@@ -60,5 +60,9 @@ void main()
 
     // 最终颜色
     vec3 result = (ambient + diffuse + specular) * baseColor;
+
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    result = pow(result, vec3(1.0 / 2.2));
+
     FragColor = vec4(result, 1.0);
 }

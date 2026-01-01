@@ -72,5 +72,8 @@ void main() {
     float paperTexture = random(screenUV * 200.0) * 0.05 + 0.95;
     sketchColor *= paperTexture;
 
+    // Gamma校正 - 将颜色从线性空间转换到sRGB空间
+    sketchColor = pow(sketchColor, vec3(1.0 / 2.2));
+
     FragColor = vec4(sketchColor, 1.0);
 }
