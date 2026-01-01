@@ -1,6 +1,7 @@
 build/
 CMakeFiles/
-vendor/
-assets/models
-assets/picture
 logs/
+assets/models/cars
+assets/models/CornellBox
+assets/models/clouds
+docs/fixs
