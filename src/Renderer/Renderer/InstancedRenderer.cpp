@@ -13,10 +13,14 @@ namespace Renderer
 
     // 移动构造函数（转移所有权）
     InstancedRenderer::InstancedRenderer(InstancedRenderer &&other) noexcept
-        : m_meshBuffer(std::move(other.m_meshBuffer)), m_instances(std::move(other.m_instances)), m_instanceCount(other.m_instanceCount), m_vao(other.m_vao), m_instanceVBO(other.m_instanceVBO), m_texture(std::move(other.m_texture)), m_materialColor(other.m_materialColor)
+        : m_meshBuffer(std::move(other.m_meshBuffer)),
+          m_instances(std::move(other.m_instances)),
+          m_instanceCount(other.m_instanceCount),
+          m_instanceVBO(other.m_instanceVBO),
+          m_texture(std::move(other.m_texture)),
+          m_materialColor(other.m_materialColor)
     {
         // 将源对象的OpenGL资源ID置零，避免析构时重复释放
-        other.m_vao = 0;
         other.m_instanceVBO = 0;
         other.m_instanceCount = 0;
         other.m_materialColor = glm::vec3(1.0f);
@@ -27,12 +31,7 @@ namespace Renderer
     {
         if (this != &other)
         {
-            // 1. 释放当前对象的OpenGL资源
-            if (m_vao)
-            {
-                glDeleteVertexArrays(1, &m_vao);
-                m_vao = 0;
-            }
+            // 1. 释放当前对象的OpenGL资源（instanceVBO）
             if (m_instanceVBO)
             {
                 glDeleteBuffers(1, &m_instanceVBO);
@@ -43,13 +42,11 @@ namespace Renderer
             m_meshBuffer = std::move(other.m_meshBuffer);
             m_instances = std::move(other.m_instances);
             m_instanceCount = other.m_instanceCount;
-            m_vao = other.m_vao;
             m_instanceVBO = other.m_instanceVBO;
             m_texture = std::move(other.m_texture);
             m_materialColor = other.m_materialColor;
 
             // 3. 将源对象置为有效但空的状态
-            other.m_vao = 0;
             other.m_instanceVBO = 0;
             other.m_instanceCount = 0;
             other.m_materialColor = glm::vec3(1.0f);
@@ -59,20 +56,14 @@ namespace Renderer
 
     InstancedRenderer::~InstancedRenderer()
     {
-        // 清理 OpenGL 资源
-        if (m_vao)
-        {
-            glDeleteVertexArrays(1, &m_vao);
-            m_vao = 0;
-        }
-
+        // ✅ 修复：只清理实例化VBO，VAO由MeshBuffer管理
         if (m_instanceVBO)
         {
             glDeleteBuffers(1, &m_instanceVBO);
             m_instanceVBO = 0;
         }
 
-        // 注意：网格缓冲区和纹理由 shared_ptr 自动管理，无需手动删除
+        // 注意：网格缓冲区（含VAO）和纹理由 shared_ptr 自动管理，无需手动删除
     }
 
     void InstancedRenderer::SetMesh(std::shared_ptr<MeshBuffer> meshBuffer)
@@ -106,45 +97,24 @@ namespace Renderer
             return;
         }
 
-        // 🔧 修复1：检查是否已经初始化，避免VBO泄漏
+        // ✅ 修复：检查是否已经初始化，避免VBO泄漏
         if (m_instanceVBO != 0)
         {
-            Core::Logger::GetInstance().Warning("InstancedRenderer::Initialize() - Already initialized, cleaning up old resources.");
-            if (m_vao)
-            {
-                glDeleteVertexArrays(1, &m_vao);
-                m_vao = 0;
-            }
+            Core::Logger::GetInstance().Warning("InstancedRenderer::Initialize() - Already initialized, cleaning up old instance VBO.");
             glDeleteBuffers(1, &m_instanceVBO);
             m_instanceVBO = 0;
         }
 
-        // 创建独立的VAO（每个渲染器一个，避免状态污染）
-        glGenVertexArrays(1, &m_vao);
-
-        // 创建实例化 VBO
+        // ✅ 修复：不再创建独立VAO，直接使用MeshBuffer的VAO
+        // 创建实例化 VBO（用于存储实例矩阵和颜色）
         glGenBuffers(1, &m_instanceVBO);
 
         // 上传实例数据
         UploadInstanceData();
 
-        // 🔧 修复2：在Initialize时一次性配置所有VAO状态（只执行一次）
-        glBindVertexArray(m_vao);
-
-        // 复制网格VBO和EBO到独立VAO（共享网格数据）
-        m_meshBuffer->BindBuffersToVAO();
-
-        // 设置顶点属性（从网格数据）
-        const MeshData &meshData = m_meshBuffer->GetData();
-        const std::vector<size_t> &offsets = meshData.GetAttributeOffsets();
-        const std::vector<int> &sizes = meshData.GetAttributeSizes();
-        size_t stride = meshData.GetVertexStride() * sizeof(float);
-
-        for (size_t i = 0; i < offsets.size(); ++i)
-        {
-            glEnableVertexAttribArray(i);
-            glVertexAttribPointer(i, sizes[i], GL_FLOAT, GL_FALSE, stride, (void *)(offsets[i] * sizeof(float)));
-        }
+        // ✅ 修复：直接在MeshBuffer的VAO上配置实例属性
+        GLuint meshVAO = m_meshBuffer->GetVAO();
+        glBindVertexArray(meshVAO);
 
         // 设置实例属性（从instanceVBO）
         glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
@@ -168,7 +138,7 @@ namespace Renderer
 
         Core::Logger::GetInstance().Info("InstancedRenderer::Initialize() - Initialized with " +
                                          std::to_string(m_instanceCount) + " instances" +
-                                         ", VAO: " + std::to_string(m_vao) +
+                                         ", MeshBuffer VAO: " + std::to_string(meshVAO) +
                                          ", instanceVBO: " + std::to_string(m_instanceVBO) +
                                          ", instancesPtr: " + std::to_string(reinterpret_cast<uintptr_t>(m_instances.get())));
     }
@@ -253,7 +223,8 @@ namespace Renderer
 
     void InstancedRenderer::Render() const
     {
-        if (!m_meshBuffer || m_vao == 0)
+        // ✅ 修复：检查MeshBuffer的VAO（而不是已删除的m_vao）
+        if (!m_meshBuffer || m_meshBuffer->GetVAO() == 0)
         {
             return; // 静默失败，避免每帧日志
         }
@@ -270,8 +241,9 @@ namespace Renderer
             m_texture->Bind(GL_TEXTURE1);
         }
 
-        // 绑定独立VAO（所有属性已预先配置）
-        glBindVertexArray(m_vao);
+        // ✅ 修复：绑定MeshBuffer的VAO（而不是独立的m_vao）
+        GLuint meshVAO = m_meshBuffer->GetVAO();
+        glBindVertexArray(meshVAO);
 
         // 执行实例化渲染
         if (m_meshBuffer->HasIndices())

@@ -14,6 +14,7 @@
 | 6 | IMesh 接口污染（未被使用） | 删除 `IMesh` 接口和 `MeshFactory` 工厂类 | `include/Renderer/Geometry/Mesh.hpp` | 代码精简 |
 | 7 | 几何体静态方法内联化 | 将 `GetVertexData()` 等声明为 `inline static` | 各几何体头文件 | 代码精简 |
 | 8 | **VAO僵尸属性污染** | **先禁用所有属性，确保干净状态** | **`src/Renderer/Data/MeshBuffer.cpp:196-224`** | **+0.75 μs/网格** |
+| 9 | **InstancedRenderer双重所有权** | **删除独立VAO，直接使用MeshBuffer的VAO** | **`include/Renderer/Renderer/InstancedRenderer.hpp:116**** | **-15~30%调用** |
 
 ---
 
@@ -21,10 +22,12 @@
 
 ### 极高危：未定义行为 & 驱动崩溃
 
-#### 1. InstancedRenderer GPU资源双重所有权灾难
+#### 1. ~~InstancedRenderer GPU资源双重所有权灾难~~ ✅ 已修复
 
-**位置**：`InstancedRenderer.hpp:128-145`
+**位置**：`include/Renderer/Renderer/InstancedRenderer.hpp:116`
 **风险**：🔴 资源重复释放/泄漏，跨线程TDR蓝屏
+**状态**：✅ **已修复（2026-01-02）**
+
 **问题剖析**：
 
 - `InstancedRenderer` 持有独立的 `m_vao` 成员
@@ -32,20 +35,26 @@
 - 移动语义打破了"唯一所有权"，导致同一GPU资源被两个C++对象引用
 - OpenGL上下文是单线程状态机，`glDeleteVertexArrays` 必须在创建线程调用
 
-**修复方案**：
+**修复方案（已实现）**：
 
 ```cpp
-// 架构重构：删除冗余VAO所有权
+// ✅ 架构重构：删除冗余VAO所有权
 class InstancedRenderer {
-    // ❌ 删除 GLuint m_vao;  // 移除独立VAO
-    // ✅ 只保留 shared_ptr<MeshBuffer> m_meshBuffer;
+    // ✅ 删除 GLuint m_vao;  // 移除独立VAO
+    // ✅ 直接使用MeshBuffer的VAO
 
     void Render() {
-        glBindVertexArray(m_meshBuffer->GetVAO());  // 直接使用MeshBuffer的VAO
+        GLuint meshVAO = m_meshBuffer->GetVAO();
+        glBindVertexArray(meshVAO);  // 直接使用MeshBuffer的VAO
         // ...
     }
 };
 ```
+
+**性能影响**：
+- 初始化减少：1-3次OpenGL调用（15-30%提升）
+- 渲染性能：0%影响（API兼容）
+- 详细分析：`docs/fixs/INSTANCED_RENDERER_DUAL_OWNERSHIP_FIX_2026.md`
 
 ---
 

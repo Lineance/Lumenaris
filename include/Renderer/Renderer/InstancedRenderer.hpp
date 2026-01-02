@@ -113,7 +113,8 @@ namespace Renderer
         size_t m_instanceCount = 0;                   // 实例数量
 
         // OpenGL 对象
-        GLuint m_vao = 0;                             // 独立VAO（每个渲染器一个，避免状态污染）
+        // ✅ 修复：删除独立的VAO，直接使用MeshBuffer的VAO
+        // 避免双重所有权导致的资源重复释放/泄漏问题
         GLuint m_instanceVBO = 0;                     // 实例化 VBO（存储矩阵和颜色）
 
         // 材质和纹理
