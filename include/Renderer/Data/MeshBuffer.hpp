@@ -100,16 +100,11 @@ namespace Renderer
         unsigned int GetVAO() const { return m_vao; }
 
         /**
-         * @brief 获取 VBO（用于创建独立VAO）
-         * @return OpenGL VBO ID
+         * @brief 将 VBO/EBO 绑定到当前 VAO
+         * @note 用于 InstancedRenderer 创建独立 VAO 时共享网格数据
+         *       这个方法封装了 OpenGL 的 buffer 绑定操作，避免暴露裸 ID
          */
-        unsigned int GetVBO() const { return m_vbo; }
-
-        /**
-         * @brief 获取 EBO（用于创建独立VAO）
-         * @return OpenGL EBO ID
-         */
-        unsigned int GetEBO() const { return m_ebo; }
+        void BindBuffersToVAO() const;
 
         /**
          * @brief 获取顶点数量

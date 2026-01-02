@@ -22,6 +22,11 @@
 #define ENABLE_RENDER_STATS 0
 #endif
 
+// 编译时控制主循环中的性能日志输出（FPS、调试信息等）
+#ifndef ENABLE_PERFORMANCE_LOGGING
+#define ENABLE_PERFORMANCE_LOGGING 0
+#endif
+
 namespace Core {
 
 /**

@@ -131,11 +131,7 @@ namespace Renderer
         glBindVertexArray(m_vao);
 
         // 复制网格VBO和EBO到独立VAO（共享网格数据）
-        glBindBuffer(GL_ARRAY_BUFFER, m_meshBuffer->GetVBO());
-        if (m_meshBuffer->HasIndices())
-        {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_meshBuffer->GetEBO());
-        }
+        m_meshBuffer->BindBuffersToVAO();
 
         // 设置顶点属性（从网格数据）
         const MeshData &meshData = m_meshBuffer->GetData();

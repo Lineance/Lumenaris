@@ -143,6 +143,18 @@ namespace Renderer
         Core::Logger::GetInstance().Debug("MeshBuffer::ReleaseGPU() - Released GPU resources");
     }
 
+    void MeshBuffer::BindBuffersToVAO() const
+    {
+        // 将 VBO 绑定到当前 VAO
+        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+
+        // 如果有 EBO，也绑定到当前 VAO
+        if (m_ebo != 0)
+        {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
+        }
+    }
+
     // ============================================================
     // 内部方法
     // ============================================================

@@ -1,5 +1,7 @@
 + cube 应该是cube还是通用立方体？
 
++ main里面日志输出影响效率
+
 1.1 InstancedRenderer - GPU资源双重所有权灾难
 位置：InstancedRenderer.hpp:128-145 移动语义实现
 风险：🔴 高危 - 资源重复释放/泄漏
@@ -25,16 +27,19 @@ RAII强化：若必须独立VAO，应使用std::unique_ptr+自定义删除器，
 风险：🟡 中危 - 意外悬空指针
 cpp
 复制
-// 删除了拷贝构造/赋值，但提供了GetVBO()/GetEBO()返回裸GLuint
-MeshBuffer a = std::move(buffer);  // 合法
-GLuint vbo = a.GetVBO();           // 返回裸ID
-// a被再次移动后，vbo指向已释放的GPU资源
-底层原理剖析：
-OpenGL ID是弱类型句柄，C++对象销毁后ID失效，但编译器无法检测
-返回裸ID暴露了资源管理边界，违背C++17的std::owner_less理念
-修改方向：
-封装ID：返回std::shared_ptr<GLuint>，使用自定义删除器延迟glDeleteBuffers
-或：完全封装ID，仅提供Bind()/Unbind()方法，禁止外部直接访问
+// ✅ 已修复：删除了 GetVBO()/GetEBO()，替换为 BindBuffersToVAO()
+// 修改时间：2026-01-02
+// 修复方案：
+// 1. 删除了 GetVBO() 和 GetEBO() 方法（不再暴露裸 GLuint）
+// 2. 新增 BindBuffersToVAO() 方法，封装 buffer 绑定操作
+// 3. InstancedRenderer 使用新的封装方法，保持资源管理边界清晰
+//
+// 修改前的问题：
+// GLuint vbo = a.GetVBO();  // 返回裸ID，可能被滥用
+// glDeleteBuffers(1, &vbo);  // ❌ 在 MeshBuffer 不知道的情况下删除资源！
+//
+// 修改后的方案：
+// m_meshBuffer->BindBuffersToVAO();  // ✅ 安全封装，不暴露 ID
 
 2.1 Plane::Create() - VAO状态泄漏
 位置：Plane.cpp:95-105
