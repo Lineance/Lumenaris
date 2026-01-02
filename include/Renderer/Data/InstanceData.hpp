@@ -53,9 +53,32 @@ namespace Renderer
         // 判断是否为空
         bool IsEmpty() const { return m_modelMatrices.empty(); }
 
+        // ✅ 性能优化（2026-01-02）：脏标记机制
+        // 避免每帧无条件更新 GPU 数据，只在数据变化时更新
+        bool IsDirty() const { return m_dirty; }
+        void ClearDirty() { m_dirty = false; }
+        void MarkDirty() { m_dirty = true; }
+
+        // ✅ 性能优化：直接设置单个实例的矩阵（自动标记脏）
+        void SetModelMatrix(size_t index, const glm::mat4& matrix) {
+            if (index < m_modelMatrices.size()) {
+                m_modelMatrices[index] = matrix;
+                m_dirty = true;
+            }
+        }
+
+        // ✅ 性能优化：直接设置单个实例的颜色（自动标记脏）
+        void SetColor(size_t index, const glm::vec3& color) {
+            if (index < m_colors.size()) {
+                m_colors[index] = color;
+                m_dirty = true;
+            }
+        }
+
     private:
         std::vector<glm::mat4> m_modelMatrices; // 实例的模型矩阵
         std::vector<glm::vec3> m_colors;        // 实例的颜色
+        bool m_dirty = true;                    // ✅ 脏标记：初始为 true（首次上传）
     };
 
 } // namespace Renderer

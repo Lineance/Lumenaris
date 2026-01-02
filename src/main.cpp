@@ -351,6 +351,15 @@ void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
                                                        2.0f * breatheScale * twistZ));
         bunnyMatrices[0] = bunnyModel;
     }
+
+    // ✅ 性能优化（2026-01-02）：标记所有动画数据为脏
+    // 因为所有实例数据都在动画更新中被修改，需要同步到GPU
+    for (auto& instanceData : stage.instanceDataList) {
+        instanceData->MarkDirty();
+    }
+    if (stage.bunnyData) {
+        stage.bunnyData->MarkDirty();
+    }
 }
 
 // ========================================

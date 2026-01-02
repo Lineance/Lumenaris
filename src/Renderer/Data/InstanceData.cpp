@@ -17,6 +17,9 @@ namespace Renderer
 
         m_modelMatrices.push_back(model);
         m_colors.push_back(color);
+
+        // ✅ 性能优化：标记数据已修改
+        m_dirty = true;
     }
 
     void InstanceData::AddBatch(const std::vector<glm::mat4>& matrices, const std::vector<glm::vec3>& colors)
@@ -45,12 +48,18 @@ namespace Renderer
             m_modelMatrices.insert(m_modelMatrices.end(), matrices.begin(), matrices.end());
             m_colors.insert(m_colors.end(), colors.begin(), colors.end());
         }
+
+        // ✅ 性能优化：标记数据已修改
+        m_dirty = true;
     }
 
     void InstanceData::Clear()
     {
         m_modelMatrices.clear();
         m_colors.clear();
+
+        // ✅ 性能优化：标记数据已修改
+        m_dirty = true;
     }
 
 } // namespace Renderer

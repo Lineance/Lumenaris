@@ -202,6 +202,13 @@ namespace Renderer
             return;
         }
 
+        // ✅ 性能优化（2026-01-02）：脏标记机制
+        // 只在数据实际变化时更新 GPU，避免每帧冗余传输
+        if (!m_instances->IsDirty())
+        {
+            return;  // 数据未变化，跳过 GPU 更新
+        }
+
         // 准备缓冲区数据
         std::vector<float> buffer = PrepareInstanceBuffer();
 
@@ -212,6 +219,9 @@ namespace Renderer
                         buffer.size() * sizeof(float),
                         buffer.data());
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // ✅ 清除脏标记，表示数据已同步到 GPU
+        m_instances->ClearDirty();
     }
 
     void InstancedRenderer::Render() const
