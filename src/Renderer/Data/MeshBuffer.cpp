@@ -199,6 +199,17 @@ namespace Renderer
         const auto& sizes = m_data.GetAttributeSizes();
         size_t stride = m_data.GetVertexStride();
 
+        // ✅ 修复VAO僵尸属性污染：先禁用所有属性，确保干净状态
+        // 这可以防止之前绑定的VAO属性污染当前VAO
+        // 例如：ImGui可能启用了location 8，但当前网格只用0-2
+        // 如果不禁用location 8，glDrawArrays会尝试读取未绑定的VBO，导致驱动崩溃
+        GLint maxAttribs = 0;
+        glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxAttribs);
+        for (GLint i = 0; i < maxAttribs; ++i)
+        {
+            glDisableVertexAttribArray(i);
+        }
+
         // 设置顶点属性
         for (size_t i = 0; i < sizes.size(); ++i)
         {
