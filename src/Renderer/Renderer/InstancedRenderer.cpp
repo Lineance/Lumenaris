@@ -4,6 +4,7 @@
 #include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <glad/glad.h>
+#include <cstring>  // for std::memcpy
 
 namespace Renderer
 {
@@ -206,13 +207,21 @@ namespace Renderer
         std::vector<float> buffer;
         buffer.reserve(totalFloatCount);
 
-        // 将矩阵数据插入缓冲区（每个 mat4 是 16 个 float）
-        const float *matrixData = reinterpret_cast<const float *>(matrices.data());
-        buffer.insert(buffer.end(), matrixData, matrixData + matrixFloatCount);
+        // ✅ 修复严格别名违规：使用 memcpy 符合 C++ 标准
+        // C++17 保证：memcpy 可以用于任意类型的字节级别复制
+        buffer.resize(matrixFloatCount);
+        std::memcpy(buffer.data(), matrices.data(), matrices.size() * sizeof(glm::mat4));
 
-        // 将颜色数据插入缓冲区（每个 vec3 是 3 个 float）
-        const float *colorData = reinterpret_cast<const float *>(colors.data());
-        buffer.insert(buffer.end(), colorData, colorData + colorFloatCount);
+        // ✅ 修复严格别名违规：逐个元素复制 glm::vec3
+        // 避免直接 reinterpret_cast，改用值语义访问
+        size_t colorOffset = matrixFloatCount;
+        buffer.resize(totalFloatCount);
+        for (size_t i = 0; i < colors.size(); ++i)
+        {
+            buffer[colorOffset + i * 3 + 0] = colors[i].x;
+            buffer[colorOffset + i * 3 + 1] = colors[i].y;
+            buffer[colorOffset + i * 3 + 2] = colors[i].z;
+        }
 
         return buffer;
     }
