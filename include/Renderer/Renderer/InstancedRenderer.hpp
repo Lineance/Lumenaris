@@ -1,5 +1,4 @@
 #pragma once
-#include "Renderer/Geometry/Mesh.hpp"
 #include "Renderer/Data/MeshBuffer.hpp"
 #include "Renderer/Resources/Texture.hpp"
 #include "Renderer/Data/InstanceData.hpp"

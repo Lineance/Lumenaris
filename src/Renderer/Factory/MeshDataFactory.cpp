@@ -212,18 +212,8 @@ namespace Renderer
         return dataList;
     }
 
-    MeshData MeshDataFactory::ExtractFromCube(const Cube& cube)
-    {
-        // Cube 已经有静态方法提供顶点数据
-        return CreateCubeData();
-    }
-
-    MeshData MeshDataFactory::ExtractFromSphere(const Sphere& sphere)
-    {
-        // 需要从 Sphere 对象获取参数
-        // 暂时使用默认参数
-        return CreateSphereData(32, 32, sphere.GetRadius());
-    }
+    // 已删除（2026-01-02）：ExtractFromCube() - 几何体类已改为纯静态类
+    // 已删除（2026-01-02）：ExtractFromSphere() - 几何体类已改为纯静态类
 
     // ============================================================
     // MeshBufferFactory 实现

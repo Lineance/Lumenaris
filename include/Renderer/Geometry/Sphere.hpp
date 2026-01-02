@@ -1,60 +1,54 @@
 #pragma once
-#include "Renderer/Geometry/Mesh.hpp"
 #include "Core/GLM.hpp"
+#include <vector>
 
 namespace Renderer
 {
 
-    class Sphere : public IMesh
+    /**
+     * @class Sphere
+     * @brief 球体几何数据工具类
+     *
+     * 纯静态工具类，提供球体的几何数据生成。
+     * 不管理 GPU 资源，不维护实例状态。
+     *
+     * 使用方式：
+     * - 使用 MeshDataFactory::CreateSphereBuffer() 创建已上传到 GPU 的缓冲区
+     * - 或使用 Sphere::GetVertexData() 获取原始顶点数据
+     */
+    class Sphere
     {
     public:
-        // 构造函数，设置球体参数
-        explicit Sphere(float radius = 1.0f, int stacks = 20, int slices = 20);
+        // 删除默认构造函数（纯静态类）
+        Sphere() = delete;
 
-        // 保持原始接口不变
-        void Create(); // 保持public，手动调用
-        void Draw() const override;
+        /**
+         * @brief 获取球体的顶点数据
+         * @param radius 球体半径（默认 1.0）
+         * @param stacks 纬度线数量（默认 20）
+         * @param slices 经度线数量（默认 20）
+         * @return std::vector<float> 顶点数据数组
+         *
+         * 顶点布局：每8个float为一个顶点 [x, y, z, nx, ny, nz, u, v]
+         */
+        static std::vector<float> GetVertexData(float radius = 1.0f, int stacks = 20, int slices = 20);
 
-        // 新增：实例配置接口
-        void SetPosition(const glm::vec3 &pos) { m_position = pos; }
-        void SetColor(const glm::vec3 &color) { m_color = color; }
-        void SetScale(float scale) { m_scale = scale; }
-        void SetRadius(float radius) { m_radius = radius; }
-        void SetSegments(int stacks, int slices) { m_stacks = stacks; m_slices = slices; }
+        /**
+         * @brief 获取球体的索引数据
+         * @param stacks 纬度线数量
+         * @param slices 经度线数量
+         * @return std::vector<unsigned int> 索引数据数组
+         */
+        static std::vector<unsigned int> GetIndexData(int stacks = 20, int slices = 20);
 
-        // 获取状态
-        const glm::vec3 &GetColor() const { return m_color; }
-        float GetRadius() const { return m_radius; }
-        glm::mat4 GetModelMatrix() const;
-
-        // 静态方法：获取球体的顶点数据（用于实例化渲染）
-        static std::vector<float> GetVertexData();
-        static std::vector<unsigned int> GetIndexData();
+        /**
+         * @brief 获取球体的顶点布局
+         * @param offsets 输出：各属性在顶点中的偏移量
+         * @param sizes 输出：各属性的大小
+         *
+         * 布局：位置(3), 法线(3), UV(2)
+         */
         static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
-
-        // IMesh接口实现
-        unsigned int GetVAO() const override { return m_vao; }
-        size_t GetVertexCount() const override { return m_vertexCount; }
-        size_t GetIndexCount() const override { return m_indexCount; }
-        bool HasIndices() const override { return m_ebo != 0; }
-        bool HasTexture() const override { return false; }
-
-    private:
-        unsigned int m_vao = 0, m_vbo = 0, m_ebo = 0;
-
-        // 球体参数
-        float m_radius;
-        int m_stacks;  // 纬度线数量
-        int m_slices;  // 经度线数量
-
-        // 新增：实例数据
-        glm::vec3 m_position = glm::vec3(0.0f);
-        glm::vec3 m_color = glm::vec3(1.0f);
-        float m_scale = 1.0f;
-
-        // 缓存顶点和索引数据
-        int m_vertexCount = 0;
-        int m_indexCount = 0;
     };
 
 } // namespace Renderer

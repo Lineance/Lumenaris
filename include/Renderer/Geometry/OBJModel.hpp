@@ -1,5 +1,5 @@
 #pragma once
-#include "Renderer/Geometry/Mesh.hpp"
+
 #include "Renderer/Resources/OBJLoader.hpp"
 #include "Renderer/Resources/Texture.hpp"
 #include "Core/GLM.hpp"
@@ -9,7 +9,7 @@
 namespace Renderer
 {
 
-    class OBJModel : public IMesh
+    class OBJModel 
     {
     public:
         OBJModel();
@@ -17,15 +17,15 @@ namespace Renderer
         ~OBJModel();
 
         // 从IGeometry继承的接口
-        void Create() override;
-        void Draw() const override;
+        void Create();
+        void Draw() const;
 
-        // IMesh 接口实现
-        unsigned int GetVAO() const override { return m_vao; }
-        size_t GetVertexCount() const override { return m_loader.GetVertices().size(); }
-        size_t GetIndexCount() const override { return m_loader.GetIndices().size(); }
-        bool HasIndices() const override { return m_loader.HasIndices(); }
-        bool HasTexture() const override;
+        // 获取 VAO（用于兼容性，但建议使用 MeshBuffer）
+        unsigned int GetVAO() const { return m_vao; }
+        size_t GetVertexCount() const { return m_loader.GetVertices().size(); }
+        size_t GetIndexCount() const { return m_loader.GetIndices().size(); }
+        bool HasIndices() const { return m_loader.HasIndices(); }
+        bool HasTexture() const;
 
         // 按材质渲染
         void DrawWithMaterial(int materialIndex) const;

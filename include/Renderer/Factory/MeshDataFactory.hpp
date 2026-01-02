@@ -85,16 +85,18 @@ namespace Renderer
          * @param cube Cube 对象引用
          * @return MeshData 包含 Cube 的顶点数据
          *
-         * @note 这是一个静态辅助方法，用于从现有的 Cube 对象提取数据
+         * @note 已废弃（2026-01-02）：几何体类已改为纯静态类，请直接使用 CreateCubeData()
          */
-        static MeshData ExtractFromCube(const class Cube& cube);
+        // static MeshData ExtractFromCube(const class Cube& cube);  // 已删除
 
         /**
          * @brief 从 Sphere 对象提取 MeshData
          * @param sphere Sphere 对象引用
          * @return MeshData 包含 Sphere 的顶点和索引数据
+         *
+         * @note 已废弃（2026-01-02）：几何体类已改为纯静态类，请直接使用 CreateSphereData()
          */
-        static MeshData ExtractFromSphere(const class Sphere& sphere);
+        // static MeshData ExtractFromSphere(const class Sphere& sphere);  // 已删除
     };
 
     /**

@@ -1089,3 +1089,64 @@ class OBJModel : public IMesh {
 
 这是一个学习项目，欢迎对代码质量、架构设计、功能实现等方面提出宝贵意见和建议。可以通过提交Issue或Pull Request的方式参与项目改进。
 
+
+---
+
+## 🔄 架构更新日志 (2026-01-02)
+
+### Geometry 模块重构 - 纯静态工具类设计
+
+**重大变更**：Geometry 模块已从实例类重构为纯静态工具类。
+
+#### 变更内容
+
+1. **删除的组件**
+   - ❌ `IMesh` 接口和 `MeshFactory` 工厂类
+   - ❌ 所有几何体的 `Create()` 和 `Draw()` 方法
+   - ❌ 所有实例状态（`m_vao`, `m_vbo`, `m_position`, `m_rotation`, `m_color`, `m_scale`）
+   - ❌ `GetVAO()`, `GetModelMatrix()` 等 OpenGL 相关方法
+
+2. **净化的几何体类**
+   - ✅ **Cube** - 59 行（减少 54%）
+   - ✅ **Sphere** - 88 行（减少 62%）
+   - ✅ **Plane** - 88 行（减少 59%）
+   - ✅ **Torus** - 99 行（减少 45%）
+   - ⚠️ **OBJModel** - 保持实例类（需要文件加载和材质管理）
+
+3. **新架构使用方式**
+
+```cpp
+// ✅ 推荐方式：通过 MeshDataFactory 创建已上传到 GPU 的缓冲区
+auto cubeBuffer = MeshDataFactory::CreateCubeBuffer();
+auto sphereBuffer = MeshDataFactory::CreateSphereBuffer(32, 32, 1.0f);
+auto planeBuffer = MeshDataFactory::CreatePlaneBuffer(10.0f, 10.0f);
+auto torusBuffer = MeshDataFactory::CreateTorusBuffer(1.0f, 0.3f);
+auto objBuffers = MeshDataFactory::CreateOBJBuffers("models/bunny.obj");
+
+// 通过 InstancedRenderer 渲染
+InstancedRenderer renderer(std::move(cubeBuffer), instances);
+renderer.Render();
+
+// ⚠️ OBJModel 特殊处理（保留实例类）
+OBJModel bunny;
+bunny.LoadFromFile("models/bunny.obj");
+bunny.Create();
+bunny.Draw();  // 或 bunny.DrawWithMaterial(materialIndex);
+```
+
+#### 架构优势
+
+- ✅ **职责清晰**：几何类只生成数据，MeshDataFactory 负责创建 GPU 资源
+- ✅ **易于测试**：纯静态函数，无状态，易于单元测试
+- ✅ **代码精简**：总代码减少 32%（~500 行 → ~340 行）
+- ✅ **编译优化**：静态函数更容易内联优化
+- ✅ **内存效率**：无实例状态，零内存开销
+
+#### 统一接口
+
+所有基础几何体类（Cube, Sphere, Plane, Torus）提供以下静态方法：
+
+- `GetVertexData(...)` - 生成顶点数据
+- `GetIndexData(...)` - 生成索引数据（部分几何体）
+- `GetVertexLayout(...)` - 返回顶点属性布局
+

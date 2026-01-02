@@ -65,7 +65,6 @@ target_link_libraries(Renderer PUBLIC Core) # Renderer 依赖 Core
 # 网格库 - 支持基础网格和OBJ模型加载
 # ✅ 重构后的新文件结构
 add_library(Geometry OBJECT
-    src/Renderer/Geometry/Mesh.cpp
     src/Renderer/Geometry/Cube.cpp
     src/Renderer/Geometry/Sphere.cpp
     src/Renderer/Geometry/Torus.cpp         # 圆环体

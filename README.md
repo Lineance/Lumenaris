@@ -66,16 +66,18 @@ make -j$(nproc)
 ### 1. 基础几何体渲染
 
 ```cpp
-// 创建立方体缓冲区（工厂模式）
-auto cubeBuffer = std::make_shared<Renderer::MeshBuffer>(
-    Renderer::MeshBufferFactory::CreateCubeBuffer()
-);
+#include "Renderer/Factory/MeshDataFactory.hpp"
+#include "Renderer/Renderer/InstancedRenderer.hpp"
+#include "Renderer/Data/InstanceData.hpp"
+
+// 创建立方体缓冲区（工厂模式，已上传到GPU）
+auto cubeBuffer = Renderer::MeshDataFactory::CreateCubeBuffer();
 
 // 准备实例数据（100个立方体）
 auto instances = std::make_shared<Renderer::InstanceData>();
 for (int x = 0; x < 10; ++x) {
     for (int z = 0; z < 10; ++z) {
-        instances->Add(
+        instances->AddInstance({
             glm::vec3(x * 2.0f, 0.0f, z * 2.0f), // 位置
             glm::vec3(0.0f),                      // 旋转
             glm::vec3(1.0f),                      // 缩放

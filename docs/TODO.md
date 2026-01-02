@@ -74,12 +74,54 @@ cpp
 风险：🟡 中危 - 抽象不当
 cpp
 复制
-class IMesh {
-    virtual unsigned int GetVAO() const = 0;  // 暴露了OpenGL实现细节
-    virtual bool HasTexture() const { return false; }  // 与网格数据无关
-};
-底层问题：
-IMesh应只表示"几何数据抽象"，但GetVAO()强制所有实现基于OpenGL
+// ✅ 已修复：2026-01-02
+// 删除了 IMesh 接口和 MeshFactory 工厂类
+//
+// 修改内容：
+// 1. 删除 include/Renderer/Geometry/Mesh.hpp（IMesh 接口定义）
+// 2. 删除 src/Renderer/Geometry/Mesh.cpp（MeshFactory 实现）
+// 3. 从所有几何类移除 IMesh 继承：
+//    - Cube
+//    - Sphere
+//    - Plane
+//    - Torus
+//    - OBJModel
+// 4. 移除所有 override 关键字
+// 5. 更新 CMakeLists.txt（移除 Mesh.cpp 引用）
+//
+// 理由：
+// - 项目已迁移到 MeshData + MeshBuffer + InstancedRenderer 架构
+// - IMesh 没有被实际使用，只是增加维护成本
+// - GetVAO() 暴露了 OpenGL 实现细节，违反抽象原则
+//
+// 新架构：
+// - MeshData：纯数据抽象（几何数据）
+// - MeshBuffer：GPU 资源管理（VAO/VBO/EBO）
+// - InstancedRenderer：渲染逻辑
+// - 各几何类（Cube/Sphere 等）：独立的工具类，保留 GetVAO() 以兼容性
+
+删除几何体的 .cpp 实现（可选）
+既然 Cube::Create() 和 Cube::Draw() 未被调用，可激进删除整个 .cpp 文件，仅保留头文件中的静态方法：
+cpp
+复制
+// Cube.hpp 中内联静态方法
+inline static std::vector<float> GetVertexData() {
+    return { /*硬编码顶点*/ };
+}
+优势：编译时计算，零链接开销。
+几何体类也应删除
+既然几何体现在仅作为数据模板存在，可彻底删除类，仅保留 命名空间函数：
+cpp
+复制
+// ❌ 删除 Cube.hpp
+// ✅ 创建 GeometryData.hpp
+
+namespace GeometryData {
+    std::vector<float> GetCubeVertices();
+    std::vector<float> GetSphereVertices(int stacks, int slices);
+    std::vector<float> GetTorusVertices(float majorR, float minorR, ...);
+}
+优势：零继承、零实例化、零内存占用，编译器可优化为 constexpr 数组。
 
 严格别名违例（Strict Aliasing Violation） - 编译器优化炸弹
 9.1 InstancedRenderer::PrepareInstanceBuffer() - 标准违例核弹
@@ -106,6 +148,7 @@ std::memcpy(static_cast<std::byte*>(dst) + matrixFloatCount *sizeof(float),
             colors.data(), colorFloatCount* sizeof(float));
 
 glBufferData(GL_ARRAY_BUFFER, buffer.size(), buffer.data(), GL_DYNAMIC_DRAW);
+
 9.2 MeshData 的 vector<float> 布局假设
 位置：MeshData.cpp:13
 风险：🔴 极高危 - ABI不兼容
