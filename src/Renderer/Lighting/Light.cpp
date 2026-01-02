@@ -11,6 +11,13 @@ namespace Renderer
     {
 
         // ========================================
+        // 静态成员定义
+        // ========================================
+
+        // ✅ 性能优化（2026-01-02）：线程局部格式化缓冲区定义
+        thread_local Light::UniformFormatter Light::s_formatter;
+
+        // ========================================
         // Light 基类实现
         // ========================================
 
@@ -47,25 +54,27 @@ namespace Renderer
 
         void DirectionalLight::ApplyToShader(Shader &shader, int index) const
         {
-            std::string prefix = "dirLights[" + std::to_string(index) + "].";
+            // ✅ 性能优化（2026-01-02）：使用栈上格式化缓冲区，避免堆分配
+            // 修复前：每帧 48 光源 × 10 uniform = 480 次字符串分配（~10 KB）
+            // 修复后：零堆分配，直接使用 snprintf 格式化到栈上 64 字节缓冲区
 
             // 修复：禁用时设置零值而非跳过，避免未初始化的uniform数据
             if (m_enabled)
             {
-                shader.SetVec3(prefix + "direction", m_direction);
-                shader.SetVec3(prefix + "color", m_color * m_intensity);
-                shader.SetFloat(prefix + "ambient", m_ambient);
-                shader.SetFloat(prefix + "diffuse", m_diffuse);
-                shader.SetFloat(prefix + "specular", m_specular);
+                shader.SetVec3(s_formatter.formatUniform("dirLights", index, "direction"), m_direction);
+                shader.SetVec3(s_formatter.formatUniform("dirLights", index, "color"), m_color * m_intensity);
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "ambient"), m_ambient);
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "diffuse"), m_diffuse);
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "specular"), m_specular);
             }
             else
             {
                 // 禁用的光源设置零值，确保着色器不会读取随机数据
-                shader.SetVec3(prefix + "direction", glm::vec3(0.0f, -1.0f, 0.0f));
-                shader.SetVec3(prefix + "color", glm::vec3(0.0f));
-                shader.SetFloat(prefix + "ambient", 0.0f);
-                shader.SetFloat(prefix + "diffuse", 0.0f);
-                shader.SetFloat(prefix + "specular", 0.0f);
+                shader.SetVec3(s_formatter.formatUniform("dirLights", index, "direction"), glm::vec3(0.0f, -1.0f, 0.0f));
+                shader.SetVec3(s_formatter.formatUniform("dirLights", index, "color"), glm::vec3(0.0f));
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "ambient"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "diffuse"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("dirLights", index, "specular"), 0.0f);
             }
         }
 
@@ -126,31 +135,33 @@ namespace Renderer
 
         void PointLight::ApplyToShader(Shader &shader, int index) const
         {
-            std::string prefix = "pointLights[" + std::to_string(index) + "].";
+            // ✅ 性能优化（2026-01-02）：使用栈上格式化缓冲区，避免堆分配
+            // 修复前：每帧 48 光源 × 10 uniform = 480 次字符串分配（~10 KB）
+            // 修复后：零堆分配，直接使用 snprintf 格式化到栈上 64 字节缓冲区
 
             // 修复：禁用时设置零值而非跳过，避免未初始化的uniform数据
             if (m_enabled)
             {
-                shader.SetVec3(prefix + "position", m_position);
-                shader.SetVec3(prefix + "color", m_color * m_intensity);
-                shader.SetFloat(prefix + "ambient", m_ambient);
-                shader.SetFloat(prefix + "diffuse", m_diffuse);
-                shader.SetFloat(prefix + "specular", m_specular);
-                shader.SetFloat(prefix + "constant", m_attenuation.constant);
-                shader.SetFloat(prefix + "linear", m_attenuation.linear);
-                shader.SetFloat(prefix + "quadratic", m_attenuation.quadratic);
+                shader.SetVec3(s_formatter.formatUniform("pointLights", index, "position"), m_position);
+                shader.SetVec3(s_formatter.formatUniform("pointLights", index, "color"), m_color * m_intensity);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "ambient"), m_ambient);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "diffuse"), m_diffuse);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "specular"), m_specular);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "constant"), m_attenuation.constant);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "linear"), m_attenuation.linear);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "quadratic"), m_attenuation.quadratic);
             }
             else
             {
                 // 禁用的光源设置零值，确保着色器不会读取随机数据
-                shader.SetVec3(prefix + "position", glm::vec3(0.0f));
-                shader.SetVec3(prefix + "color", glm::vec3(0.0f));
-                shader.SetFloat(prefix + "ambient", 0.0f);
-                shader.SetFloat(prefix + "diffuse", 0.0f);
-                shader.SetFloat(prefix + "specular", 0.0f);
-                shader.SetFloat(prefix + "constant", 1.0f);
-                shader.SetFloat(prefix + "linear", 0.0f);
-                shader.SetFloat(prefix + "quadratic", 0.0f);
+                shader.SetVec3(s_formatter.formatUniform("pointLights", index, "position"), glm::vec3(0.0f));
+                shader.SetVec3(s_formatter.formatUniform("pointLights", index, "color"), glm::vec3(0.0f));
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "ambient"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "diffuse"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "specular"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "constant"), 1.0f);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "linear"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("pointLights", index, "quadratic"), 0.0f);
             }
         }
 
@@ -202,37 +213,39 @@ namespace Renderer
 
         void SpotLight::ApplyToShader(Shader &shader, int index) const
         {
-            std::string prefix = "spotLights[" + std::to_string(index) + "].";
+            // ✅ 性能优化（2026-01-02）：使用栈上格式化缓冲区，避免堆分配
+            // 修复前：每帧 48 光源 × 10 uniform = 480 次字符串分配（~10 KB）
+            // 修复后：零堆分配，直接使用 snprintf 格式化到栈上 64 字节缓冲区
 
             // 修复：禁用时设置零值而非跳过，避免未初始化的uniform数据
             if (m_enabled)
             {
-                shader.SetVec3(prefix + "position", m_position);  // 继承自 LightWithAttenuation
-                shader.SetVec3(prefix + "direction", m_direction);
-                shader.SetVec3(prefix + "color", m_color * m_intensity);
-                shader.SetFloat(prefix + "ambient", m_ambient);
-                shader.SetFloat(prefix + "diffuse", m_diffuse);
-                shader.SetFloat(prefix + "specular", m_specular);
-                shader.SetFloat(prefix + "constant", m_attenuation.constant);  // 继承自 LightWithAttenuation
-                shader.SetFloat(prefix + "linear", m_attenuation.linear);
-                shader.SetFloat(prefix + "quadratic", m_attenuation.quadratic);
-                shader.SetFloat(prefix + "cutOff", m_cutOff);
-                shader.SetFloat(prefix + "outerCutOff", m_outerCutOff);
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "position"), m_position);  // 继承自 LightWithAttenuation
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "direction"), m_direction);
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "color"), m_color * m_intensity);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "ambient"), m_ambient);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "diffuse"), m_diffuse);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "specular"), m_specular);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "constant"), m_attenuation.constant);  // 继承自 LightWithAttenuation
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "linear"), m_attenuation.linear);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "quadratic"), m_attenuation.quadratic);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "cutOff"), m_cutOff);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "outerCutOff"), m_outerCutOff);
             }
             else
             {
                 // 禁用的光源设置零值，确保着色器不会读取随机数据
-                shader.SetVec3(prefix + "position", glm::vec3(0.0f));
-                shader.SetVec3(prefix + "direction", glm::vec3(0.0f, -1.0f, 0.0f));
-                shader.SetVec3(prefix + "color", glm::vec3(0.0f));
-                shader.SetFloat(prefix + "ambient", 0.0f);
-                shader.SetFloat(prefix + "diffuse", 0.0f);
-                shader.SetFloat(prefix + "specular", 0.0f);
-                shader.SetFloat(prefix + "constant", 1.0f);
-                shader.SetFloat(prefix + "linear", 0.0f);
-                shader.SetFloat(prefix + "quadratic", 0.0f);
-                shader.SetFloat(prefix + "cutOff", glm::cos(glm::radians(0.0f)));
-                shader.SetFloat(prefix + "outerCutOff", glm::cos(glm::radians(0.0f)));
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "position"), glm::vec3(0.0f));
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "direction"), glm::vec3(0.0f, -1.0f, 0.0f));
+                shader.SetVec3(s_formatter.formatUniform("spotLights", index, "color"), glm::vec3(0.0f));
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "ambient"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "diffuse"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "specular"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "constant"), 1.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "linear"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "quadratic"), 0.0f);
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "cutOff"), glm::cos(glm::radians(0.0f)));
+                shader.SetFloat(s_formatter.formatUniform("spotLights", index, "outerCutOff"), glm::cos(glm::radians(0.0f)));
             }
         }
 

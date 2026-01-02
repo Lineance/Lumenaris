@@ -71,6 +71,23 @@ namespace Renderer
          */
         class Light
         {
+        protected:
+            // ✅ 性能优化（2026-01-02）：线程局部格式化缓冲区
+            // 避免每帧构造大量字符串（48 光源 × 10 uniform = 480 次字符串分配）
+            // 使用 snprintf 直接格式化到栈上缓冲区，零堆分配
+            struct UniformFormatter
+            {
+                char buffer[64];
+
+                const char* formatUniform(const char* lightType, int index, const char* property)
+                {
+                    snprintf(buffer, sizeof(buffer), "%s[%d].%s", lightType, index, property);
+                    return buffer;
+                }
+            };
+
+            // 线程局部存储（每个线程独享一份，无锁竞争）
+            static thread_local UniformFormatter s_formatter;
         public:
             // 构造函数
             Light(
