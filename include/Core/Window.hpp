@@ -28,6 +28,9 @@ namespace Core
 
         // 设置宽高（用于窗口大小变化回调）
         void SetSize(int width, int height) { m_width = width; m_height = height; }
+
+        //设置窗口标题
+        void SetTitle(const std::string &title);
     };
 
 } // namespace Core

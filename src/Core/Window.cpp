@@ -11,7 +11,7 @@ namespace Core
         glViewport(0, 0, width, height); // 调整OpenGL视口
 
         // 更新Window实例的成员变量
-        Window* win = static_cast<Window*>(glfwGetWindowUserPointer(window));
+        Window *win = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (win)
         {
             win->SetSize(width, height);
@@ -69,7 +69,7 @@ namespace Core
                                          " (" + std::to_string(m_width) + "x" + std::to_string(m_height) + ")");
 
         glfwMakeContextCurrent(m_window);                                    // 设置为当前OpenGL上下文
-        glfwSetWindowUserPointer(m_window, this);                         // 设置用户指针以便回调函数访问
+        glfwSetWindowUserPointer(m_window, this);                            // 设置用户指针以便回调函数访问
         glfwSetFramebufferSizeCallback(m_window, framebuffer_size_callback); // 设置窗口回调
 
         // 初始化GLAD，加载OpenGL函数指针
@@ -89,5 +89,12 @@ namespace Core
     void Window::SwapBuffers() const { glfwSwapBuffers(m_window); }                         // 交换缓冲区
     bool Window::ShouldClose() const { return glfwWindowShouldClose(m_window); }            // 检查关闭条件
     void Window::SetWindowShouldClose() const { glfwSetWindowShouldClose(m_window, true); } // 请求关闭窗口
+
+    // 设置窗口标题
+    void Window::SetTitle(const std::string &title)
+    {
+        m_title = title;
+        glfwSetWindowTitle(m_window, title.c_str());
+    }
 
 } // namespace Core

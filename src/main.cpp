@@ -1411,6 +1411,13 @@ int main()
                 fps = fpsFrameCount / (currentTime - fpsLastTime);
                 Core::Logger::GetInstance().SetFPS(static_cast<int>(fps));
 
+                // ✅ FPS 显示：在窗口标题中实时显示
+                std::string title = std::string("Super Disco Stage | FPS: ") +
+                                    std::to_string(static_cast<int>(fps)) +
+                                    " | Frames: " + std::to_string(totalFrameCount) +
+                                    " | Space:Pause 1/2/3:AmbMode [/]:Intensity";
+                window.SetTitle(title);
+
 #if ENABLE_PERFORMANCE_LOGGING
                 // 每秒输出一次统计
                 static int logCounter = 0;
