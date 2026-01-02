@@ -16,8 +16,9 @@ namespace Renderer
 
     MeshData MeshDataFactory::CreateCubeData()
     {
-        // 使用 Cube 类的静态方法获取顶点数据
+        // 使用 Cube 类的静态方法获取顶点数据和索引数据
         std::vector<float> vertices = Cube::GetVertexData();
+        std::vector<unsigned int> indices = Cube::GetIndexData();
 
         std::vector<size_t> offsets;
         std::vector<int> sizes;
@@ -26,11 +27,13 @@ namespace Renderer
         MeshData data;
         // ✅ 性能优化：使用移动语义避免数据拷贝
         data.SetVertices(std::move(vertices), 8);  // stride = 8 (pos:3 + normal:3 + uv:2)
+        data.SetIndices(std::move(indices));      // ✅ 添加索引数据
         data.SetVertexLayout(offsets, sizes);
         data.SetMaterialColor(glm::vec3(1.0f));
 
         Core::Logger::GetInstance().Debug("MeshDataFactory::CreateCubeData() - Created cube data: " +
-                                          std::to_string(data.GetVertexCount()) + " vertices");
+                                          std::to_string(data.GetVertexCount()) + " vertices, " +
+                                          std::to_string(data.GetIndexCount()) + " indices");
 
         return data;
     }

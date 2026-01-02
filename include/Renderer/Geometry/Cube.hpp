@@ -32,6 +32,15 @@ namespace Renderer
         static std::vector<float> GetVertexData();
 
         /**
+         * @brief 获取立方体的索引数据
+         * @return std::vector<unsigned int> 索引数据数组
+         *
+         * 将每面的4个顶点拆分成2个三角形
+         * 共6面 × 6索引/面 = 36个索引
+         */
+        static std::vector<unsigned int> GetIndexData();
+
+        /**
          * @brief 获取立方体的顶点布局
          * @param offsets 输出：各属性在顶点中的偏移量
          * @param sizes 输出：各属性的大小
