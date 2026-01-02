@@ -285,6 +285,7 @@ void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
         auto &bunnyMatrices = stage.bunnyData->GetModelMatrices();
 
         // 调试：每秒输出一次bunny的位置
+#if ENABLE_PERFORMANCE_LOGGING
         static int debugFrameCount = 0;
         static float lastDebugY = 0.0f;
         if (++debugFrameCount % 60 == 0)
@@ -299,6 +300,10 @@ void UpdateDiscoStageAnimation(DiscoStage &stage, float time)
             Core::Logger::GetInstance().Info("============================");
             lastDebugY = currentPos.y;
         }
+#else
+        (void)bunnyMatrices; // 避免未使用变量警告
+        (void)time; // 避免未使用变量警告
+#endif
 
         // ⭐ 增强的舞蹈参数（更剧烈的动作）
         float moveRadius = 6.0f;  // 移动范围翻倍（从3.0m增加到6.0m）
@@ -1406,6 +1411,7 @@ int main()
                 fps = fpsFrameCount / (currentTime - fpsLastTime);
                 Core::Logger::GetInstance().SetFPS(static_cast<int>(fps));
 
+#if ENABLE_PERFORMANCE_LOGGING
                 // 每秒输出一次统计
                 static int logCounter = 0;
                 if (++logCounter >= 2) // 每1秒输出一次
@@ -1417,6 +1423,7 @@ int main()
                     Core::Logger::GetInstance().Info(logMessage);
                     logCounter = 0;
                 }
+#endif
 
                 fpsFrameCount = 0;
                 fpsLastTime = currentTime;
@@ -1503,6 +1510,7 @@ int main()
                     // 获取renderer使用的instances指针
                     auto rendererInstances = discoStage.renderers[i]->GetInstances();
 
+#if ENABLE_PERFORMANCE_LOGGING
                     static int updateCount = 0;
                     if (++updateCount <= 5) // 只输出前5次
                     {
@@ -1510,6 +1518,9 @@ int main()
                                                          " UpdateInstanceData() - instances pointer: " +
                                                          std::to_string(reinterpret_cast<uintptr_t>(rendererInstances.get())));
                     }
+#else
+                    (void)rendererInstances; // 避免未使用变量警告
+#endif
 
                     discoStage.renderers[i]->UpdateInstanceData();
                 }

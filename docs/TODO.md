@@ -1,6 +1,11 @@
 + cube 应该是cube还是通用立方体？
 
-+ main里面日志输出影响效率
++ ✅ main里面日志输出影响效率 - 已修复（2026-01-02）
+  - 添加 ENABLE_PERFORMANCE_LOGGING 编译开关（默认禁用）
+  - 禁用渲染循环中的 FPS 日志输出
+  - 禁用 Bunny 动画调试日志
+  - 禁用 UpdateInstanceData 调试日志
+  - 注意：初始化日志保留（不影响运行时性能）
 
 1.1 InstancedRenderer - GPU资源双重所有权灾难
 位置：InstancedRenderer.hpp:128-145 移动语义实现
