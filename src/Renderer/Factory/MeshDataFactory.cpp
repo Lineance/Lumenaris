@@ -232,33 +232,33 @@ namespace Renderer
     MeshBuffer MeshBufferFactory::CreateCubeBuffer()
     {
         MeshData data = MeshDataFactory::CreateCubeData();
-        return CreateFromMeshData(data);
+        return CreateFromMeshData(std::move(data));
     }
 
     MeshBuffer MeshBufferFactory::CreateSphereBuffer(int stacks, int slices, float radius)
     {
         MeshData data = MeshDataFactory::CreateSphereData(stacks, slices, radius);
-        return CreateFromMeshData(data);
+        return CreateFromMeshData(std::move(data));
     }
 
     MeshBuffer MeshBufferFactory::CreateTorusBuffer(float majorRadius, float minorRadius,
                                                      int majorSegments, int minorSegments)
     {
         MeshData data = MeshDataFactory::CreateTorusData(majorRadius, minorRadius, majorSegments, minorSegments);
-        return CreateFromMeshData(data);
+        return CreateFromMeshData(std::move(data));
     }
 
     MeshBuffer MeshBufferFactory::CreatePlaneBuffer(float width, float height,
                                                      int widthSegments, int heightSegments)
     {
         MeshData data = MeshDataFactory::CreatePlaneData(width, height, widthSegments, heightSegments);
-        return CreateFromMeshData(data);
+        return CreateFromMeshData(std::move(data));
     }
 
     std::vector<MeshBuffer> MeshBufferFactory::CreateOBJBuffers(const std::string& objPath)
     {
         std::vector<MeshData> dataList = MeshDataFactory::CreateOBJData(objPath);
-        return CreateFromMeshDataList(dataList);
+        return CreateFromMeshDataList(std::move(dataList));
     }
 
     MeshBuffer MeshBufferFactory::CreateFromMeshData(const MeshData& data)
@@ -288,6 +288,22 @@ namespace Renderer
 
         Core::Logger::GetInstance().Info("MeshBufferFactory::CreateFromMeshDataList() - Created " +
                                          std::to_string(buffers.size()) + " mesh buffers");
+
+        return buffers;
+    }
+
+    std::vector<MeshBuffer> MeshBufferFactory::CreateFromMeshDataList(std::vector<MeshData>&& dataList)
+    {
+        std::vector<MeshBuffer> buffers;
+        buffers.reserve(dataList.size());
+
+        for (auto& data : dataList)
+        {
+            buffers.push_back(CreateFromMeshData(std::move(data)));
+        }
+
+        Core::Logger::GetInstance().Info("MeshBufferFactory::CreateFromMeshDataList() - Created " +
+                                         std::to_string(buffers.size()) + " mesh buffers (moved)");
 
         return buffers;
     }

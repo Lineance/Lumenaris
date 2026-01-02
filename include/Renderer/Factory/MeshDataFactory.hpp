@@ -189,6 +189,14 @@ namespace Renderer
          * @return std::vector<MeshBuffer> 已上传到 GPU 的缓冲区列表
          */
         static std::vector<MeshBuffer> CreateFromMeshDataList(const std::vector<MeshData>& dataList);
+
+        /**
+         * @brief 从网格数据列表创建缓冲区列表（右值引用版本，移动语义）
+         * @param dataList 网格数据列表
+         * @return std::vector<MeshBuffer> 已上传到 GPU 的缓冲区列表
+         * @note 使用移动语义避免数据拷贝，性能更优
+         */
+        static std::vector<MeshBuffer> CreateFromMeshDataList(std::vector<MeshData>&& dataList);
     };
 
 } // namespace Renderer
