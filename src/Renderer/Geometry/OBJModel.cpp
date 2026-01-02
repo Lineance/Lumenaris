@@ -1,6 +1,7 @@
 #include "Renderer/Geometry/OBJModel.hpp"
 #include "Core/Logger.hpp"
 #include <algorithm>
+#include <unordered_map>
 
 namespace Renderer
 {
@@ -54,13 +55,13 @@ namespace Renderer
         }
         else
         {
-            // 为每个材质创建顶点数据
+            // ✅ 性能优化：为每个材质只收集实际使用的顶点
+            // 避免复制全部顶点，减少内存占用和GPU传输
+
+            // 第一步：收集每个材质使用的唯一顶点索引
+            std::vector<std::vector<unsigned int>> materialVertexIndices(materials.size());
             for (size_t matIdx = 0; matIdx < materials.size(); ++matIdx)
             {
-                MaterialVertexData data;
-                data.material = materials[matIdx];
-                data.texturePath = loader.GetBasePath() + materials[matIdx].diffuseTexname;
-
                 // 收集使用此材质的所有面的索引
                 for (size_t faceIdx = 0; faceIdx < faceMaterialIndices.size(); ++faceIdx)
                 {
@@ -69,23 +70,44 @@ namespace Renderer
                         size_t idxStart = faceIdx * 3;
                         if (idxStart + 2 < indices.size())
                         {
-                            data.indices.push_back(indices[idxStart]);
-                            data.indices.push_back(indices[idxStart + 1]);
-                            data.indices.push_back(indices[idxStart + 2]);
+                            materialVertexIndices[matIdx].push_back(indices[idxStart]);
+                            materialVertexIndices[matIdx].push_back(indices[idxStart + 1]);
+                            materialVertexIndices[matIdx].push_back(indices[idxStart + 2]);
                         }
                     }
                 }
 
                 // 如果此材质没有使用任何面，跳过
-                if (data.indices.empty())
+                if (materialVertexIndices[matIdx].empty())
                 {
                     continue;
                 }
 
-                // 转换所有顶点数据（每个材质网格包含全部顶点）
-                data.vertices.reserve(vertices.size() * 8);
-                for (const auto& vertex : vertices)
+                // 第二步：获取唯一顶点索引（去重）
+                std::vector<unsigned int> uniqueIndices = materialVertexIndices[matIdx];
+                std::sort(uniqueIndices.begin(), uniqueIndices.end());
+                uniqueIndices.erase(std::unique(uniqueIndices.begin(), uniqueIndices.end()), uniqueIndices.end());
+
+                // 第三步：创建局部顶点索引映射（全局索引 → 局部索引）
+                std::unordered_map<unsigned int, unsigned int> globalToLocalMap;
+                for (size_t i = 0; i < uniqueIndices.size(); ++i)
                 {
+                    globalToLocalMap[uniqueIndices[i]] = static_cast<unsigned int>(i);
+                }
+
+                // 第四步：只复制实际使用的顶点
+                MaterialVertexData data;
+                data.material = materials[matIdx];
+                data.texturePath = loader.GetBasePath() + materials[matIdx].diffuseTexname;
+
+                // 预分配空间：只分配实际使用的顶点
+                data.vertices.reserve(uniqueIndices.size() * 8);
+                data.indices.reserve(materialVertexIndices[matIdx].size());
+
+                // 复制实际使用的顶点数据
+                for (unsigned int globalIdx : uniqueIndices)
+                {
+                    const auto& vertex = vertices[globalIdx];
                     data.vertices.push_back(vertex.position.x);
                     data.vertices.push_back(vertex.position.y);
                     data.vertices.push_back(vertex.position.z);
@@ -94,6 +116,12 @@ namespace Renderer
                     data.vertices.push_back(vertex.normal.z);
                     data.vertices.push_back(vertex.texCoord.x);
                     data.vertices.push_back(vertex.texCoord.y);
+                }
+
+                // 转换索引：全局索引 → 局部索引
+                for (unsigned int globalIdx : materialVertexIndices[matIdx])
+                {
+                    data.indices.push_back(globalToLocalMap[globalIdx]);
                 }
 
                 materialDataList.push_back(std::move(data));
