@@ -301,6 +301,73 @@ namespace Renderer
         return renderer;
     }
 
+    // ✅ 性能优化（2026-01-02）：批量渲染方法实现
+    void InstancedRenderer::RenderBatch(const std::vector<InstancedRenderer*>& renderers)
+    {
+        if (renderers.empty())
+        {
+            return;
+        }
+
+        // ✅ 按纹理分组（使用原始指针作为key，避免shared_ptr拷贝）
+        // 使用 std::map 保持纹理顺序稳定
+        std::map<Texture*, std::vector<InstancedRenderer*>> batches;
+
+        for (auto* renderer : renderers)
+        {
+            if (!renderer)
+            {
+                continue;  // 跳过空指针
+            }
+
+            // 获取纹理原始指针（nullptr表示无纹理）
+            Texture* textureKey = renderer->GetTexture().get();
+            batches[textureKey].push_back(renderer);
+        }
+
+        // ✅ 批量渲染每个纹理组
+        for (const auto& [texturePtr, batch] : batches)
+        {
+            if (batch.empty())
+            {
+                continue;
+            }
+
+            // 绑定纹理（如果有）
+            if (texturePtr)
+            {
+                texturePtr->Bind(GL_TEXTURE1);
+            }
+
+            // 批量渲染所有使用该纹理的渲染器
+            for (auto* renderer : batch)
+            {
+                renderer->Render();
+            }
+
+            // 解绑纹理
+            if (texturePtr)
+            {
+                Texture::UnbindStatic();
+            }
+        }
+    }
+
+    // ✅ 重载版本：支持 unique_ptr vector
+    void InstancedRenderer::RenderBatch(const std::vector<std::unique_ptr<InstancedRenderer>>& renderers)
+    {
+        // 转换为原始指针 vector，调用重载版本
+        std::vector<InstancedRenderer*> rawPointers;
+        rawPointers.reserve(renderers.size());
+
+        for (const auto& renderer : renderers)
+        {
+            rawPointers.push_back(renderer.get());
+        }
+
+        RenderBatch(rawPointers);
+    }
+
     // 静态方法：为 OBJ 模型创建实例化渲染器（返回多个渲染器，每个材质一个）
     std::tuple<std::vector<InstancedRenderer>, std::vector<std::shared_ptr<MeshBuffer>>, std::shared_ptr<InstanceData>>
     InstancedRenderer::CreateForOBJ(const std::string &objPath, const std::shared_ptr<InstanceData> &instances)
