@@ -274,10 +274,14 @@ auto config = SkyboxLoader::CreateFromCustomScheme(
 
 ### P2 - 极致性能（目前放弃）
 
+- ❌ **GPU 上传优化**：glBufferStorage(OpenGL4.4+)
 - ❌ **视锥剔除**：Frustum Culling
 - ❌ **渲染状态批处理**：State Batching
 - ❌ **纹理压缩与MipMap优化**
 - ❌ **Uniform Buffer Object (UBO)**
+- ❌ **InstanceData 无锁快照机制**：多线程数据竞争优化
+  - **问题**：`std::vector::push_back()` 非原子操作，扩容时可能导致渲染线程读取已释放内存
+  - **不开发原因**：需要引入 GSL 库或 C++20 `std::span`，增加依赖复杂度；当前单线程架构已满足需求
 
 ---
 

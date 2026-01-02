@@ -173,25 +173,18 @@ namespace Renderer
         size_t colorFloatCount = colors.size() * 3;
         size_t totalFloatCount = matrixFloatCount + colorFloatCount;
 
-        // 创建连续的缓冲区
+        // ✅ 性能优化（2026-01-02）：单次分配，避免多次 resize() 和零填充开销
         std::vector<float> buffer;
-        buffer.reserve(totalFloatCount);
+        buffer.resize(totalFloatCount);  // 只分配一次
 
-        // ✅ 修复严格别名违规：使用 memcpy 符合 C++ 标准
-        // C++17 保证：memcpy 可以用于任意类型的字节级别复制
-        buffer.resize(matrixFloatCount);
+        // ✅ 性能优化：批量复制矩阵（编译器自动优化为 AVX/AVX2/AVX-512）
         std::memcpy(buffer.data(), matrices.data(), matrices.size() * sizeof(glm::mat4));
 
-        // ✅ 修复严格别名违规：逐个元素复制 glm::vec3
-        // 避免直接 reinterpret_cast，改用值语义访问
-        size_t colorOffset = matrixFloatCount;
-        buffer.resize(totalFloatCount);
-        for (size_t i = 0; i < colors.size(); ++i)
-        {
-            buffer[colorOffset + i * 3 + 0] = colors[i].x;
-            buffer[colorOffset + i * 3 + 1] = colors[i].y;
-            buffer[colorOffset + i * 3 + 2] = colors[i].z;
-        }
+        // ✅ 性能优化：批量复制颜色（glm::vec3 内存布局连续，无 padding）
+        // sizeof(glm::vec3) = 12 bytes = 3 floats，memcpy 安全且可向量化
+        std::memcpy(buffer.data() + matrixFloatCount,
+                    colors.data(),
+                    colors.size() * sizeof(glm::vec3));
 
         return buffer;
     }
