@@ -986,39 +986,37 @@ lightManager.ApplyToShader(shader);
 
 ## Renderer 模块接口
 
-### IMesh 抽象接口
+### ⚠️ IMesh 抽象接口 - 已废弃（2026-01-02）
 
-网格渲染的抽象基类，定义了网格的基本操作。
+**状态**：❌ 已删除
+**原因**：Geometry 模块已重构为纯静态工具类
+
+**历史说明**：
+- IMesh 接口曾定义网格的基本操作（`Create()`, `Draw()` 等）
+- 所有几何体类（Cube, Sphere, Plane, Torus, OBJModel）继承此接口
+- 2026-01-02 重构后，所有几何体类改为纯静态工具类，不再需要此接口
+
+**新架构**：
+- 几何体类只负责数据生成（纯静态方法）
+- MeshDataFactory 负责创建 GPU 资源
+- InstancedRenderer 负责渲染逻辑
 
 ```cpp
-namespace Renderer {
+// ❌ 旧接口（已删除）
 class IMesh {
-public:
-    virtual void Create() = 0;                      // 创建网格资源
-    virtual void Draw() const = 0;                  // 绘制网格
-    virtual ~IMesh() = default;                     // 虚析构函数
-
-    // 扩展接口（可选实现）
-    virtual unsigned int GetVAO() const { return 0; }
-    virtual size_t GetVertexCount() const { return 0; }
-    virtual size_t GetIndexCount() const { return 0; }
-    virtual bool HasIndices() const { return false; }
-    virtual bool HasTexture() const { return false; }
+    virtual void Create() = 0;
+    virtual void Draw() const = 0;
+    virtual ~IMesh() = default;
+    // ... 其他方法
 };
-}
+
+// ✅ 新接口（纯静态类）
+class Cube {
+    Cube() = delete;  // 禁止实例化
+    static std::vector<float> GetVertexData();
+    static void GetVertexLayout(...);
+};
 ```
-
-#### 接口说明
-
-| 方法 | 参数 | 返回值 | 说明 |
-|------|------|--------|------|
-| `Create()` | 无 | void | 初始化网格的顶点缓冲对象和数组对象 |
-| `Draw()` | 无 | void | 执行网格的渲染操作 |
-| `GetVAO()` | 无 | unsigned int | 返回VAO ID（可选实现） |
-| `GetVertexCount()` | 无 | size_t | 返回顶点数量（可选实现） |
-| `GetIndexCount()` | 无 | size_t | 返回索引数量（可选实现） |
-| `HasIndices()` | 无 | bool | 是否有索引数据（可选实现） |
-| `HasTexture()` | 无 | bool | 是否有纹理（可选实现） |
 
 ---
 
@@ -1054,33 +1052,37 @@ public:
 
 #### 设计说明
 
-IRenderer接口与IMesh接口分离：
+当前架构采用**分离关注点**设计：
 
-- **IMesh**: 表示可渲染的几何体数据
-- **IRenderer**: 表示渲染逻辑的执行者
-- 例如：InstancedRenderer继承IRenderer，Cube/Sphere/Torus继承IMesh
+- **几何体类（静态）**：只负责数据生成（Cube, Sphere, Plane, Torus, OBJModel）
+- **MeshDataFactory**：负责创建 GPU 资源（MeshBuffer）
+- **IRenderer 实现**：负责渲染逻辑（InstancedRenderer）
 
 ---
 
-### MeshFactory 工厂类
+### MeshFactory 工厂类 - 已废弃（2026-01-02）
 
-网格对象的工厂类，支持运行时注册和创建不同类型的网格。
+**状态**：❌ 已删除
+**原因**：几何体类改为纯静态类，不再需要运行时工厂
+
+**历史说明**：
+- MeshFactory 支持运行时注册和创建不同类型的网格
+- 2026-01-02 重构后，通过编译时工厂方法（MeshDataFactory）创建对象
+
+**新方式**：
 
 ```cpp
-namespace Renderer {
-class MeshFactory {
-public:
-    // 类型注册
-    static void Register(const std::string& type,
-                        std::function<std::unique_ptr<IMesh>()> creator);
+// ❌ 旧方式（已删除）
+auto mesh = MeshFactory::Create("Cube");
 
-    // 对象创建
-    static std::unique_ptr<IMesh> Create(const std::string& type);
-};
-}
+// ✅ 新方式：直接使用静态方法
+auto cubeData = Cube::GetVertexData();
+
+// ✅ 或使用 MeshDataFactory
+auto cubeBuffer = MeshDataFactory::CreateCubeBuffer();
 ```
 
-#### 接口说明
+---
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
@@ -1245,67 +1247,26 @@ public:
 
 ---
 
-### Cube 类
+### Cube 类 ⭐ UPDATED (2026-01-02)
 
-立方体网格实现类。
+**纯静态工具类** - 提供立方体顶点数据生成。
 
-```cpp
-namespace Renderer {
-class Cube : public IMesh {
-public:
-    Cube();
-    ~Cube() override;
-
-    void Create() override;
-    void Draw() const override;
-};
-}
-```
-
-#### 接口说明
-
-继承自 `IMesh`，实现立方体的创建和绘制。
-
----
-
-### Sphere 类
-
-球体网格实现类，支持自定义半径和分段数。
+**架构更新**：
+- ❌ 删除实例方法和成员变量
+- ✅ 纯静态方法，禁止实例化
+- ✅ 只负责数据生成，不涉及GPU操作
 
 ```cpp
 namespace Renderer {
-class Sphere : public IMesh {
+class Cube {
 public:
-    // 构造函数
-    explicit Sphere(float radius = 1.0f, int stacks = 20, int slices = 20);
+    Cube() = delete;  // 禁止实例化
 
-    // IMesh 接口实现
-    void Create() override;
-    void Draw() const override;
-
-    // 变换配置
-    void SetPosition(const glm::vec3& pos);
-    void SetColor(const glm::vec3& color);
-    void SetScale(float scale);
-    void SetRadius(float radius);
-    void SetSegments(int stacks, int slices);
-
-    // 获取状态
-    const glm::vec3& GetColor() const;
-    float GetRadius() const;
-    glm::mat4 GetModelMatrix() const;
-
-    // 静态方法：获取球体的标准顶点数据（用于实例化渲染）
+    // 获取顶点数据
     static std::vector<float> GetVertexData();
-    static std::vector<unsigned int> GetIndexData();
-    static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 
-    // IMesh 接口扩展
-    unsigned int GetVAO() const override;
-    size_t GetVertexCount() const override;
-    size_t GetIndexCount() const override;
-    bool HasIndices() const override;
-    bool HasTexture() const override;
+    // 获取顶点布局
+    static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 };
 }
 ```
@@ -1314,82 +1275,107 @@ public:
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `Sphere()` | float radius, int stacks, int slices | - | 构造函数，radius=球半径，stacks=纬度线数，slices=经度线数 |
-| `Create()` | 无 | void | 创建球体网格资源 |
-| `Draw()` | 无 | void | 绘制球体 |
-| `SetPosition()` | glm::vec3 pos | void | 设置位置 |
-| `SetColor()` | glm::vec3 color | void | 设置颜色 |
-| `SetScale()` | float scale | void | 设置缩放 |
-| `SetRadius()` | float radius | void | 设置半径 |
-| `SetSegments()` | int stacks, int slices | void | 设置分段数 |
-| `GetColor()` | 无 | glm::vec3 | 获取颜色 |
-| `GetRadius()` | 无 | float | 获取半径 |
-| `GetModelMatrix()` | 无 | glm::mat4 | 获取模型矩阵 |
-| `GetVertexData()` | 无 | vector<float> | 静态方法：获取顶点数据（用于工厂模式） |
-| `GetIndexData()` | 无 | vector<uint> | 静态方法：获取索引数据 |
-| `GetVertexLayout()` | vector<size_t>& offsets, vector<int>& sizes | void | 静态方法：获取顶点布局 |
+| `GetVertexData()` | 无 | vector<float> | 获取立方体顶点数据（24个顶点，每个8个float：位置3+法线3+UV2） |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点属性布局（offsets={0,3,6}, sizes={3,3,2}） |
 
 #### 使用示例
 
 ```cpp
-// 示例1：创建并渲染单个球体
-Renderer::Sphere sphere(1.0f, 32, 32);  // 半径1.0，高精度分段
-sphere.SetPosition(glm::vec3(0.0f, 2.0f, 0.0f));
-sphere.SetColor(glm::vec3(1.0f, 0.5f, 0.0f));  // 橙色
-sphere.Create();
+// ✅ 新方式：使用静态方法获取数据
+auto vertices = Renderer::Cube::GetVertexData();
 
-// 在渲染循环中
-shader.Use();
-shader.SetMat4("model", sphere.GetModelMatrix());
-shader.SetVec3("color", sphere.GetColor());
-sphere.Draw();
-
-// 示例2：使用静态方法获取顶点数据（用于实例化渲染）
-auto vertices = Renderer::Sphere::GetVertexData();
-auto indices = Renderer::Sphere::GetIndexData();
 std::vector<size_t> offsets;
 std::vector<int> sizes;
-Renderer::Sphere::GetVertexLayout(offsets, sizes);
+Renderer::Cube::GetVertexLayout(offsets, sizes);
+
+// 创建 MeshData 并上传到GPU
+Renderer::MeshData cubeData;
+cubeData.SetVertices(std::move(vertices), 8);
+cubeData.SetVertexLayout(offsets, sizes);
+
+Renderer::MeshBuffer cubeBuffer;
+cubeBuffer.UploadToGPU(std::move(cubeData));
+
+// ✅ 或使用工厂方法（推荐）
+auto cubeBuffer = Renderer::MeshBufferFactory::CreateCubeBuffer();
 ```
 
 ---
 
-### Torus 类
+### Sphere 类 ⭐ UPDATED (2026-01-02)
 
-圆环体（甜甜圈）网格实现类，支持自定义主半径、管半径和分段数。
+**纯静态工具类** - 提供球体顶点和索引数据生成（支持参数化）。
+
+**架构更新**：
+- ❌ 删除实例方法（Create, Draw, SetPosition等）
+- ✅ 纯静态方法，禁止实例化
+- ✅ 支持参数化（半径、分段数）
 
 ```cpp
 namespace Renderer {
-class Torus : public IMesh {
+class Sphere {
 public:
-    // 构造函数
-    explicit Torus(float majorRadius = 1.0f, float minorRadius = 0.3f,
-                   int majorSegments = 32, int minorSegments = 24);
+    Sphere() = delete;  // 禁止实例化
 
-    // IMesh 接口实现
-    void Create() override;
-    void Draw() const override;
+    // 获取顶点数据（支持参数化）
+    static std::vector<float> GetVertexData(float radius = 1.0f, int stacks = 32, int slices = 32);
 
-    // 变换配置
-    void SetPosition(const glm::vec3& pos);
-    void SetScale(float scale);
-    void SetRotation(const glm::vec3& rotation);
-    void SetColor(const glm::vec3& color);
+    // 获取索引数据（支持参数化）
+    static std::vector<unsigned int> GetIndexData(int stacks = 32, int slices = 32);
 
-    // 参数配置
-    void SetMajorRadius(float radius);
-    void SetMinorRadius(float radius);
-    void SetMajorSegments(int segments);
-    void SetMinorSegments(int segments);
+    // 获取顶点布局
+    static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
+};
+}
+```
 
-    // 获取状态
-    const glm::vec3& GetColor() const;
-    float GetMajorRadius() const;
-    float GetMinorRadius() const;
-    glm::mat4 GetModelMatrix() const;
+#### 接口说明
 
-    // 静态方法：获取圆环体的标准顶点数据（用于工厂模式）
-    // ⭐ 支持参数化，避免硬编码（2025-01-01修复）
+| 方法 | 参数 | 返回值 | 说明 |
+|------|------|--------|------|
+| `GetVertexData()` | radius, stacks, slices | vector<float> | 获取球体顶点数据（位置3+法线3+UV2） |
+| `GetIndexData()` | stacks, slices | vector<uint> | 获取球体索引数据 |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点属性布局 |
+
+#### 使用示例
+
+```cpp
+// ✅ 新方式：使用静态方法（支持参数化）
+auto vertices = Renderer::Sphere::GetVertexData(1.0f, 64, 64);
+auto indices = Renderer::Sphere::GetIndexData(64, 64);
+
+std::vector<size_t> offsets;
+std::vector<int> sizes;
+Renderer::Sphere::GetVertexLayout(offsets, sizes);
+
+// 创建 MeshData
+Renderer::MeshData sphereData;
+sphereData.SetVertices(std::move(vertices), 8);
+sphereData.SetIndices(std::move(indices));
+sphereData.SetVertexLayout(offsets, sizes);
+
+// ✅ 或使用工厂方法（推荐）
+auto sphereBuffer = Renderer::MeshBufferFactory::CreateSphereBuffer(32, 32, 1.0f);
+```
+
+---
+
+### Torus 类 ⭐ UPDATED (2026-01-02)
+
+**纯静态工具类** - 提供圆环体顶点和索引数据生成（支持参数化）。
+
+**架构更新**：
+- ❌ 删除实例方法（Create, Draw, SetPosition等）
+- ✅ 纯静态方法，禁止实例化
+- ✅ 支持参数化（主半径、管半径、分段数）
+
+```cpp
+namespace Renderer {
+class Torus {
+public:
+    Torus() = delete;  // 禁止实例化
+
+    // 获取顶点数据（支持参数化）
     static std::vector<float> GetVertexData(
         float majorRadius = 1.0f,
         float minorRadius = 0.3f,
@@ -1397,19 +1383,14 @@ public:
         int minorSegments = 24
     );
 
+    // 获取索引数据（支持参数化）
     static std::vector<unsigned int> GetIndexData(
         int majorSegments = 32,
         int minorSegments = 24
     );
 
+    // 获取顶点布局
     static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
-
-    // IMesh 接口扩展
-    unsigned int GetVAO() const override;
-    size_t GetVertexCount() const override;
-    size_t GetIndexCount() const override;
-    bool HasIndices() const override;
-    bool HasTexture() const override;
 };
 }
 ```
@@ -1418,89 +1399,49 @@ public:
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `Torus()` | float majorRadius, float minorRadius, int majorSegments, int minorSegments | - | 构造函数，majorRadius=主半径（环半径），minorRadius=管半径 |
-| `Create()` | 无 | void | 创建圆环体网格资源 |
-| `Draw()` | 无 | void | 绘制圆环体 |
-| `SetPosition()` | glm::vec3 pos | void | 设置位置 |
-| `SetRotation()` | glm::vec3 rotation | void | 设置旋转（欧拉角） |
-| `SetColor()` | glm::vec3 color | void | 设置颜色 |
-| `SetMajorRadius()` | float radius | void | 设置主半径（从中心到管中心的距离） |
-| `SetMinorRadius()` | float radius | void | 设置管半径（管的粗细） |
-| `GetMajorRadius()` | 无 | float | 获取主半径 |
-| `GetMinorRadius()` | 无 | float | 获取管半径 |
-| `GetVertexData()` | majorRadius, minorRadius, majorSegments, minorSegments | vector<float> | 获取顶点数据（参数化） |
-| `GetIndexData()` | majorSegments, minorSegments | vector<uint> | 获取索引数据（参数化） |
-| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点布局 |
-| `GetModelMatrix()` | 无 | glm::mat4 | 获取模型矩阵 |
+| `GetVertexData()` | majorRadius, minorRadius, majorSegments, minorSegments | vector<float> | 获取圆环顶点数据（位置3+法线3+UV2） |
+| `GetIndexData()` | majorSegments, minorSegments | vector<uint> | 获取圆环索引数据 |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点属性布局 |
 
 #### 使用示例
 
 ```cpp
-// 示例1：创建一个甜甜圈形状
-Renderer::Torus torus(1.0f, 0.3f, 48, 32);  // 主半径1.0，管半径0.3，高精度
-torus.SetPosition(glm::vec3(3.0f, 0.5f, 0.0f));
-torus.SetRotation(glm::vec3(90.0f, 0.0f, 0.0f));  // 绕X轴旋转90度
-torus.SetColor(glm::vec3(0.8f, 0.2f, 0.8f));  // 紫色
-torus.Create();
-
-// 在渲染循环中
-shader.Use();
-shader.SetMat4("model", torus.GetModelMatrix());
-shader.SetVec3("color", torus.GetColor());
-torus.Draw();
-
-// 示例2：使用静态方法获取顶点数据（用于实例化渲染）
-// ⭐ 支持参数化（2025-01-01修复）
+// ✅ 新方式：使用静态方法（支持参数化）
 auto vertices = Renderer::Torus::GetVertexData(2.0f, 0.5f, 64, 48);
 auto indices = Renderer::Torus::GetIndexData(64, 48);
+
 std::vector<size_t> offsets;
 std::vector<int> sizes;
 Renderer::Torus::GetVertexLayout(offsets, sizes);
 
-// 示例3：通过工厂创建不同大小的圆环
-auto torus1 = Renderer::MeshDataFactory::CreateTorusData(1.0f, 0.3f, 32, 24);
-auto torus2 = Renderer::MeshDataFactory::CreateTorusData(2.0f, 0.5f, 64, 48);
-// 现在这些参数会真正生效！
+// 创建 MeshData
+Renderer::MeshData torusData;
+torusData.SetVertices(std::move(vertices), 8);
+torusData.SetIndices(std::move(indices));
+torusData.SetVertexLayout(offsets, sizes);
+
+// ✅ 或使用工厂方法（推荐）
+auto torusBuffer = Renderer::MeshBufferFactory::CreateTorusBuffer(1.0f, 0.3f, 32, 24);
 ```
 
 ---
 
-### Plane 类
+### Plane 类 ⭐ UPDATED (2026-01-02)
 
-平面网格实现类，支持自定义宽度和高度，可配置分段数。
+**纯静态工具类** - 提供平面顶点和索引数据生成（支持参数化）。
+
+**架构更新**：
+- ❌ 删除实例方法（Create, Draw, SetPosition等）
+- ✅ 纯静态方法，禁止实例化
+- ✅ 支持参数化（宽度、高度、分段数）
 
 ```cpp
 namespace Renderer {
-class Plane : public IMesh {
+class Plane {
 public:
-    // 构造函数
-    explicit Plane(float width = 1.0f, float height = 1.0f,
-                   int widthSegments = 1, int heightSegments = 1);
+    Plane() = delete;  // 禁止实例化
 
-    // IMesh 接口实现
-    void Create() override;
-    void Draw() const override;
-
-    // 变换配置
-    void SetPosition(const glm::vec3& pos);
-    void SetScale(float scale);
-    void SetRotation(const glm::vec3& rotation);
-    void SetColor(const glm::vec3& color);
-
-    // 参数配置
-    void SetWidth(float width);
-    void SetHeight(float height);
-    void SetWidthSegments(int segments);
-    void SetHeightSegments(int segments);
-
-    // 获取状态
-    const glm::vec3& GetColor() const;
-    float GetWidth() const;
-    float GetHeight() const;
-    glm::mat4 GetModelMatrix() const;
-
-    // 静态方法：获取平面的标准顶点数据（用于工厂模式）
-    // ⭐ 支持参数化，避免硬编码（2025-01-01修复）
+    // 获取顶点数据（支持参数化）
     static std::vector<float> GetVertexData(
         float width = 1.0f,
         float height = 1.0f,
@@ -1508,19 +1449,14 @@ public:
         int heightSegments = 1
     );
 
+    // 获取索引数据（支持参数化）
     static std::vector<unsigned int> GetIndexData(
         int widthSegments = 1,
         int heightSegments = 1
     );
 
+    // 获取顶点布局
     static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
-
-    // IMesh 接口扩展
-    unsigned int GetVAO() const override;
-    size_t GetVertexCount() const override;
-    size_t GetIndexCount() const override;
-    bool HasIndices() const override;
-    bool HasTexture() const override;
 };
 }
 ```
@@ -1529,46 +1465,29 @@ public:
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `Plane()` | float width, float height, int widthSegments, int heightSegments | - | 构造函数，width=宽度，height=高度，segments=分段数 |
-| `Create()` | 无 | void | 创建平面网格资源 |
-| `Draw()` | 无 | void | 绘制平面 |
-| `SetPosition()` | glm::vec3 pos | void | 设置位置 |
-| `SetRotation()` | glm::vec3 rotation | void | 设置旋转（欧拉角） |
-| `SetWidth()` | float width | void | 设置宽度 |
-| `SetHeight()` | float height | void | 设置高度 |
-| `SetWidthSegments()` | int segments | void | 设置宽度方向分段数（用于细分） |
-| `SetHeightSegments()` | int segments | void | 设置高度方向分段数 |
-| `GetWidth()` | 无 | float | 获取宽度 |
-| `GetHeight()` | 无 | float | 获取高度 |
-| `GetVertexData()` | width, height, widthSegments, heightSegments | vector<float> | 获取顶点数据（参数化） |
-| `GetIndexData()` | widthSegments, heightSegments | vector<uint> | 获取索引数据（参数化） |
-| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点布局 |
-| `GetModelMatrix()` | 无 | glm::mat4 | 获取模型矩阵 |
+| `GetVertexData()` | width, height, widthSegments, heightSegments | vector<float> | 获取平面顶点数据（位置3+法线3+UV2） |
+| `GetIndexData()` | widthSegments, heightSegments | vector<uint> | 获取平面索引数据 |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点属性布局 |
 
 #### 使用示例
 
 ```cpp
-// 示例1：创建地面平面
-Renderer::Plane ground(20.0f, 20.0f, 1, 1);  // 20x20的地面
-ground.SetPosition(glm::vec3(0.0f, -1.0f, 0.0f));
-ground.SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));  // 放平
-ground.SetColor(glm::vec3(0.5f, 0.5f, 0.5f));  // 灰色
-ground.Create();
-
-// 示例2：创建细分平面（用于地形等）
-Renderer::Plane terrain(50.0f, 50.0f, 100, 100);  // 100x100细分
-terrain.SetPosition(glm::vec3(-25.0f, -2.0f, -25.0f));
-terrain.Create();
-
-// 示例3：使用静态方法获取顶点数据（用于实例化渲染）
-// ⭐ 支持参数化（2025-01-01修复）
+// ✅ 新方式：使用静态方法（支持参数化）
 auto vertices = Renderer::Plane::GetVertexData(10.0f, 10.0f, 10, 10);
 auto indices = Renderer::Plane::GetIndexData(10, 10);
 
-// 示例4：通过工厂创建不同尺寸的平面
-auto plane1 = Renderer::MeshDataFactory::CreatePlaneData(5.0f, 5.0f, 1, 1);
-auto plane2 = Renderer::MeshDataFactory::CreatePlaneData(20.0f, 20.0f, 20, 20);
-// 现在这些参数会真正生效！
+std::vector<size_t> offsets;
+std::vector<int> sizes;
+Renderer::Plane::GetVertexLayout(offsets, sizes);
+
+// 创建 MeshData
+Renderer::MeshData planeData;
+planeData.SetVertices(std::move(vertices), 8);
+planeData.SetIndices(std::move(indices));
+planeData.SetVertexLayout(offsets, sizes);
+
+// ✅ 或使用工厂方法（推荐）
+auto planeBuffer = Renderer::MeshBufferFactory::CreatePlaneBuffer(20.0f, 20.0f, 1, 1);
 ```
 
 ---
@@ -2080,25 +1999,43 @@ Renderer::MeshBuffer buffer = Renderer::MeshBufferFactory::CreateFromMeshData(st
 
 ---
 
-### OBJModel 类
+### OBJModel 类 ⭐ UPDATED (2026-01-02)
 
-OBJ模型加载和渲染类。
+**纯静态工具类** - 提供OBJ模型数据加载和生成（支持多材质）。
+
+**架构更新**：
+- ❌ 删除实例方法（Create, Draw, LoadFromFile等）
+- ✅ 纯静态方法，禁止实例化
+- ✅ 支持材质分离（每个材质独立的顶点数据）
 
 ```cpp
 namespace Renderer {
-class OBJModel : public IMesh {
+class OBJModel {
 public:
-    OBJModel(const std::string& filepath);
-    ~OBJModel() override;
+    OBJModel() = delete;  // 禁止实例化
 
-    void Create() override;
-    void Draw() const override;
+    // 材质顶点数据结构
+    struct MaterialVertexData {
+        std::vector<float> vertices;      // 顶点数据（位置3+法线3+UV2）
+        std::vector<unsigned int> indices; // 索引数据
+        OBJMaterial material;              // 材质信息
+        std::string texturePath;           // 纹理路径
+    };
 
-    // 模型信息查询
-    bool IsLoaded() const;
-    const std::string& GetFilePath() const;
-    size_t GetVertexCount() const;
-    size_t GetTriangleCount() const;
+    // 获取材质分离的顶点数据（用于多材质渲染）
+    static std::vector<MaterialVertexData> GetMaterialVertexData(const std::string& objPath);
+
+    // 获取单个MeshData（不分离材质）
+    static MeshData GetMeshData(const std::string& objPath);
+
+    // 获取材质列表
+    static std::vector<OBJMaterial> GetMaterials(const std::string& objPath);
+
+    // 检查是否有材质
+    static bool HasMaterials(const std::string& objPath);
+
+    // 获取顶点布局
+    static void GetVertexLayout(std::vector<size_t>& offsets, std::vector<int>& sizes);
 };
 }
 ```
@@ -2107,9 +2044,51 @@ public:
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| `IsLoaded()` | 无 | bool | 检查模型是否成功加载 |
-| `GetVertexCount()` | 无 | size_t | 返回模型顶点数量 |
-| `GetTriangleCount()` | 无 | size_t | 返回模型三角形数量 |
+| `GetMaterialVertexData()` | objPath | vector<MaterialVertexData> | 获取材质分离的顶点数据（推荐用于多材质模型） |
+| `GetMeshData()` | objPath | MeshData | 获取单个网格数据（合并所有材质） |
+| `GetMaterials()` | objPath | vector<OBJMaterial> | 获取材质列表 |
+| `HasMaterials()` | objPath | bool | 检查模型是否包含材质 |
+| `GetVertexLayout()` | offsets, sizes (引用) | void | 获取顶点属性布局（offsets={0,3,6}, sizes={3,3,2}） |
+
+#### 使用示例
+
+```cpp
+// ✅ 新方式：获取材质分离的数据（推荐）
+std::string carPath = "assets/models/cars/sportsCar.obj";
+auto materialDataList = Renderer::OBJModel::GetMaterialVertexData(carPath);
+
+// 为每个材质创建 MeshBuffer
+std::vector<Renderer::MeshBuffer> meshBuffers;
+for (const auto& materialData : materialDataList) {
+    Renderer::MeshData meshData;
+    meshData.SetVertices(std::move(materialData.vertices), 8);
+    meshData.SetIndices(std::move(materialData.indices));
+
+    std::vector<size_t> offsets = {0, 3, 6};
+    std::vector<int> sizes = {3, 3, 2};
+    meshData.SetVertexLayout(offsets, sizes);
+    meshData.SetMaterialColor(glm::vec3(
+        materialData.material.diffuse[0],
+        materialData.material.diffuse[1],
+        materialData.material.diffuse[2]
+    ));
+
+    Renderer::MeshBuffer buffer;
+    buffer.UploadToGPU(std::move(meshData));
+
+    // 加载纹理（如果有）
+    if (!materialData.texturePath.empty()) {
+        auto texture = std::make_shared<Renderer::Texture>();
+        texture->LoadFromFile(materialData.texturePath);
+        buffer.SetTexture(texture);
+    }
+
+    meshBuffers.push_back(std::move(buffer));
+}
+
+// ✅ 或使用工厂方法（推荐）
+auto meshBuffers = Renderer::MeshBufferFactory::CreateOBJBuffers(carPath);
+```
 
 ---
 

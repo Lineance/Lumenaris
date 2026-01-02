@@ -100,6 +100,7 @@ cpp
 // - InstancedRenderer：渲染逻辑
 // - 各几何类（Cube/Sphere 等）：独立的工具类，保留 GetVAO() 以兼容性
 
+6.2
 删除几何体的 .cpp 实现（可选）
 既然 Cube::Create() 和 Cube::Draw() 未被调用，可激进删除整个 .cpp 文件，仅保留头文件中的静态方法：
 cpp
