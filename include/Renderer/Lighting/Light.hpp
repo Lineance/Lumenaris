@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <cstdio>
 
 namespace Renderer
 {

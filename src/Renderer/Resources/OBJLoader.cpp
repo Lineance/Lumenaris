@@ -83,7 +83,14 @@ namespace Renderer
         // ✅ 性能优化（2026-01-02）：使用 unordered_map 替代 map
         // O(1) 平均查找 vs O(log N) 红黑树，加速 5 倍
         std::unordered_map<VertexKey, unsigned int, VertexKeyHash> vertexMap;
-        vertexMap.reserve(100000);  // 预分配，减少哈希表扩容
+
+        // ✅ 性能优化（2026-01-02）：精确预估哈希表容量，避免扩容
+        size_t totalFaces = 0;
+        for (const auto& shape : shapes) {
+            totalFaces += shape.mesh.num_face_vertices.size();
+        }
+        size_t estimatedVertices = totalFaces * 3;  // 每个面最多3个唯一顶点
+        vertexMap.reserve(estimatedVertices);
 
         // 处理每个shape
         for (const auto& shape : shapes) {
