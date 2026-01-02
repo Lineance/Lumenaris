@@ -1593,6 +1593,30 @@ public:
 | `SetModelMatrix()` | index, matrix | void | 直接设置单个实例的矩阵，**自动标记脏** ✨ |
 | `SetColor()` | index, color | void | 直接设置单个实例的颜色，**自动标记脏** ✨ |
 
+**⚠️ 多材质模型的脏标记管理**：
+
+当多个渲染器共享同一个 InstanceData 时（如多材质OBJ模型），脏标记必须由**调用者统一管理**：
+
+```cpp
+// ❌ 错误：在 UpdateInstanceData() 中自动清除
+for (auto& renderer : renderers) {
+    renderer.UpdateInstanceData();  // 第一个清除标记后，其余跳过
+}
+
+// ✅ 正确：调用者在所有渲染器更新后统一清除
+for (auto& renderer : renderers) {
+    renderer.UpdateInstanceData();  // 所有渲染器都能检测到脏标记
+}
+if (instanceData->IsDirty()) {
+    instanceData->ClearDirty();  // 统一清除
+}
+```
+
+**设计原则**：
+- 脏标记的清除由调用者管理，不在被调用者中自动清除
+- 避免第一个消费者清除标记后，其余消费者跳过更新
+- 适用于多个消费者共享同一个状态标志的场景
+
 #### 设计原则
 
 - ✅ 纯数据容器，无 GPU 资源（无 VAO/VBO/EBO）
@@ -1600,6 +1624,7 @@ public:
 - ✅ **脏标记机制优化**：避免冗余的 GPU 数据传输
 - ✅ **自动标记**：`Add()`, `Clear()`, `SetModelMatrix()`, `SetColor()` 自动标记脏
 - ✅ **手动控制**：支持手动 `MarkDirty()` 和 `ClearDirty()`
+- ⚠️ **调用者负责清除**：多材质模型需在所有渲染器更新完毕后清除
 
 #### 使用示例
 
