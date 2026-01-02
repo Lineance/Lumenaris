@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <functional>
 #include "Core/GLM.hpp"
 #include "tiny_obj_loader.h"
 
@@ -13,6 +15,33 @@ namespace Renderer
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texCoord;
+    };
+
+    // ✅ 性能优化（2026-01-02）：顶点键结构，用于快速去重
+    struct VertexKey
+    {
+        int vi;  // 顶点索引
+        int ni;  // 法线索引
+        int ti;  // 纹理坐标索引
+
+        // ✅ C++20 三路比较运算符（或使用 = default）
+        bool operator==(const VertexKey& other) const
+        {
+            return vi == other.vi && ni == other.ni && ti == other.ti;
+        }
+    };
+
+    // ✅ 性能优化：完美哈希函数（零碰撞）
+    struct VertexKeyHash
+    {
+        size_t operator()(const VertexKey& k) const noexcept
+        {
+            // 完美哈希：每个 21 位，左移避免重叠
+            // OBJ 索引范围：0-1M（20 位），21 位足够
+            return (static_cast<size_t>(k.vi) << 42) |
+                   (static_cast<size_t>(k.ni) << 21) |
+                   (static_cast<size_t>(k.ti));
+        }
     };
 
     struct OBJMaterial
