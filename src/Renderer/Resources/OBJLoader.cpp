@@ -22,6 +22,9 @@ namespace Renderer
     bool OBJLoader::LoadFromFile(const std::string& filepath)
     {
         Core::Logger::GetInstance().Info("Loading OBJ file: " + filepath);
+        std::cout << "[OBJLoader] Starting to load: " << filepath << std::endl;
+        std::cout.flush();
+
         Clear();
 
         // 获取文件所在目录，用于加载材质文件
@@ -38,9 +41,15 @@ namespace Renderer
 
         std::string err;
 
+        std::cout << "[OBJLoader] Parsing OBJ file with tinyobjloader (this may take a while for large files)..." << std::endl;
+        std::cout.flush();
+
         // 使用tinyobjloader加载OBJ文件
         bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
                                    filepath.c_str(), m_basePath.c_str(), true);
+
+        std::cout << "[OBJLoader] Parsing completed!" << std::endl;
+        std::cout.flush();
 
         // 检查错误和警告信息（tinyobj将警告也包含在err中）
         if (!err.empty()) {
@@ -57,9 +66,15 @@ namespace Renderer
             return false;
         }
 
+        std::cout << "[OBJLoader] Converting tinyobj data to internal format..." << std::endl;
+        std::cout.flush();
+
         // 转换tinyobj数据为我们的格式
         ConvertTinyObjData(attrib, shapes, materials);
         ConvertMaterials(materials);
+
+        std::cout << "[OBJLoader] Data conversion completed!" << std::endl;
+        std::cout.flush();
 
         m_loaded = true;
 
@@ -75,13 +90,16 @@ namespace Renderer
                                       const std::vector<tinyobj::shape_t>& shapes,
                                       const std::vector<tinyobj::material_t>& materials)
     {
+        std::cout << "[OBJLoader] ConvertTinyObjData: Starting conversion..." << std::endl;
+        std::cout.flush();
+
         // 清空之前的数据
         m_vertices.clear();
         m_indices.clear();
         m_faceMaterialIndices.clear();
 
-        // ✅ 性能优化（2026-01-02）：使用 unordered_map 替代 map
-        // O(1) 平均查找 vs O(log N) 红黑树，加速 5 倍
+        // ✅ 性能优化（2026-01-02）：使用 unordered_map（哈希函数已修复 -1 问题）
+        // O(1) 平均查找 vs O(log N) 红黑树
         std::unordered_map<VertexKey, unsigned int, VertexKeyHash> vertexMap;
 
         // ✅ 性能优化（2026-01-02）：精确预估哈希表容量，避免扩容
@@ -89,15 +107,33 @@ namespace Renderer
         for (const auto& shape : shapes) {
             totalFaces += shape.mesh.num_face_vertices.size();
         }
+
+        std::cout << "[OBJLoader] Total faces to process: " << totalFaces << std::endl;
+        std::cout.flush();
+
         size_t estimatedVertices = totalFaces * 3;  // 每个面最多3个唯一顶点
         vertexMap.reserve(estimatedVertices);
 
+        std::cout << "[OBJLoader] Processing " << shapes.size() << " shapes..." << std::endl;
+        std::cout.flush();
+
         // 处理每个shape
+        size_t shapeIndex = 0;
         for (const auto& shape : shapes) {
             size_t index_offset = 0;
 
+            std::cout << "[OBJLoader] Processing shape " << (shapeIndex + 1) << "/" << shapes.size()
+                      << " with " << shape.mesh.num_face_vertices.size() << " faces..." << std::endl;
+            std::cout.flush();
+
             // 处理每个face
             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+                // 每处理10000个面输出一次进度
+                if (f % 10000 == 0 && f > 0) {
+                    std::cout << "[OBJLoader]   Processed " << f << "/" << shape.mesh.num_face_vertices.size()
+                              << " faces (" << (f * 100 / shape.mesh.num_face_vertices.size()) << "%)" << std::endl;
+                    std::cout.flush();
+                }
                 int fv = shape.mesh.num_face_vertices[f];
                 int materialId = shape.mesh.material_ids[f]; // 获取face的材质索引
 
@@ -109,10 +145,10 @@ namespace Renderer
                     for (size_t v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
 
-                        // ✅ 性能优化：创建结构化键（替代 tuple）
+                        // ✅ 使用修复后的哈希键（正确处理 -1）
                         VertexKey key{idx.vertex_index, idx.normal_index, idx.texcoord_index};
 
-                        // ✅ 性能优化：O(1) 哈希查找 vs O(log N) 红黑树
+                        // ✅ 性能优化：O(1) 哈希查找
                         auto it = vertexMap.find(key);
                         if (it != vertexMap.end()) {
                             // 已经存在的顶点，直接使用索引
@@ -183,7 +219,15 @@ namespace Renderer
 
                 index_offset += fv;
             }
+
+            shapeIndex++;
+            std::cout << "[OBJLoader] Shape " << shapeIndex << " completed!" << std::endl;
+            std::cout.flush();
         }
+
+        std::cout << "[OBJLoader] All shapes processed! Total vertices: " << m_vertices.size()
+                  << ", Total indices: " << m_indices.size() << std::endl;
+        std::cout.flush();
     }
 
     void OBJLoader::ConvertMaterials(const std::vector<tinyobj::material_t>& tinyMaterials)

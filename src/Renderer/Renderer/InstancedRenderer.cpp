@@ -220,8 +220,11 @@ namespace Renderer
                         buffer.data());
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        // ✅ 清除脏标记，表示数据已同步到 GPU
-        m_instances->ClearDirty();
+        // ❌ BUG 修复（2026-01-02）：不要在这里清除脏标记！
+        // 当多个 renderer 共享同一个 instanceData 时（例如多材质 OBJ 模型），
+        // 每个 renderer 都有自己的 instanceVBO，都需要从同一个 instanceData 更新数据。
+        // 如果在第一个 renderer 更新后就清除脏标记，其余的 renderer 将无法更新。
+        // 脏标记由调用者在所有 renderer 更新完毕后统一清除。
     }
 
     void InstancedRenderer::Render() const
@@ -363,6 +366,22 @@ namespace Renderer
         for (const auto& renderer : renderers)
         {
             rawPointers.push_back(renderer.get());
+        }
+
+        RenderBatch(rawPointers);
+    }
+
+    // ✅ 重载版本：支持值类型 vector (2026-01-02)
+    void InstancedRenderer::RenderBatch(const std::vector<InstancedRenderer>& renderers)
+    {
+        // 转换为原始指针 vector，调用重载版本
+        std::vector<InstancedRenderer*> rawPointers;
+        rawPointers.reserve(renderers.size());
+
+        for (size_t i = 0; i < renderers.size(); ++i)
+        {
+            // 注意：获取指向vector中元素的指针（const_cast因为Render()是const方法）
+            rawPointers.push_back(const_cast<InstancedRenderer*>(&renderers[i]));
         }
 
         RenderBatch(rawPointers);

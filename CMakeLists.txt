@@ -97,5 +97,3 @@ target_include_directories(HelloWindow PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader
 )
 target_link_libraries(HelloWindow PRIVATE Core Renderer OpenGL::GL)
-
-

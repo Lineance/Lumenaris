@@ -54,6 +54,21 @@ struct DiscoStage
 };
 
 // ========================================
+// 前置声明：Car 结构体（行驶的车）
+// ========================================
+struct Car
+{
+    std::vector<Renderer::InstancedRenderer> renderers;  // 车的渲染器（多材质）
+    std::vector<std::shared_ptr<Renderer::MeshBuffer>> meshBuffers;
+    std::shared_ptr<Renderer::InstanceData> instanceData;
+    float speed = 2.0f;          // 降低速度（更慢更真实）
+    float carScale = 0.8f;       // 缩小到0.8倍
+    float orbitRadius = 12.0f;   // 行驶半径
+    float groundY = 0.3f;        // 离地高度
+    float wheelbase = 1.5f;      // 轴距（前后轮距离，用于后轮中心转弯）
+};
+
+// ========================================
 // 辅助函数：计算光源运动模式
 // ========================================
 glm::vec3 CalculateLightMotion(int index, float time, float baseRadius, float baseHeight)
@@ -613,6 +628,48 @@ std::shared_ptr<Renderer::InstanceData> CreateMultiLightDemoPlane()
     Core::Logger::GetInstance().Info("Multi-Light Demo Plane created: " +
                                      std::to_string(instances->GetCount()) + " cubes");
     return instances;
+}
+
+// ========================================
+// 创建行驶的车
+// ========================================
+Car CreateCar()
+{
+    Car car;
+    std::string carPath = "assets/models/cars/sportsCar.obj";
+
+    Core::Logger::GetInstance().Info("Loading car model: " + carPath);
+
+    if (!fs::exists(carPath))
+    {
+        Core::Logger::GetInstance().Warning("Car model not found: " + carPath);
+        return car;
+    }
+
+    // 创建车实例（单个车）
+    car.instanceData = std::make_shared<Renderer::InstanceData>();
+    glm::vec3 position(0.0f, car.groundY, 0.0f);  // 初始位置在地面上
+    glm::vec3 rotation(0.0f, 0.0f, 0.0f);
+    glm::vec3 scale(car.carScale);  // 使用新的缩放比例
+    glm::vec3 color(1.0f, 1.0f, 1.0f);  // 白色（使用材质颜色）
+
+    car.instanceData->Add(position, rotation, scale, color);
+
+    // 创建渲染器（多材质）
+    auto [renderers, meshBuffers, instances] =
+        Renderer::InstancedRenderer::CreateForOBJ(carPath, car.instanceData);
+
+    car.renderers = std::move(renderers);
+    car.meshBuffers = std::move(meshBuffers);
+
+    // ⭐ 关键修复：使用返回的 instances，而不是传入的那个
+    // CreateForOBJ 内部使用传入的 instances 创建渲染器，但返回的是渲染器内部使用的 shared_ptr
+    car.instanceData = instances;
+
+    Core::Logger::GetInstance().Info("Car loaded: " + std::to_string(car.renderers.size()) + " materials");
+    Core::Logger::GetInstance().Info("Car scale: " + std::to_string(car.carScale) + ", orbit radius: " + std::to_string(car.orbitRadius));
+
+    return car;
 }
 
 DiscoStage CreateDiscoStage()
@@ -1328,6 +1385,34 @@ int main()
         }
 
         // ========================================
+        // 创建行驶的车
+        // ========================================
+        Car car = CreateCar();
+
+        Core::Logger::GetInstance().Info("=== CAR CREATION DEBUG ===");
+        Core::Logger::GetInstance().Info("Car renderers count: " + std::to_string(car.renderers.size()));
+        Core::Logger::GetInstance().Info("Car instanceData pointer: " + std::to_string(reinterpret_cast<uintptr_t>(car.instanceData.get())));
+        if (car.renderers.size() > 0)
+        {
+            Core::Logger::GetInstance().Info("Car renderer[0] instanceData pointer: " +
+                                             std::to_string(reinterpret_cast<uintptr_t>(car.renderers[0].GetInstances().get())));
+            Core::Logger::GetInstance().Info("Same pointer? " + std::string(car.instanceData.get() == car.renderers[0].GetInstances().get() ? "YES" : "NO"));
+            Core::Logger::GetInstance().Info("Car renderer[0] VAO: " + std::to_string(car.renderers[0].GetMesh()->GetVAO()));
+            Core::Logger::GetInstance().Info("Car renderer[0] HasTexture: " + std::string(car.renderers[0].HasTexture() ? "YES" : "NO"));
+            Core::Logger::GetInstance().Info("Car renderer[0] InstanceCount: " + std::to_string(car.renderers[0].GetInstanceCount()));
+
+            // 检查所有渲染器的VAO
+            for (size_t i = 0; i < car.renderers.size(); ++i)
+            {
+                Core::Logger::GetInstance().Info("Car renderer[" + std::to_string(i) + "] VAO: " +
+                                                 std::to_string(car.renderers[i].GetMesh()->GetVAO()) +
+                                                 " Vertices: " + std::to_string(car.renderers[i].GetMesh()->GetVertexCount()) +
+                                                 " Indices: " + std::to_string(car.renderers[i].GetMesh()->GetIndexCount()));
+            }
+        }
+        Core::Logger::GetInstance().Info("===========================");
+
+        // ========================================
         // 注册键盘回调
         // ========================================
 
@@ -1490,6 +1575,68 @@ int main()
                 }
             }
 
+            // ✅ 更新车位置（真实驾驶模式 - 以后轮中心为转弯中心）
+            if (car.renderers.size() > 0)
+            {
+                float time = static_cast<float>(glfwGetTime());
+
+                // 更复杂的随机轨迹：叠加多个正弦波
+                float carX = std::sin(time * car.speed * 0.3f) * car.orbitRadius +
+                            std::sin(time * car.speed * 0.7f) * car.orbitRadius * 0.3f +
+                            std::cos(time * car.speed * 0.2f) * car.orbitRadius * 0.2f;
+
+                float carZ = std::sin(time * car.speed * 0.5f) * car.orbitRadius * 0.7f +
+                            std::cos(time * car.speed * 0.4f) * car.orbitRadius * 0.4f;
+
+                // 计算速度方向（切线方向）用于车头朝向
+                float velocityX = std::cos(time * car.speed * 0.3f) * car.orbitRadius * 0.3f +
+                                 std::cos(time * car.speed * 0.7f) * car.orbitRadius * 0.21f -
+                                 std::sin(time * car.speed * 0.2f) * car.orbitRadius * 0.04f;
+
+                float velocityZ = std::cos(time * car.speed * 0.5f) * car.orbitRadius * 0.35f -
+                                 std::sin(time * car.speed * 0.4f) * car.orbitRadius * 0.16f;
+
+                // 车头朝向：根据速度方向计算
+                float carRotation = -glm::degrees(std::atan2(velocityX, velocityZ));
+
+                // 计算侧倾效果（转弯时车身倾斜）
+                float lateralAccel = std::sin(time * car.speed * 0.3f) * std::cos(time * car.speed * 0.2f);
+                float carRoll = lateralAccel * 4.0f;  // 最大4度侧倾
+
+                // 计算俯仰效果（加速/减速时的车身俯仰）
+                float pitchAccel = std::cos(time * car.speed * 0.6f) * 0.5f;
+                float carPitch = pitchAccel * 2.0f;  // 最大2度俯仰
+
+                // ⭐ 关键：以后轮中心为移动中心
+                // 真实汽车转弯时，后轮中心是转弯支点，前轮转向
+                // 我们需要将车向车头方向偏移轴距的一半
+                float headingRadians = glm::radians(carRotation);
+                float forwardOffset = car.wheelbase * 0.5f;  // 向前偏移半个轴距
+
+                float finalCarX = carX + std::sin(headingRadians) * forwardOffset;
+                float finalCarZ = carZ - std::cos(headingRadians) * forwardOffset;
+
+                // 更新实例矩阵
+                auto &matrices = car.instanceData->GetModelMatrices();
+
+                if (!matrices.empty())
+                {
+                    glm::mat4 model = glm::mat4(1.0f);
+                    // 位置：使用偏移后的坐标（让后轮中心在计算位置，车身向前）
+                    model = glm::translate(model, glm::vec3(finalCarX, car.groundY, finalCarZ));
+                    // 旋转：先俯仰（绕X轴），再侧倾（绕Z轴），最后转向（绕Y轴）
+                    model = glm::rotate(model, glm::radians(carPitch), glm::vec3(1.0f, 0.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(carRoll), glm::vec3(0.0f, 0.0f, 1.0f));
+                    model = glm::rotate(model, glm::radians(carRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+                    // 缩放
+                    model = glm::scale(model, glm::vec3(car.carScale));
+                    matrices[0] = model;
+
+                    // 标记为脏数据
+                    car.instanceData->MarkDirty();
+                }
+            }
+
             // 更新实例数据到GPU
             // 索引顺序：floor=0, cube=1, sphere=2, torus=3, platform=4, bunny=5+
             const size_t cubeIndex = 1;
@@ -1640,6 +1787,52 @@ int main()
             // 修复前：逐个渲染（46个渲染器 × 4次状态切换 = 184次状态切换/帧）
             // 修复后：按纹理分组批量渲染（状态切换减少60-70%）
             Renderer::InstancedRenderer::RenderBatch(discoStage.renderers);
+
+            // ========================================
+            // 渲染行驶的车 - ✅ 放在最后渲染，确保不被遮挡
+            // ========================================
+            if (car.renderers.size() > 0)
+            {
+                // 更新车实例数据到GPU
+                for (auto &renderer : car.renderers)
+                {
+                    renderer.UpdateInstanceData();
+                }
+
+                // ⭐ 关键修复：所有渲染器更新完毕后，统一清除脏标记
+                // 避免第一个渲染器清除标记后，其余渲染器跳过更新
+                if (car.instanceData && car.instanceData->IsDirty())
+                {
+                    car.instanceData->ClearDirty();
+                }
+
+                // 渲染车的所有材质
+                for (const auto &carRenderer : car.renderers)
+                {
+                    if (carRenderer.GetInstanceCount() > 0)
+                    {
+                        ambientShader.SetBool("useTexture", carRenderer.HasTexture());
+                        ambientShader.SetBool("useInstanceColor", false);  // 使用材质颜色
+                        ambientShader.SetVec3("objectColor", carRenderer.GetMaterialColor());
+                        carRenderer.Render();
+                    }
+                }
+
+                // 调试：每5秒输出一次渲染信息
+                static int renderDebugCount = 0;
+                if (++renderDebugCount % 300 == 0)
+                {
+                    Core::Logger::GetInstance().Info("=== CAR RENDER DEBUG ===");
+                    Core::Logger::GetInstance().Info("Rendering car with " + std::to_string(car.renderers.size()) + " renderers");
+                    for (size_t i = 0; i < car.renderers.size(); ++i)
+                    {
+                        Core::Logger::GetInstance().Info("  Renderer " + std::to_string(i) +
+                                                         " HasTexture: " + (car.renderers[i].HasTexture() ? "YES" : "NO") +
+                                                         " InstanceCount: " + std::to_string(car.renderers[i].GetInstanceCount()));
+                    }
+                    Core::Logger::GetInstance().Info("========================");
+                }
+            }
 
             // ========================================
             // 交换缓冲区和事件处理

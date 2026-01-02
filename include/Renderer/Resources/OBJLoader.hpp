@@ -36,11 +36,16 @@ namespace Renderer
     {
         size_t operator()(const VertexKey& k) const noexcept
         {
+            // ✅ 修复：正确处理 -1（表示无属性）
+            // 将 -1 映射到一个特殊标记值（比如 0x7FFFFF）
+            size_t vi = (k.vi == -1) ? 0x7FFFFF : static_cast<size_t>(k.vi);
+            size_t ni = (k.ni == -1) ? 0x7FFFFF : static_cast<size_t>(k.ni);
+            size_t ti = (k.ti == -1) ? 0x7FFFFF : static_cast<size_t>(k.ti);
+
             // 完美哈希：每个 21 位，左移避免重叠
             // OBJ 索引范围：0-1M（20 位），21 位足够
-            return (static_cast<size_t>(k.vi) << 42) |
-                   (static_cast<size_t>(k.ni) << 21) |
-                   (static_cast<size_t>(k.ti));
+            // 使用 0x7FFFFF 作为 -1 的标记值（21位全1）
+            return (vi << 42) | (ni << 21) | ti;
         }
     };
 

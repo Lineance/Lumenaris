@@ -103,6 +103,7 @@ namespace Renderer
         // 修复后：相同纹理的渲染器批量渲染（状态切换减少60-70%）
         static void RenderBatch(const std::vector<InstancedRenderer*>& renderers);
         static void RenderBatch(const std::vector<std::unique_ptr<InstancedRenderer>>& renderers);
+        static void RenderBatch(const std::vector<InstancedRenderer>& renderers);  // ✅ 新增：支持值类型 vector
 
         // 禁用拷贝（防止OpenGL资源双重释放）
         InstancedRenderer(const InstancedRenderer&) = delete;
